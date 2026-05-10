@@ -13,68 +13,99 @@ Dự án xây dựng một hệ thống AI Agent hỗ trợ nhân viên nội b�
 
 ---
 
-## ASCII Flow — Luồng nghiệp vụ MVP
+## ASCII Flow — Luồng nghiệp vụ MVP (Cải thiện)
 
-KHÁCH HÀNG
-|
-v
-[Zalo cá nhân]
-| (copy/forward)
-v
-[Nhân viên]
-|
-v
-[Telegram Agent] --------+
-| |
-| Tạo booking case|
-v |
-[Database] |
-| |
-v |
-[BullMQ + Redis Queue] |
-| |
-v |
-[Playwright Worker] |
-| |
-v |
-[1Booking Dashboard] |
-| |
-v |
-[Screenshot + Flight Options]
-|
-v
-[Telegram Agent] <----+
-| |
-v |
-[Nhân viên] |
-| |
-v |
-[Zalo cá nhân] --------+
-|
-v
-KHÁCH HÀNG chọn chuyến
-|
-v
-[Nhân viên gửi lựa chọn vào Telegram]
-|
-v
-[Agent match chuyến]
-|
-v
-[BullMQ job: hold booking]
-|
-v
-[Playwright Worker chọn chuyến + giữ chỗ]
-|
-v
-[PNR code]
-|
-v
-[Telegram Agent trả về]
-|
-v
-[Nhân viên gửi PNR cho khách trên Zalo]
-
++-------------------+
+| KHÁCH HÀNG        |
++-------------------+
+          |
+          v
++-------------------+
+| Zalo cá nhân       |  <- Khách nhắn, nhân viên copy/forward
++-------------------+
+          |
+          v
++-------------------+
+| Nhân viên          |  <- Kiểm tra và gửi yêu cầu vào Telegram Agent
++-------------------+
+          |
+          v
++-------------------+
+| Telegram Agent     |
++-------------------+
+          |
+          |  Tạo booking case & lưu DB
+          v
++-------------------+
+| Database / Case    |
++-------------------+
+          |
+          |  Đẩy job vào Queue
+          v
++-------------------+
+| BullMQ + Redis     |
++-------------------+
+          |
+          v
++-------------------+
+| Playwright Worker  |
+| (1Booking search)  |
++-------------------+
+          |
+          v
++-------------------+
+| Screenshot + Flight Options |
++-------------------+
+          |
+          v
++-------------------+
+| Telegram Agent     |
++-------------------+
+          |
+          v
++-------------------+
+| Nhân viên          |  <- Nhận screenshot, gửi lại cho khách trên Zalo
++-------------------+
+          |
+          v
++-------------------+
+| KHÁCH HÀNG chọn chuyến |
++-------------------+
+          |
+          v
++-------------------+
+| Nhân viên nhập lựa chọn vào Telegram |
++-------------------+
+          |
+          v
++-------------------+
+| Agent match chuyến |
++-------------------+
+          |
+          v
++-------------------+
+| BullMQ job: hold booking |
++-------------------+
+          |
+          v
++-------------------+
+| Playwright Worker (chọn chuyến + giữ chỗ) |
++-------------------+
+          |
+          v
++-------------------+
+| PNR code          |
++-------------------+
+          |
+          v
++-------------------+
+| Telegram Agent trả về |
++-------------------+
+          |
+          v
++-------------------+
+| Nhân viên gửi PNR cho khách trên Zalo |
++-------------------+
 
 ---
 
