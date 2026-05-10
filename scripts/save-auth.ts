@@ -3,7 +3,7 @@ import {
   ONE_BOOKING_STORAGE_STATE_PATH,
   ONE_BOOKING_URL,
   ONE_BOOKING_VIEWPORT,
-} from './src/automation/1booking/constants';
+} from '../src/automation/1booking/constants';
 
 async function main() {
   const browser = await chromium.launch({ headless: false }); //open chrome browser with headless mode false
