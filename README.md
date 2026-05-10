@@ -136,6 +136,22 @@ Dự án xây dựng một hệ thống AI Agent hỗ trợ nhân viên nội b�
 
 ---
 
+## Viewport Policy (Rất quan trọng - Nhất quán layout để playwright có thể chạy ổn)
+
+1Booking là web app responsive, nên automation có thể fail nếu viewport thay đổi.
+
+Toàn bộ Playwright flows phải chạy với viewport cố định:
+
+- width: 1440
+- height: 900
+- deviceScaleFactor: 1
+
+Các flow codegen, save-auth, search-flights, screenshot và hold-booking phải dùng cùng viewport này.
+
+Không dùng viewport mặc định hoặc viewport phụ thuộc kích thước màn hình thật trong production.
+
+---
+
 ## Cấu trúc folder gợi ý
 
 /apps
