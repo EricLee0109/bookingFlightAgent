@@ -1,5 +1,15 @@
 import { type Page } from 'playwright';
 
+function parseFlightResultCount(text: string) {
+  const match = text.match(/tìm thấy\s+(\d+)\s+kết quả/i);
+
+  if (!match) {
+    return null;
+  }
+
+  return Number(match[1]);
+}
+
 export async function waitForLoadingOverlayToDisappear(page: Page) {
   const possibleLoadingOverlays = [
     '.ant-spin',
@@ -27,22 +37,57 @@ export async function waitForLoadingOverlayToDisappear(page: Page) {
 }
 
 export async function waitForFlightResultsReady(page: Page) {
-  const flightCards = page.locator('div').filter({
-    hasText: /Chuyến đang chọn/,
-  });
+  await waitForLoadingOverlayToDisappear(page);
 
-  await flightCards.first().waitFor({
+  const resultSummary = page
+    .locator('div')
+    .filter({
+      hasText: /tìm thấy\s+\d+\s+kết quả/i,
+    })
+    .last();
+
+  await resultSummary.waitFor({
     state: 'visible',
     timeout: 30000,
   });
 
-  const count = await flightCards.count();
+  const summaryText = await resultSummary.innerText();
+  const countFromSummary = parseFlightResultCount(summaryText);
 
-  if (count < 1) {
+  if (countFromSummary === null) {
+    throw new Error(`Could not parse flight result count from: ${summaryText}`);
+  }
+
+  if (countFromSummary < 1) {
     throw new Error('Expected at least 1 flight result, but found 0.');
   }
 
-  await waitForLoadingOverlayToDisappear(page);
+  const flightOptions = page
+    .getByRole('list', { name: /Single ticket options/i })
+    .locator(':scope > div');
+
+  await flightOptions.first().waitFor({
+    state: 'visible',
+    timeout: 30000,
+  });
+
+  const visibleFlightOptionCount = await flightOptions.evaluateAll((elements) =>
+    elements.filter(
+      (element) =>
+        element instanceof HTMLElement &&
+        Boolean(
+          element.offsetWidth ||
+            element.offsetHeight ||
+            element.getClientRects().length,
+        ),
+    ).length,
+  );
+
+  if (visibleFlightOptionCount !== countFromSummary) {
+    throw new Error(
+      `Flight result count mismatch. Summary says ${countFromSummary}, but found ${visibleFlightOptionCount} visible option(s).`,
+    );
+  }
 
   await page.waitForLoadState('networkidle', {
     timeout: 10000,
@@ -51,5 +96,5 @@ export async function waitForFlightResultsReady(page: Page) {
   // Small render-stabilization delay before screenshot.
   await page.waitForTimeout(1500);
 
-  return count;
+  return countFromSummary;
 }

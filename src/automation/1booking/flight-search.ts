@@ -2,7 +2,7 @@ import { type Page } from 'playwright';
 import { ONE_BOOKING_URL } from './constants';
 import { selectAirport } from './airports';
 import { waitForFlightResultsReady } from './waiters';
-import { takeFullPageScreenshot } from './screenshots';
+import { takeFlightResultsScreenshot } from './screenshots';
 
 export type SearchFlightsInput = {
     fromAirportCode: string;
@@ -41,10 +41,9 @@ export async function searchFlights(
     // Finds the Search Button to search flights
     await page.locator('button.ant-btn.w-20.xl\\:flex').click(); //technical debt - if have better way to find the search button, fix later
 
-    //   Assert flight results are ready
-    const flightCount = await waitForFlightResultsReady(page); //test result not right - fix later
+    const flightCount = await waitForFlightResultsReady(page);
 
-    const screenshotPath = await takeFullPageScreenshot(
+    const screenshotPath = await takeFlightResultsScreenshot(
         page,
         '1booking-search-flights.png',
     );

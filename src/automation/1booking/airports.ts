@@ -11,6 +11,21 @@ export async function clickVisibleAirportOption(page: Page, airportText: string)
     hasText: airportText,
   });
 
+  await page.waitForFunction(
+    (text) =>
+      Array.from(document.querySelectorAll('p')).some((element) => {
+        const isVisible = Boolean(
+          element.offsetWidth ||
+            element.offsetHeight ||
+            element.getClientRects().length,
+        );
+
+        return isVisible && element.textContent?.includes(text);
+      }),
+    airportText,
+    { timeout: 10000 },
+  );
+
   const count = await options.count();
 
   for (let i = 0; i < count; i++) {
