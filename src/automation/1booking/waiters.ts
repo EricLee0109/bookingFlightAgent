@@ -28,7 +28,7 @@ export async function waitForLoadingOverlayToDisappear(page: Page) {
 
 export async function waitForFlightResultsReady(page: Page) {
   const flightCards = page.locator('div').filter({
-    hasText: /Bay thẳng|HAN\s*-\s*SGN|SGN\s*-\s*HAN/i,
+    hasText: /Chuyến đang chọn/,
   });
 
   await flightCards.first().waitFor({

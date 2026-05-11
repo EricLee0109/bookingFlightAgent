@@ -176,16 +176,30 @@ git clone <repo-url>
 cd <project>
 Cài dependencies:
 npm install
-# hoặc pnpm install
+# or pnpm install
+
+---
+
 Chạy backend API:
 npm run start:api
+
+---
+
 Chạy Playwright Worker:
 npm run start:worker
+
+---
+
 Chạy Telegram Bot (nhận request từ nhân viên):
 npm run start:telegram
+
+---
+
 Test Playwright với site demo / 1Booking (cần session login):
 npx tsx scripts/save-auth.ts
 npx tsx scripts/test-1booking-auth.ts
+
+---
 Phần mở rộng (Phase sau MVP)
 Tích hợp Zalo OA để Agent gửi screenshot/lịch trình trực tiếp cho khách.
 Auto Mode: Agent tự search, match, hold mà không cần nhân viên bấm tay (có toggle bật/tắt).
@@ -193,8 +207,11 @@ Dashboard đầy đủ cho quản lý booking case, trạng thái, audit logs.
 Multi-operator và RBAC nếu công ty cần nhiều người quản lý Agent.
 Realtime notifications, analytics, báo cáo.
 Vector DB / RAG nếu muốn Agent học rules nghiệp vụ hoặc FAQ hãng bay.
+
+---
+
 Ghi chú quan trọng
 MVP chỉ dùng Telegram làm kênh nội bộ.
 Zalo cá nhân vẫn giữ cho khách cũ, Agent không auto gửi cho khách trong MVP.
 1Booking không có public API, Playwright là cách duy nhất để automation trong MVP.
-Session/state Playwright nên lưu sau login thủ công để tránh login lại nhiều lần.
+Session/state Playwright lưu auth-state sau login thủ công để tránh login lại nhiều lần. (npx tsx scripts/save-auth.ts)

@@ -7,10 +7,10 @@ async function main() {
 
   try {
     const result = await searchFlights(page, {
-      fromAirportCode: 'HAN',
-      fromAirportText: 'Sân bay Nội Bài (HAN)',
-      toAirportCode: 'SGN',
-      toAirportText: 'Sân bay Tân Sơn Nhất (SGN)',
+      fromAirportCode: 'SGN',
+      fromAirportText: 'Sân bay Tân Sơn Nhất (SGN)',
+      toAirportCode: 'HAN',
+      toAirportText: 'Sân bay Nội Bài (HAN)',
     });
 
     console.log(
