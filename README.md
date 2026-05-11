@@ -200,6 +200,7 @@ npx tsx scripts/save-auth.ts
 npx tsx scripts/test-1booking-auth.ts
 
 ---
+
 Phần mở rộng (Phase sau MVP)
 Tích hợp Zalo OA để Agent gửi screenshot/lịch trình trực tiếp cho khách.
 Auto Mode: Agent tự search, match, hold mà không cần nhân viên bấm tay (có toggle bật/tắt).
