@@ -1,6 +1,6 @@
 #gitignore
 node_modules
-auth/*.json
+1booking-storage-state.json.json
 test-results
 screenshots
 
