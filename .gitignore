@@ -1,7 +1,7 @@
 #gitignore
+.env
 node_modules
-auth/*.json
+auth/
 test-results
-screenshots
-
-
+screenshots/
+.pnpm-store/

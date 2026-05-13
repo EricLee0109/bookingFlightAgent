@@ -4,15 +4,24 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "telegram:dev": "tsx scripts/start-telegram-agent.ts",
+    "test:e2e:1booking": "playwright test tests/1booking-search.e2e.spec.ts",
+    "test:e2e:1booking:headed": "playwright test tests/1booking-search.e2e.spec.ts --headed"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "@playwright/test": "^1.59.1",
+  "@playwright/test": "^1.59.1",
     "@types/node": "^25.6.2",
-    "playwright": "^1.59.1"
+    "@types/node-telegram-bot-api": "^0.64.14",
+    "playwright": "^1.59.1",
+    "tsx": "^4.21.0"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "node-telegram-bot-api": "^0.67.0",
+    "zod": "^4.4.3"
   }
 }

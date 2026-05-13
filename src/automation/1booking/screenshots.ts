@@ -2,12 +2,23 @@ import fs from 'node:fs/promises';
 import { type Page } from 'playwright';
 import { SCREENSHOT_DIR } from './constants';
 
+/**
+ * Ensures the local screenshot output directory exists.
+ *
+ * This component owns filesystem preparation for screenshots only.
+ */
 export async function ensureScreenshotDir() {
   await fs.mkdir(SCREENSHOT_DIR, {
     recursive: true,
   });
 }
 
+/**
+ * Captures the current full page.
+ *
+ * This component is used for debugging/failure evidence, not for
+ * customer-facing flight option images.
+ */
 export async function takeFullPageScreenshot(page: Page, fileName: string) {
   await ensureScreenshotDir();
 
@@ -21,6 +32,13 @@ export async function takeFullPageScreenshot(page: Page, fileName: string) {
   return path;
 }
 
+/**
+ * Captures only the rendered 1Booking flight result list.
+ *
+ * This component owns customer-facing search screenshots. It temporarily grows
+ * the viewport so all returned flight cards are painted, captures the list, then
+ * restores the original viewport for the rest of the automation flow.
+ */
 export async function takeFlightResultsScreenshot(page: Page, fileName: string) {
   await ensureScreenshotDir();
 

@@ -1,4 +1,4 @@
-import { type Page } from 'playwright';
+import { type Locator, type Page } from 'playwright';
 
 function parseFlightResultCount(text: string) {
   const match = text.match(/tìm thấy\s+(\d+)\s+kết quả/i);
@@ -10,6 +10,50 @@ function parseFlightResultCount(text: string) {
   return Number(match[1]);
 }
 
+async function countRenderedFlightOptions(flightOptions: Locator) {
+  return flightOptions.evaluateAll((elements) =>
+    elements.filter(
+      (element) =>
+        element instanceof HTMLElement &&
+        Boolean(
+          element.offsetWidth ||
+            element.offsetHeight ||
+            element.getClientRects().length,
+        ),
+    ).length,
+  );
+}
+
+async function waitForFlightOptionsCount(
+  page: Page,
+  flightOptions: Locator,
+  expectedCount: number,
+) {
+  const timeoutMs = 30000;
+  const startedAt = Date.now();
+  let renderedCount = 0;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    renderedCount = await countRenderedFlightOptions(flightOptions);
+
+    if (renderedCount >= expectedCount) {
+      return renderedCount;
+    }
+
+    await page.waitForTimeout(500);
+  }
+
+  throw new Error(
+    `Flight result count mismatch after waiting. Summary says ${expectedCount}, but found ${renderedCount} rendered option(s).`,
+  );
+}
+
+/**
+ * Waits for common 1Booking loading indicators to disappear.
+ *
+ * This component owns UI loading synchronization only. It does not decide
+ * whether search results are valid.
+ */
 export async function waitForLoadingOverlayToDisappear(page: Page) {
   const possibleLoadingOverlays = [
     '.ant-spin',
@@ -36,6 +80,14 @@ export async function waitForLoadingOverlayToDisappear(page: Page) {
   }
 }
 
+/**
+ * Waits until 1Booking flight results are fully rendered and safe to screenshot.
+ *
+ * This component owns result readiness:
+ * - reads the summary count from the 1Booking UI
+ * - waits for the rendered flight cards to catch up
+ * - fails when the page still looks incomplete after the bounded wait
+ */
 export async function waitForFlightResultsReady(page: Page) {
   await waitForLoadingOverlayToDisappear(page);
 
@@ -71,19 +123,13 @@ export async function waitForFlightResultsReady(page: Page) {
     timeout: 30000,
   });
 
-  const visibleFlightOptionCount = await flightOptions.evaluateAll((elements) =>
-    elements.filter(
-      (element) =>
-        element instanceof HTMLElement &&
-        Boolean(
-          element.offsetWidth ||
-            element.offsetHeight ||
-            element.getClientRects().length,
-        ),
-    ).length,
+  const visibleFlightOptionCount = await waitForFlightOptionsCount(
+    page,
+    flightOptions,
+    countFromSummary,
   );
 
-  if (visibleFlightOptionCount !== countFromSummary) {
+  if (visibleFlightOptionCount > countFromSummary) {
     throw new Error(
       `Flight result count mismatch. Summary says ${countFromSummary}, but found ${visibleFlightOptionCount} visible option(s).`,
     );

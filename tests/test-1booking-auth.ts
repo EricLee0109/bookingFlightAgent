@@ -11,6 +11,7 @@ async function main() {
       fromAirportText: 'Sân bay Tân Sơn Nhất (SGN)',
       toAirportCode: 'HAN',
       toAirportText: 'Sân bay Nội Bài (HAN)',
+      departureDate: '2026-05-13',
     });
 
     console.log(
