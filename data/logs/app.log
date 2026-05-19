@@ -43,3 +43,8 @@ Call log:
 2026-05-19T08:30:01.283Z WARN flight_request_missing_fields case=BK-20260519-152959 Missing fields: toAirportCode, toAirportText
 2026-05-19T08:42:36.925Z INFO telegram_request_received case=BK-20260519-154236 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
 2026-05-19T08:42:58.454Z INFO one_booking_search_completed case=BK-20260519-154236 1Booking search completed. meta={"flightCount":7,"screenshotPath":"screenshots/1booking-search-flights.png"}
+2026-05-19T08:59:36.475Z INFO telegram_request_received case=BK-20260519-155936 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-05-19T09:01:53.569Z ERROR one_booking_search_failed case=BK-20260519-155936 locator.waitFor: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('div').filter({ hasText: /tìm thấy\s+\d+\s+kết quả/i }).last() to be visible[22m
+ meta={"errorScreenshotPath":"screenshots/1booking-telegram-search-failed.png"}

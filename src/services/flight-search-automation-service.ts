@@ -2,6 +2,7 @@ import { createOneBookingBrowserSession } from '../automation/1booking/browser';
 import { searchFlights } from '../automation/1booking/flight-search';
 import { type SearchFlightsInput } from '../automation/1booking/search-flight-input';
 import { takeFullPageScreenshot } from '../automation/1booking/screenshots';
+import { isRetryableOneBookingSearchError } from '../automation/1booking/waiters';
 import { runWithAutomationLock } from '../utils/automation-lock';
 
 export type FlightSearchAutomationResult =
@@ -13,8 +14,10 @@ export type FlightSearchAutomationResult =
   | {
       ok: false;
       message: string;
-      errorScreenshotPath: string | null;
+    errorScreenshotPath: string | null;
     };
+
+const MAX_ONE_BOOKING_SEARCH_ATTEMPTS = 2;
 
 /**
  * Runs a validated 1Booking flight search with browser lifecycle management.
@@ -44,34 +47,50 @@ export async function searchOneBookingFlights(
 async function searchOneBookingFlightsUnlocked(
   input: SearchFlightsInput,
 ): Promise<FlightSearchAutomationResult> {
-  const { browser, page } = await createOneBookingBrowserSession();
+  let lastError: unknown = null;
+  let lastErrorScreenshotPath: string | null = null;
 
-  try {
-    const result = await searchFlights(page, input);
-
-    return {
-      ok: true,
-      flightCount: result.flightCount,
-      screenshotPath: result.screenshotPath,
-    };
-  } catch (error) {
-    let errorScreenshotPath: string | null = null;
+  for (let attempt = 1; attempt <= MAX_ONE_BOOKING_SEARCH_ATTEMPTS; attempt++) {
+    const { browser, page } = await createOneBookingBrowserSession();
 
     try {
-      errorScreenshotPath = await takeFullPageScreenshot(
-        page,
-        '1booking-telegram-search-failed.png',
-      );
-    } catch {
-      errorScreenshotPath = null;
-    }
+      const result = await searchFlights(page, input);
 
-    return {
-      ok: false,
-      message: error instanceof Error ? error.message : 'Unknown 1Booking automation error.',
-      errorScreenshotPath,
-    };
-  } finally {
-    await browser.close();
+      return {
+        ok: true,
+        flightCount: result.flightCount,
+        screenshotPath: result.screenshotPath,
+      };
+    } catch (error) {
+      lastError = error;
+
+      try {
+        lastErrorScreenshotPath = await takeFullPageScreenshot(
+          page,
+          `1booking-telegram-search-failed-attempt-${attempt}.png`,
+        );
+      } catch {
+        lastErrorScreenshotPath = null;
+      }
+
+      const shouldRetry =
+        isRetryableOneBookingSearchError(error) &&
+        attempt < MAX_ONE_BOOKING_SEARCH_ATTEMPTS;
+
+      if (!shouldRetry) {
+        break;
+      }
+    } finally {
+      await browser.close();
+    }
   }
+
+  return {
+    ok: false,
+    message:
+      lastError instanceof Error
+        ? lastError.message
+        : 'Unknown 1Booking automation error.',
+    errorScreenshotPath: lastErrorScreenshotPath,
+  };
 }

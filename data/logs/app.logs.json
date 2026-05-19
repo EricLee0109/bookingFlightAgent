@@ -396,5 +396,26 @@
       "screenshotPath": "screenshots/1booking-search-flights.png"
     },
     "timestamp": "2026-05-19T08:42:58.454Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260519-155936",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-05-19T08:59:36.475Z"
+  },
+  {
+    "level": "error",
+    "event": "one_booking_search_failed",
+    "caseId": "BK-20260519-155936",
+    "message": "locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('div').filter({ hasText: /tìm thấy\\s+\\d+\\s+kết quả/i }).last() to be visible\u001b[22m\n",
+    "meta": {
+      "errorScreenshotPath": "screenshots/1booking-telegram-search-failed.png"
+    },
+    "timestamp": "2026-05-19T09:01:53.569Z"
   }
 ]

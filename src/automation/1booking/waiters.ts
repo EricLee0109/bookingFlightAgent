@@ -1,5 +1,21 @@
 import { type Locator, type Page } from 'playwright';
 
+export class RetryableOneBookingSearchError extends Error {
+  readonly retryable = true;
+}
+
+/**
+ * Checks whether an automation error is safe to retry with the same search input.
+ */
+export function isRetryableOneBookingSearchError(error: unknown) {
+  return (
+    error instanceof RetryableOneBookingSearchError ||
+    (error instanceof Error &&
+      'retryable' in error &&
+      error.retryable === true)
+  );
+}
+
 /**
  * Fails fast when 1Booking shows the login modal during automation.
  *
@@ -71,6 +87,42 @@ async function waitForFlightOptionsCount(
 
   throw new Error(
     `Flight result count mismatch after waiting. Summary says ${expectedCount}, but found ${renderedCount} rendered option(s).`,
+  );
+}
+
+async function hasVisibleProviderSearchLoading(page: Page) {
+  const providerLoadingText = page
+    .getByText(/Đang tìm hệ thống|Dang tim he thong/i)
+    .first();
+
+  return providerLoadingText
+    .isVisible({
+      timeout: 500,
+    })
+    .catch(() => false);
+}
+
+/**
+ * Waits for provider-level background fetching to finish after cards appear.
+ *
+ * 1Booking can render partial flight results while one provider is still loading.
+ * Customer screenshots should not include those skeleton/loading rows. If the
+ * provider fetch stays stuck, the caller can retry the same search input.
+ */
+export async function waitForProviderSearchToSettle(page: Page) {
+  const timeoutMs = 30000;
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    if (!(await hasVisibleProviderSearchLoading(page))) {
+      return;
+    }
+
+    await page.waitForTimeout(1000);
+  }
+
+  throw new RetryableOneBookingSearchError(
+    '1Booking provider search is still loading after 30s. Retrying the same SearchFlightsInput may recover.',
   );
 }
 
@@ -160,6 +212,8 @@ export async function waitForFlightResultsReady(page: Page) {
       `Flight result count mismatch. Summary says ${countFromSummary}, but found ${visibleFlightOptionCount} visible option(s).`,
     );
   }
+
+  await waitForProviderSearchToSettle(page);
 
   await page.waitForLoadState('networkidle', {
     timeout: 10000,
