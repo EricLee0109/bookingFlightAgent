@@ -1,0 +1,180 @@
+[
+  {
+    "level": "info",
+    "event": "smoke_test",
+    "message": "storage smoke test",
+    "timestamp": "2026-05-17T08:17:06.165Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260517-162541",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-05-17T09:25:41.323Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260517-162614",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-05-17T09:26:14.974Z"
+  },
+  {
+    "level": "error",
+    "event": "one_booking_search_failed",
+    "caseId": "BK-20260517-162614",
+    "message": "Automation is busy. Current task: 1booking-search-flights.",
+    "meta": {
+      "errorScreenshotPath": null
+    },
+    "timestamp": "2026-05-17T09:26:16.120Z"
+  },
+  {
+    "level": "error",
+    "event": "one_booking_search_failed",
+    "caseId": "BK-20260517-162541",
+    "message": "locator.waitFor: Target page, context or browser has been closed\nCall log:\n\u001b[2m  - waiting for locator('div').filter({ hasText: /tìm thấy\\s+\\d+\\s+kết quả/i }).last() to be visible\u001b[22m\n",
+    "meta": {
+      "errorScreenshotPath": null
+    },
+    "timestamp": "2026-05-17T09:26:29.962Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260517-162749",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-05-17T09:27:49.551Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_search_completed",
+    "caseId": "BK-20260517-162749",
+    "message": "1Booking search completed.",
+    "meta": {
+      "flightCount": 18,
+      "screenshotPath": "screenshots/1booking-search-flights.png"
+    },
+    "timestamp": "2026-05-17T09:28:03.258Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260517-162821",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-05-17T09:28:21.830Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260517-162825",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-05-17T09:28:25.192Z"
+  },
+  {
+    "level": "error",
+    "event": "one_booking_search_failed",
+    "caseId": "BK-20260517-162825",
+    "message": "Automation is busy. Current task: 1booking-search-flights.",
+    "meta": {
+      "errorScreenshotPath": null
+    },
+    "timestamp": "2026-05-17T09:28:26.289Z"
+  },
+  {
+    "level": "error",
+    "event": "one_booking_search_failed",
+    "caseId": "BK-20260517-162821",
+    "message": "locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('div').filter({ hasText: /tìm thấy\\s+\\d+\\s+kết quả/i }).last() to be visible\u001b[22m\n",
+    "meta": {
+      "errorScreenshotPath": "screenshots/1booking-telegram-search-failed.png"
+    },
+    "timestamp": "2026-05-17T09:28:59.037Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260517-163324",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-05-17T09:33:24.468Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_search_completed",
+    "caseId": "BK-20260517-163324",
+    "message": "1Booking search completed.",
+    "meta": {
+      "flightCount": 17,
+      "screenshotPath": "screenshots/1booking-search-flights.png"
+    },
+    "timestamp": "2026-05-17T09:33:37.327Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260517-215308",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-05-17T14:53:08.468Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_search_completed",
+    "caseId": "BK-20260517-215308",
+    "message": "1Booking search completed.",
+    "meta": {
+      "flightCount": 3,
+      "screenshotPath": "screenshots/1booking-search-flights.png"
+    },
+    "timestamp": "2026-05-17T14:53:27.503Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260519-092808",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-05-19T02:28:08.626Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_search_completed",
+    "caseId": "BK-20260519-092808",
+    "message": "1Booking search completed.",
+    "meta": {
+      "flightCount": 35,
+      "screenshotPath": "screenshots/1booking-search-flights.png"
+    },
+    "timestamp": "2026-05-19T02:28:35.588Z"
+  }
+]

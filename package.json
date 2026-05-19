@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "telegram:dev": "tsx scripts/start-telegram-agent.ts",
+    "save-auth:dev": "tsx scripts/save-auth.ts",
     "test:e2e:1booking": "playwright test tests/1booking-search.e2e.spec.ts",
     "test:e2e:1booking:headed": "playwright test tests/1booking-search.e2e.spec.ts --headed"
   },

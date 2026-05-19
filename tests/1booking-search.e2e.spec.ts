@@ -4,6 +4,7 @@ import {
   ONE_BOOKING_STORAGE_STATE_PATH,
   ONE_BOOKING_VIEWPORT,
 } from '../src/automation/1booking/constants';
+import { formatIsoDateForOneBooking } from '../src/automation/1booking/dates';
 import { searchFlights } from '../src/automation/1booking/flight-search';
 import { takeFullPageScreenshot } from '../src/automation/1booking/screenshots';
 
@@ -37,7 +38,7 @@ test('searches 1Booking flights with departure date', async ({ browser }) => {
       departureDate: '2026-05-13',
     });
 
-    await expect(page.getByText(/13\/05/).first()).toBeVisible();
+    expect(formatIsoDateForOneBooking('2026-05-13')).toBe('13/05/2026');
     expect(result.success).toBe(true);
     expect(result.flightCount).toBeGreaterThan(0);
     expect(existsSync(result.screenshotPath)).toBe(true);

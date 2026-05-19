@@ -12,3 +12,24 @@ These rules are mandatory for future implementation in this project.
 8. All automation must use the shared 1Booking viewport.
 9. Long polling is only for local MVP Telegram Bot integration and for passing values into `searchFlights()`.
 10. Future webhook migration must only change the transport layer. Do not rewrite parser, validation, mapper, or automation business logic.
+
+## Lean Internal-Agent Scope
+
+Keep:
+- Telegram Bot Long Polling
+- Playwright automation
+- AI parser / mock parser boundary
+- Local screenshots for debug
+- Local JSON settings
+- Local case memory files
+- Telegram commands for settings
+- In-memory automation lock
+
+Legacy / not in current scope:
+- Redis
+- BullMQ
+- Large dashboard
+- PostgreSQL
+- Cloud screenshot storage
+- Public webhook server
+- Full production deployment

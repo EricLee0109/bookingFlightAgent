@@ -1,0 +1,27 @@
+{
+  "caseId": "BK-20260517-162541",
+  "status": "failed",
+  "rawMessage": "hi",
+  "createdAt": "2026-05-17T09:25:41.321Z",
+  "updatedAt": "2026-05-17T09:26:29.961Z",
+  "parsedRequest": {
+    "fromAirportCode": "HAN",
+    "fromAirportText": "Sân bay Nội Bài (HAN)",
+    "toAirportCode": "SGN",
+    "toAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "departureDate": "2026-05-13",
+    "returnDate": null,
+    "preferredTime": "morning",
+    "specificTime": null,
+    "tripType": "one_way",
+    "missingFields": []
+  },
+  "searchInput": {
+    "fromAirportCode": "HAN",
+    "fromAirportText": "Sân bay Nội Bài (HAN)",
+    "toAirportCode": "SGN",
+    "toAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "departureDate": "2026-05-13"
+  },
+  "errorMessage": "locator.waitFor: Target page, context or browser has been closed\nCall log:\n\u001b[2m  - waiting for locator('div').filter({ hasText: /tìm thấy\\s+\\d+\\s+kết quả/i }).last() to be visible\u001b[22m\n"
+}

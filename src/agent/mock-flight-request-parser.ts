@@ -1,4 +1,5 @@
 import { type ParsedFlightRequest } from './flight-request-schema';
+import { type FlightRequestParser } from './flight-request-parser';
 
 /**
  * Temporary mock parser for Telegram Agent MVP v0.
@@ -35,3 +36,11 @@ export async function mockParseFlightRequest(
     missingFields: [],
   };
 }
+
+/**
+ * Parser object for callers that prefer dependency injection over direct
+ * function imports.
+ */
+export const mockFlightRequestParser: FlightRequestParser = {
+  parse: mockParseFlightRequest,
+};

@@ -2,6 +2,7 @@ import { createOneBookingBrowserSession } from '../automation/1booking/browser';
 import { searchFlights } from '../automation/1booking/flight-search';
 import { type SearchFlightsInput } from '../automation/1booking/search-flight-input';
 import { takeFullPageScreenshot } from '../automation/1booking/screenshots';
+import { runWithAutomationLock } from '../utils/automation-lock';
 
 export type FlightSearchAutomationResult =
   | {
@@ -25,6 +26,22 @@ export type FlightSearchAutomationResult =
  * - always closes the browser session
  */
 export async function searchOneBookingFlights(
+  input: SearchFlightsInput,
+): Promise<FlightSearchAutomationResult> {
+  try {
+    return await runWithAutomationLock('1booking-search-flights', () =>
+      searchOneBookingFlightsUnlocked(input),
+    );
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : 'Unknown automation lock error.',
+      errorScreenshotPath: null,
+    };
+  }
+}
+
+async function searchOneBookingFlightsUnlocked(
   input: SearchFlightsInput,
 ): Promise<FlightSearchAutomationResult> {
   const { browser, page } = await createOneBookingBrowserSession();

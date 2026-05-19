@@ -1,0 +1,7 @@
+{
+  "agentEnabled": true,
+  "autoSearchFlights": true,
+  "autoHoldBooking": false,
+  "requireConfirmationBeforeHold": true,
+  "debugMode": true
+}

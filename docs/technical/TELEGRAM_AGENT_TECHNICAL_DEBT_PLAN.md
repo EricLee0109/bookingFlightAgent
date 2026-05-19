@@ -1,4 +1,18 @@
 `12/05/2026`
+
+# Legacy Note
+
+This document is historical planning context. The current production direction is
+the lean internal automation agent described in `docs/technical/BUSINESS_RULES.md`:
+Telegram long polling, Playwright automation, local JSON settings, local case
+memory, local screenshots, Telegram settings commands, and an in-memory
+automation lock.
+
+Do not use the Redis, BullMQ, large dashboard, PostgreSQL, cloud screenshot
+storage, public webhook server, or full production deployment sections as current
+implementation scope unless the project direction changes again.
+
+
 # Telegram Agent Technical Debt Plan
 
 ## 1. Mục đích tài liệu

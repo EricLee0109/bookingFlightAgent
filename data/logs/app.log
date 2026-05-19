@@ -1,0 +1,23 @@
+2026-05-17T08:17:06.165Z INFO smoke_test storage smoke test
+2026-05-17T09:25:41.323Z INFO telegram_request_received case=BK-20260517-162541 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-05-17T09:26:14.974Z INFO telegram_request_received case=BK-20260517-162614 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-05-17T09:26:16.120Z ERROR one_booking_search_failed case=BK-20260517-162614 Automation is busy. Current task: 1booking-search-flights. meta={"errorScreenshotPath":null}
+2026-05-17T09:26:29.962Z ERROR one_booking_search_failed case=BK-20260517-162541 locator.waitFor: Target page, context or browser has been closed
+Call log:
+[2m  - waiting for locator('div').filter({ hasText: /tìm thấy\s+\d+\s+kết quả/i }).last() to be visible[22m
+ meta={"errorScreenshotPath":null}
+2026-05-17T09:27:49.551Z INFO telegram_request_received case=BK-20260517-162749 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-05-17T09:28:03.258Z INFO one_booking_search_completed case=BK-20260517-162749 1Booking search completed. meta={"flightCount":18,"screenshotPath":"screenshots/1booking-search-flights.png"}
+2026-05-17T09:28:21.830Z INFO telegram_request_received case=BK-20260517-162821 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-05-17T09:28:25.192Z INFO telegram_request_received case=BK-20260517-162825 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-05-17T09:28:26.289Z ERROR one_booking_search_failed case=BK-20260517-162825 Automation is busy. Current task: 1booking-search-flights. meta={"errorScreenshotPath":null}
+2026-05-17T09:28:59.037Z ERROR one_booking_search_failed case=BK-20260517-162821 locator.waitFor: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('div').filter({ hasText: /tìm thấy\s+\d+\s+kết quả/i }).last() to be visible[22m
+ meta={"errorScreenshotPath":"screenshots/1booking-telegram-search-failed.png"}
+2026-05-17T09:33:24.468Z INFO telegram_request_received case=BK-20260517-163324 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-05-17T09:33:37.327Z INFO one_booking_search_completed case=BK-20260517-163324 1Booking search completed. meta={"flightCount":17,"screenshotPath":"screenshots/1booking-search-flights.png"}
+2026-05-17T14:53:08.468Z INFO telegram_request_received case=BK-20260517-215308 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-05-17T14:53:27.503Z INFO one_booking_search_completed case=BK-20260517-215308 1Booking search completed. meta={"flightCount":3,"screenshotPath":"screenshots/1booking-search-flights.png"}
+2026-05-19T02:28:08.626Z INFO telegram_request_received case=BK-20260519-092808 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-05-19T02:28:35.588Z INFO one_booking_search_completed case=BK-20260519-092808 1Booking search completed. meta={"flightCount":35,"screenshotPath":"screenshots/1booking-search-flights.png"}

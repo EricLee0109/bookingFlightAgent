@@ -11,7 +11,8 @@ import { handleTelegramMessage } from './telegram-message-handler';
  *
  * MVP note:
  * - Long polling is used for local development.
- * - Production should later move to webhook + NestJS API + queue.
+ * - Lean internal-agent production can keep long polling while there is no
+ *   public webhook server.
  */
 export async function startTelegramAgent() {
   const token = process.env.TELEGRAM_BOT_TOKEN;

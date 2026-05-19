@@ -1,0 +1,28 @@
+{
+  "caseId": "BK-20260517-163324",
+  "status": "completed",
+  "rawMessage": "tìm lại",
+  "createdAt": "2026-05-17T09:33:24.466Z",
+  "updatedAt": "2026-05-17T09:33:37.326Z",
+  "parsedRequest": {
+    "fromAirportCode": "HAN",
+    "fromAirportText": "Sân bay Nội Bài (HAN)",
+    "toAirportCode": "SGN",
+    "toAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "departureDate": "2026-05-13",
+    "returnDate": null,
+    "preferredTime": "morning",
+    "specificTime": null,
+    "tripType": "one_way",
+    "missingFields": []
+  },
+  "searchInput": {
+    "fromAirportCode": "HAN",
+    "fromAirportText": "Sân bay Nội Bài (HAN)",
+    "toAirportCode": "SGN",
+    "toAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "departureDate": "2026-05-13"
+  },
+  "flightCount": 17,
+  "screenshotPath": "screenshots/1booking-search-flights.png"
+}
