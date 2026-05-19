@@ -1,20 +1,9 @@
+import { AIRPORT_CATALOG } from './airport-catalog';
+
 export type ResolvedAirport = {
   code: string;
   text: string;
 };
-
-const AIRPORTS = [
-  {
-    code: 'HAN',
-    text: 'Sân bay Nội Bài (HAN)',
-    aliases: ['ha noi', 'hanoi', 'noi bai', 'han'],
-  },
-  {
-    code: 'SGN',
-    text: 'Sân bay Tân Sơn Nhất (SGN)',
-    aliases: ['sai gon', 'saigon', 'ho chi minh', 'tphcm', 'sgn', 'tan son nhat'],
-  },
-] as const;
 
 /**
  * Normalizes airport text for mock parser matching.
@@ -30,15 +19,34 @@ export function normalizeAirportText(value: string) {
 }
 
 /**
+ * Checks whether free text contains one airport alias safely.
+ *
+ * Short IATA aliases like `HAN` must match a whole token only. Without this,
+ * Vietnamese words such as `thanh` can accidentally match `han`.
+ */
+function matchesAirportAlias(normalizedValue: string, alias: string) {
+  const normalizedAlias = normalizeAirportText(alias);
+
+  if (normalizedAlias.length <= 3) {
+    const tokens = normalizedValue.split(/[^a-z0-9]+/).filter(Boolean);
+
+    return tokens.includes(normalizedAlias);
+  }
+
+  return normalizedValue.includes(normalizedAlias);
+}
+
+/**
  * Resolves a known airport from a free-text phrase.
  *
- * MVP supports HAN and SGN only. New airport support should be added here, not
- * inside Telegram transport or Playwright automation.
+ * Current OpenAI Telegram production flow does not call this helper directly.
+ * It is kept for mock/fallback parsers and alias coverage, where local code may
+ * need to infer an airport from raw operator text without AI.
  */
 export function resolveAirportFromText(value: string): ResolvedAirport | null {
   const normalizedValue = normalizeAirportText(value);
-  const airport = AIRPORTS.find((candidate) =>
-    candidate.aliases.some((alias) => normalizedValue.includes(alias)),
+  const airport = AIRPORT_CATALOG.find((candidate) =>
+    candidate.aliases.some((alias: string) => matchesAirportAlias(normalizedValue, alias)),
   );
 
   if (!airport) {
@@ -59,8 +67,9 @@ export function resolveAirportFromText(value: string): ResolvedAirport | null {
  */
 export function resolveAirportByCode(code: string): ResolvedAirport | null {
   const normalizedCode = code.trim().toUpperCase();
-  console.log(normalizedCode, "normalized codeee")
-  const airport = AIRPORTS.find((candidate) => candidate.code === normalizedCode);
+  const airport = AIRPORT_CATALOG.find(
+    (candidate) => candidate.code === normalizedCode,
+  );
 
   if (!airport) {
     return null;

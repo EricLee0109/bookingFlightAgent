@@ -4,6 +4,7 @@ import {
   ParsedFlightRequestSchema,
   type ParsedFlightRequest,
 } from '../contracts/flight';
+import { AIRPORT_CATALOG } from './airport-catalog';
 import { type FlightRequestParser } from './flight-request-parser';
 
 type ParsedMessage = {
@@ -102,6 +103,7 @@ export function createOpenAIFlightRequestParser(
 /**
  * Builds the stable parser instruction used for Telegram flight requests.
  *
+ * Map AIRPORT_CATALOG inside can let's openAI knows
  * Keep business rules here so raw model output is constrained before it reaches
  * validation, mapping, or browser automation.
  */
@@ -112,8 +114,10 @@ export function buildFlightParserSystemPrompt(today: string, timeZone: string) {
     `Today is ${today} in time zone ${timeZone}. Resolve relative dates from this date.`,
     '',
     'Airport rules:',
-    '- Ha Noi, Hanoi, Noi Bai, HAN => HAN / San bay Noi Bai (HAN).',
-    '- Sai Gon, Saigon, Ho Chi Minh, TPHCM, Tan Son Nhat, SGN => SGN / San bay Tan Son Nhat (SGN).',
+    ...AIRPORT_CATALOG.map(
+      (airport) =>
+        `- ${airport.aliases.join(', ')} => ${airport.code} / ${airport.text}.`,
+    ),
     '- If an airport is unclear, set both its code and text to null.',
     '',
     'Date and time rules:',

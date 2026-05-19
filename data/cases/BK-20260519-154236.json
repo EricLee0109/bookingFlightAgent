@@ -1,0 +1,28 @@
+{
+  "caseId": "BK-20260519-154236",
+  "status": "completed",
+  "rawMessage": "tôi muốn bay từ ho chi minh ra cam ranh vào ngày 26/06",
+  "createdAt": "2026-05-19T08:42:36.922Z",
+  "updatedAt": "2026-05-19T08:42:58.452Z",
+  "parsedRequest": {
+    "fromAirportCode": "SGN",
+    "fromAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "toAirportCode": "CXR",
+    "toAirportText": "Cam Ranh International Airport (CXR)",
+    "departureDate": "2026-06-26",
+    "returnDate": null,
+    "preferredTime": null,
+    "specificTime": null,
+    "tripType": "one_way",
+    "missingFields": []
+  },
+  "searchInput": {
+    "fromAirportCode": "SGN",
+    "fromAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "toAirportCode": "CXR",
+    "toAirportText": "Cam Ranh International Airport (CXR)",
+    "departureDate": "2026-06-26"
+  },
+  "flightCount": 7,
+  "screenshotPath": "screenshots/1booking-search-flights.png"
+}

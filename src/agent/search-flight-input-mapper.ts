@@ -4,7 +4,11 @@ import {
   validateSearchFlightInput,
   type ParsedFlightRequest,
 } from '../contracts/flight';
-import { resolveAirportByCode } from './airport-resolver';
+import {
+  resolveAirportByCode,
+  resolveAirportFromText,
+  type ResolvedAirport,
+} from './airport-resolver';
 
 /**
  * Converts a parsed flight request into the exact input shape required by
@@ -27,7 +31,8 @@ export function mapParsedRequestToSearchFlightsInput(
     );
   }
 
-  const validation = validateSearchFlightInput(parsed);
+  const normalizedParsed = normalizeParsedAirportFieldsForSearch(parsed);
+  const validation = validateSearchFlightInput(normalizedParsed);
 
   if (!validation.valid) {
     throw new Error(
@@ -43,7 +48,7 @@ export function mapParsedRequestToSearchFlightsInput(
     toAirportCode,
     toAirportText,
     departureDate,
-  } = parsed;
+  } = normalizedParsed;
 
   if (
     !fromAirportCode ||
@@ -78,4 +83,58 @@ export function mapParsedRequestToSearchFlightsInput(
     toAirportText: toAirport.text,
     departureDate,
   };
+}
+
+/**
+ * Completes airport code/text from the local catalog before validation.
+ *
+ * OpenAI should return airport codes, but this fallback lets the mapper recover
+ * when the model returns a recognizable airport text such as "cam ranh" without
+ * `CXR`. Raw AI output still never reaches Playwright.
+ */
+export function normalizeParsedAirportFieldsForSearch(
+  parsed: ParsedFlightRequest,
+): ParsedFlightRequest {
+  const fromAirport: ResolvedAirport | null =
+    resolveAirportByNullableCode(parsed.fromAirportCode) ??
+    resolveAirportByNullableText(parsed.fromAirportText);
+  const toAirport: ResolvedAirport | null =
+    resolveAirportByNullableCode(parsed.toAirportCode) ??
+    resolveAirportByNullableText(parsed.toAirportText);
+  const resolvedFields = new Set<string>();
+
+  if (fromAirport) {
+    resolvedFields.add('fromAirportCode');
+    resolvedFields.add('fromAirportText');
+  }
+
+  if (toAirport) {
+    resolvedFields.add('toAirportCode');
+    resolvedFields.add('toAirportText');
+  }
+
+  return {
+    ...parsed,
+    fromAirportCode: fromAirport?.code ?? parsed.fromAirportCode,
+    fromAirportText: fromAirport?.text ?? parsed.fromAirportText,
+    toAirportCode: toAirport?.code ?? parsed.toAirportCode,
+    toAirportText: toAirport?.text ?? parsed.toAirportText,
+    missingFields: parsed.missingFields.filter(
+      (field) => !resolvedFields.has(field),
+    ),
+  };
+}
+
+/**
+ * Resolves a nullable airport code without leaking string unions into callers.
+ */
+function resolveAirportByNullableCode(code: string | null) {
+  return code ? resolveAirportByCode(code) : null;
+}
+
+/**
+ * Resolves nullable airport text without leaking string unions into callers.
+ */
+function resolveAirportByNullableText(text: string | null) {
+  return text ? resolveAirportFromText(text) : null;
 }

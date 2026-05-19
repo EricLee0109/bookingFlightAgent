@@ -1,0 +1,23 @@
+{
+  "caseId": "BK-20260519-135618",
+  "status": "needs_input",
+  "rawMessage": "Tìm cho mình chuyến bay từ Hồ Chí Minh ra Đà Nẵng vào ngày mai",
+  "createdAt": "2026-05-19T06:56:18.073Z",
+  "updatedAt": "2026-05-19T06:56:21.984Z",
+  "parsedRequest": {
+    "fromAirportCode": "SGN",
+    "fromAirportText": "San bay Tan Son Nhat (SGN)",
+    "toAirportCode": null,
+    "toAirportText": null,
+    "departureDate": "2026-05-20",
+    "returnDate": null,
+    "preferredTime": null,
+    "specificTime": null,
+    "tripType": "one_way",
+    "missingFields": [
+      "toAirportCode",
+      "toAirportText"
+    ]
+  },
+  "errorMessage": "Missing fields: toAirportCode, toAirportText"
+}

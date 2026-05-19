@@ -1,6 +1,9 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { createFlightRequestParser } from '../agent/flight-request-parser-factory';
-import { mapParsedRequestToSearchFlightsInput } from '../agent/search-flight-input-mapper';
+import {
+  mapParsedRequestToSearchFlightsInput,
+  normalizeParsedAirportFieldsForSearch,
+} from '../agent/search-flight-input-mapper';
 import {
   validateAutomationSupport,
   validateSearchFlightInput,
@@ -133,11 +136,25 @@ export async function handleTelegramMessage(
     parsedRequest,
   });
 
-  await bot.sendMessage(chatId, formatParsedRequestMessage(parsedRequest));
+  const normalizedParsedRequest =
+    normalizeParsedAirportFieldsForSearch(parsedRequest);
 
-  const inputValidation = validateSearchFlightInput(parsedRequest);
+  if (normalizedParsedRequest !== parsedRequest) {
+    currentCase = await updateLocalFlightCase(currentCase, {
+      parsedRequest: normalizedParsedRequest,
+    });
+  }
+
+  await bot.sendMessage(chatId, formatParsedRequestMessage(normalizedParsedRequest));
+
+  const inputValidation = validateSearchFlightInput(normalizedParsedRequest);
   const missingFields = Array.from(
-    new Set([...parsedRequest.missingFields, ...inputValidation.missingFields]),
+    new Set([
+      ...normalizedParsedRequest.missingFields.filter(
+        (field) => !inputValidation.missingFields.includes(field),
+      ),
+      ...inputValidation.missingFields,
+    ]),
   );
 
   if (missingFields.length > 0) {
@@ -155,7 +172,7 @@ export async function handleTelegramMessage(
     return;
   }
 
-  const automationSupport = validateAutomationSupport(parsedRequest);
+  const automationSupport = validateAutomationSupport(normalizedParsedRequest);
 
   if (!automationSupport.supported) {
     const reason =
@@ -179,7 +196,7 @@ export async function handleTelegramMessage(
   let searchInput;
 
   try {
-    searchInput = mapParsedRequestToSearchFlightsInput(parsedRequest);
+    searchInput = mapParsedRequestToSearchFlightsInput(normalizedParsedRequest);
   } catch (error) {
     const errorMessage =
       error instanceof Error

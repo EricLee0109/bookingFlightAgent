@@ -1,10 +1,21 @@
 import assert from 'node:assert/strict';
-import { mapParsedRequestToSearchFlightsInput } from '../src/agent/search-flight-input-mapper';
+import { AIRPORT_CATALOG } from '../src/agent/airport-catalog';
+import {
+  resolveAirportByCode,
+  resolveAirportFromText,
+} from '../src/agent/airport-resolver';
+import {
+  mapParsedRequestToSearchFlightsInput,
+  normalizeParsedAirportFieldsForSearch,
+} from '../src/agent/search-flight-input-mapper';
 import {
   createFlightRequestParser,
   getFlightParserProvider,
 } from '../src/agent/flight-request-parser-factory';
-import { createOpenAIFlightRequestParser } from '../src/agent/openai-flight-request-parser';
+import {
+  buildFlightParserSystemPrompt,
+  createOpenAIFlightRequestParser,
+} from '../src/agent/openai-flight-request-parser';
 import { ParsedFlightRequestSchema } from '../src/contracts/flight';
 
 const validOneWayRequest = {
@@ -73,6 +84,75 @@ function testMapperCanonicalizesAirportText() {
 
   assert.equal(input.fromAirportText, 'Sân bay Nội Bài (HAN)');
   assert.equal(input.toAirportText, 'Sân bay Tân Sơn Nhất (SGN)');
+}
+
+/**
+ * Verifies that mapper can recover when AI returns airport text but misses code.
+ */
+function testMapperResolvesAirportTextFallback() {
+  const parsed = ParsedFlightRequestSchema.parse({
+    ...validOneWayRequest,
+    fromAirportCode: 'SGN',
+    fromAirportText: 'San bay Tan Son Nhat (SGN)',
+    toAirportCode: null,
+    toAirportText: 'cam ranh',
+    departureDate: '2026-06-25',
+    missingFields: [],
+  });
+  const input = mapParsedRequestToSearchFlightsInput(parsed);
+
+  assert.equal(input.fromAirportCode, 'SGN');
+  assert.equal(input.toAirportCode, 'CXR');
+  assert.equal(input.toAirportText, 'Cam Ranh International Airport (CXR)');
+}
+
+/**
+ * Verifies that parsed missing airport codes can be normalized before handler checks.
+ */
+function testParsedAirportNormalizationBeforeMissingFieldCheck() {
+  const parsed = ParsedFlightRequestSchema.parse({
+    ...validOneWayRequest,
+    toAirportCode: null,
+    toAirportText: 'cam ranh',
+    missingFields: ['toAirportCode'],
+  });
+  const normalized = normalizeParsedAirportFieldsForSearch(parsed);
+
+  assert.equal(normalized.toAirportCode, 'CXR');
+  assert.equal(normalized.toAirportText, 'Cam Ranh International Airport (CXR)');
+}
+
+/**
+ * Verifies that the Vietnam airport catalog resolves common operator aliases.
+ */
+function testAirportCatalogAliases() {
+  const airportCodes = AIRPORT_CATALOG.map((airport) => airport.code);
+
+  assert.equal(new Set(airportCodes).size, airportCodes.length);
+  assert.equal(resolveAirportFromText('khach muon bay da nang')?.code, 'DAD');
+  assert.equal(resolveAirportFromText('di duong dong ngay mai')?.code, 'PQC');
+  assert.equal(resolveAirportFromText('can ve di quy nhon')?.code, 'UIH');
+  assert.equal(resolveAirportFromText('bay den lien khuong')?.code, 'DLI');
+  assert.equal(resolveAirportFromText('bay den long thanh')?.code, 'LTH');
+}
+
+/**
+ * Verifies that the OpenAI parser prompt is generated from the airport catalog.
+ */
+function testOpenAIParserPromptIncludesAirportCatalog() {
+  const prompt = buildFlightParserSystemPrompt('2026-05-19', 'Asia/Ho_Chi_Minh');
+
+  assert.match(prompt, /cam ranh.*CXR/i);
+  assert.match(prompt, /da nang.*DAD/i);
+}
+
+/**
+ * Verifies the production mapper airport lookup path.
+ */
+function testAirportCatalogCodeLookup() {
+  assert.equal(resolveAirportByCode('DAD')?.text, 'Da Nang International Airport (DAD)');
+  assert.equal(resolveAirportByCode('dad')?.code, 'DAD');
+  assert.equal(resolveAirportByCode('XXX'), null);
 }
 
 /**
@@ -166,6 +246,11 @@ async function main() {
   testRoundTripRequiresReturnDate();
   testMapperRejectsMissingFields();
   testMapperCanonicalizesAirportText();
+  testMapperResolvesAirportTextFallback();
+  testParsedAirportNormalizationBeforeMissingFieldCheck();
+  testAirportCatalogAliases();
+  testOpenAIParserPromptIncludesAirportCatalog();
+  testAirportCatalogCodeLookup();
   testParserFactoryProviderSelection();
   testOpenAIParserRequiresApiKey();
   await testOpenAIParserRejectsInvalidOutput();
