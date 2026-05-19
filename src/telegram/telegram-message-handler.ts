@@ -1,6 +1,10 @@
 import TelegramBot from 'node-telegram-bot-api';
-import { mockParseFlightRequest } from '../agent/mock-flight-request-parser';
+import { createFlightRequestParser } from '../agent/flight-request-parser-factory';
 import { mapParsedRequestToSearchFlightsInput } from '../agent/search-flight-input-mapper';
+import {
+  validateAutomationSupport,
+  validateSearchFlightInput,
+} from '../contracts/flight';
 import { searchOneBookingFlights } from '../services/flight-search-automation-service';
 import {
   createLocalFlightCase,
@@ -10,6 +14,8 @@ import { appendLocalLog } from '../storage/local-log-store';
 import { readLocalAgentSettings } from '../storage/local-settings-store';
 import { isAllowedTelegramOperator } from './telegram-access';
 import {
+  formatMissingFlightFieldsMessage,
+  formatParserFailedMessage,
   formatParsedRequestMessage,
   formatSearchFailedMessage,
   formatSearchSuccessMessage,
@@ -23,7 +29,7 @@ import { handleTelegramSettingsCommand } from './telegram-settings-commands';
  * - Validate Telegram operator allowlist.
  * - Handle local settings commands.
  * - Accept only text messages for MVP v0.
- * - Parse the message using the mock Agent parser.
+ * - Parse the message using the configured Agent parser.
  * - Map parsed output into Playwright search input.
  * - Store local case/log memory.
  * - Run 1Booking search automation through the automation service.
@@ -78,6 +84,8 @@ export async function handleTelegramMessage(
 
   const flightCase = await createLocalFlightCase(text);
 
+
+  // Save request information to JSON storage
   await appendLocalLog({
     level: 'info',
     event: 'telegram_request_received',
@@ -89,18 +97,84 @@ export async function handleTelegramMessage(
     },
   });
 
+  // Telegram bot solving request from rawMessage
   await bot.sendMessage(
     chatId,
     `Mình đã nhận request ${flightCase.caseId}. Đang phân tích yêu cầu...`,
   );
 
-  const parsedRequest = await mockParseFlightRequest(text);
+  let parsedRequest;
+
+  try {
+    const parser = createFlightRequestParser();
+    parsedRequest = await parser.parse(text);
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : 'AI parser failed with an unknown error.';
+
+    await updateLocalFlightCase(flightCase, {
+      status: 'failed',
+      errorMessage,
+    });
+    await appendLocalLog({
+      level: 'error',
+      event: 'flight_request_parser_failed',
+      caseId: flightCase.caseId,
+      message: errorMessage,
+    });
+    await bot.sendMessage(chatId, formatParserFailedMessage());
+    return;
+  }
+
   let currentCase = await updateLocalFlightCase(flightCase, {
     status: 'parsed',
     parsedRequest,
   });
 
   await bot.sendMessage(chatId, formatParsedRequestMessage(parsedRequest));
+
+  const inputValidation = validateSearchFlightInput(parsedRequest);
+  const missingFields = Array.from(
+    new Set([...parsedRequest.missingFields, ...inputValidation.missingFields]),
+  );
+
+  if (missingFields.length > 0) {
+    await updateLocalFlightCase(currentCase, {
+      status: 'needs_input',
+      errorMessage: `Missing fields: ${missingFields.join(', ')}`,
+    });
+    await appendLocalLog({
+      level: 'warn',
+      event: 'flight_request_missing_fields',
+      caseId: currentCase.caseId,
+      message: `Missing fields: ${missingFields.join(', ')}`,
+    });
+    await bot.sendMessage(chatId, formatMissingFlightFieldsMessage(missingFields));
+    return;
+  }
+
+  const automationSupport = validateAutomationSupport(parsedRequest);
+
+  if (!automationSupport.supported) {
+    const reason =
+      automationSupport.reason ??
+      'Automation does not support this flight request yet.';
+
+    await updateLocalFlightCase(currentCase, {
+      status: 'failed',
+      errorMessage: reason,
+    });
+    await appendLocalLog({
+      level: 'warn',
+      event: 'flight_request_unsupported_automation',
+      caseId: currentCase.caseId,
+      message: reason,
+    });
+    await bot.sendMessage(chatId, reason);
+    return;
+  }
 
   let searchInput;
 

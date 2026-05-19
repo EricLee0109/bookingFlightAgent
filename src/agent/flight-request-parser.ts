@@ -1,4 +1,4 @@
-import { type ParsedFlightRequest } from './flight-request-schema';
+import { type ParsedFlightRequest } from '../contracts/flight';
 
 /**
  * Parser contract for turning operator text into a structured flight request.

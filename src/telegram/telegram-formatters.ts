@@ -1,4 +1,4 @@
-import { type ParsedFlightRequest } from '../agent/flight-request-schema';
+import { type ParsedFlightRequest } from '../contracts/flight';
 
 /**
  * Formats the parsed flight request into a readable Telegram message.
@@ -24,6 +24,31 @@ export function formatParsedRequestMessage(parsed: ParsedFlightRequest) {
     parsed.missingFields.length > 0
       ? `⚠️ Còn thiếu: ${parsed.missingFields.join(', ')}`
       : 'Thông tin cơ bản đã đủ để tìm chuyến.',
+  ].join('\n');
+}
+
+/**
+ * Formats the message used when parser output is valid but not searchable yet.
+ *
+ * The bot asks the operator for these fields instead of starting Playwright
+ * with incomplete input.
+ */
+export function formatMissingFlightFieldsMessage(missingFields: string[]) {
+  return [
+    'Mình còn thiếu thông tin để tìm chuyến.',
+    '',
+    `Vui lòng bổ sung: ${missingFields.join(', ')}`,
+  ].join('\n');
+}
+
+/**
+ * Formats the message used when the AI parser cannot return valid JSON.
+ */
+export function formatParserFailedMessage() {
+  return [
+    'Không thể phân tích yêu cầu bằng AI parser.',
+    '',
+    'Vui lòng kiểm tra OPENAI_API_KEY, OPENAI_MODEL hoặc đổi FLIGHT_PARSER_PROVIDER=mock để test local.',
   ].join('\n');
 }
 

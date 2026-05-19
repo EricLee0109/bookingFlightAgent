@@ -1,4 +1,4 @@
-import { type ParsedFlightRequest } from './flight-request-schema';
+import { type ParsedFlightRequest } from '../contracts/flight';
 import { type FlightRequestParser } from './flight-request-parser';
 
 /**

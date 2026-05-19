@@ -1,5 +1,31 @@
 import { type Locator, type Page } from 'playwright';
 
+/**
+ * Fails fast when 1Booking shows the login modal during automation.
+ *
+ * This usually means the saved auth state has expired. The caller/service owns
+ * screenshot capture, so this helper only reports the actionable cause.
+ */
+export async function throwIfOneBookingLoginModalVisible(
+  page: Page,
+  timeoutMs = 1500,
+) {
+  const passwordInput = page.locator('input[type="password"]').first();
+  const loginModalVisible = await passwordInput
+    .waitFor({
+      state: 'visible',
+      timeout: timeoutMs,
+    })
+    .then(() => true)
+    .catch(() => false);
+
+  if (loginModalVisible) {
+    throw new Error(
+      '1Booking auth session expired or login is required. Run pnpm run save-auth:dev, then retry the search.',
+    );
+  }
+}
+
 function parseFlightResultCount(text: string) {
   const match = text.match(/tìm thấy\s+(\d+)\s+kết quả/i);
 

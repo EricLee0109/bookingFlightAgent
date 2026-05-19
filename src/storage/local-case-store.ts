@@ -1,11 +1,12 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { type SearchFlightsInput } from '../automation/1booking/flight-search';
-import { type ParsedFlightRequest } from '../agent/flight-request-schema';
+import { type ParsedFlightRequest } from '../contracts/flight';
 
 export type LocalFlightCaseStatus =
   | 'received'
   | 'parsed'
+  | 'needs_input'
   | 'searching'
   | 'completed'
   | 'failed';

@@ -50,3 +50,24 @@ export function resolveAirportFromText(value: string): ResolvedAirport | null {
     text: airport.text,
   };
 }
+
+/**
+ * Resolves a known airport by IATA code.
+ *
+ * This keeps automation input using our canonical 1Booking airport text instead
+ * of trusting AI-generated display labels.
+ */
+export function resolveAirportByCode(code: string): ResolvedAirport | null {
+  const normalizedCode = code.trim().toUpperCase();
+  console.log(normalizedCode, "normalized codeee")
+  const airport = AIRPORTS.find((candidate) => candidate.code === normalizedCode);
+
+  if (!airport) {
+    return null;
+  }
+
+  return {
+    code: airport.code,
+    text: airport.text,
+  };
+}

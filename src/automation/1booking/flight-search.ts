@@ -8,7 +8,10 @@ import {
 } from './search-flight-input';
 import { submitFlightSearch } from './search-form';
 import { takeFlightResultsScreenshot } from './screenshots';
-import { waitForFlightResultsReady } from './waiters';
+import {
+  throwIfOneBookingLoginModalVisible,
+  waitForFlightResultsReady,
+} from './waiters';
 
 export type SearchFlightsResult = {
   success: boolean;
@@ -39,6 +42,7 @@ export async function searchFlights(
     waitUntil: 'domcontentloaded',
     timeout: 60000,
   });
+  await throwIfOneBookingLoginModalVisible(page);
 
   await selectAirport(page, {
     inputName: 'Chọn điểm đi',
@@ -55,6 +59,7 @@ export async function searchFlights(
   await selectDepartureDate(page, input.departureDate);
 
   await submitFlightSearch(page);
+  await throwIfOneBookingLoginModalVisible(page, 5000);
 
   const flightCount = await waitForFlightResultsReady(page);
 

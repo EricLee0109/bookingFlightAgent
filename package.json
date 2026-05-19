@@ -6,6 +6,7 @@
   "scripts": {
     "telegram:dev": "tsx scripts/start-telegram-agent.ts",
     "save-auth:dev": "tsx scripts/save-auth.ts",
+    "test:parser": "tsx tests/test-flight-parser-contract.ts",
     "test:e2e:1booking": "playwright test tests/1booking-search.e2e.spec.ts",
     "test:e2e:1booking:headed": "playwright test tests/1booking-search.e2e.spec.ts --headed"
   },
@@ -14,7 +15,7 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-  "@playwright/test": "^1.59.1",
+    "@playwright/test": "^1.59.1",
     "@types/node": "^25.6.2",
     "@types/node-telegram-bot-api": "^0.64.14",
     "playwright": "^1.59.1",
@@ -23,6 +24,7 @@
   "dependencies": {
     "dotenv": "^17.4.2",
     "node-telegram-bot-api": "^0.67.0",
+    "openai": "^6.38.0",
     "zod": "^4.4.3"
   }
 }

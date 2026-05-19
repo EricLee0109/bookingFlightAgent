@@ -40,13 +40,13 @@ export type TripType = 'one_way' | 'round_trip';
  */
 export const ParsedFlightRequestSchema = z
   .object({
-    fromAirportCode: z.string(),
-    fromAirportText: z.string(),
+    fromAirportCode: z.string().nullable(),
+    fromAirportText: z.string().nullable(),
 
-    toAirportCode: z.string(),
-    toAirportText: z.string(),
+    toAirportCode: z.string().nullable(),
+    toAirportText: z.string().nullable(),
 
-    departureDate: z.string(),
+    departureDate: z.string().nullable(),
     returnDate: z.string().nullable(),
 
     preferredTime: z

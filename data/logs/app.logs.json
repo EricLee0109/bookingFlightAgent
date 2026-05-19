@@ -176,5 +176,109 @@
       "screenshotPath": "screenshots/1booking-search-flights.png"
     },
     "timestamp": "2026-05-19T02:28:35.588Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260519-105124",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-05-19T03:51:24.095Z"
+  },
+  {
+    "level": "warn",
+    "event": "flight_request_missing_fields",
+    "caseId": "BK-20260519-105124",
+    "message": "Missing fields: fromAirportCode, fromAirportText, toAirportCode, toAirportText, departureDate",
+    "timestamp": "2026-05-19T03:51:27.081Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260519-105158",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-05-19T03:51:58.489Z"
+  },
+  {
+    "level": "error",
+    "event": "one_booking_search_failed",
+    "caseId": "BK-20260519-105158",
+    "message": "page.waitForFunction: Timeout 10000ms exceeded.",
+    "meta": {
+      "errorScreenshotPath": "screenshots/1booking-telegram-search-failed.png"
+    },
+    "timestamp": "2026-05-19T03:52:17.193Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260519-105354",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-05-19T03:53:54.908Z"
+  },
+  {
+    "level": "error",
+    "event": "one_booking_search_failed",
+    "caseId": "BK-20260519-105354",
+    "message": "page.waitForFunction: Timeout 10000ms exceeded.",
+    "meta": {
+      "errorScreenshotPath": "screenshots/1booking-telegram-search-failed.png"
+    },
+    "timestamp": "2026-05-19T03:54:15.880Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260519-132329",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-05-19T06:23:29.756Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_search_completed",
+    "caseId": "BK-20260519-132329",
+    "message": "1Booking search completed.",
+    "meta": {
+      "flightCount": 26,
+      "screenshotPath": "screenshots/1booking-search-flights.png"
+    },
+    "timestamp": "2026-05-19T06:23:49.475Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260519-132605",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-05-19T06:26:05.893Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_search_completed",
+    "caseId": "BK-20260519-132605",
+    "message": "1Booking search completed.",
+    "meta": {
+      "flightCount": 53,
+      "screenshotPath": "screenshots/1booking-search-flights.png"
+    },
+    "timestamp": "2026-05-19T06:26:24.041Z"
   }
 ]

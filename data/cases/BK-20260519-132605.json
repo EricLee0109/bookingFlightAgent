@@ -1,0 +1,28 @@
+{
+  "caseId": "BK-20260519-132605",
+  "status": "completed",
+  "rawMessage": "Tìm cho mình chuyến bay từ Hồ Chí Minh vào Hà Nội vào ngày mai",
+  "createdAt": "2026-05-19T06:26:05.892Z",
+  "updatedAt": "2026-05-19T06:26:24.040Z",
+  "parsedRequest": {
+    "fromAirportCode": "SGN",
+    "fromAirportText": "San bay Tan Son Nhat (SGN)",
+    "toAirportCode": "HAN",
+    "toAirportText": "San bay Noi Bai (HAN)",
+    "departureDate": "2026-05-20",
+    "returnDate": null,
+    "preferredTime": null,
+    "specificTime": null,
+    "tripType": "one_way",
+    "missingFields": []
+  },
+  "searchInput": {
+    "fromAirportCode": "SGN",
+    "fromAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "toAirportCode": "HAN",
+    "toAirportText": "Sân bay Nội Bài (HAN)",
+    "departureDate": "2026-05-20"
+  },
+  "flightCount": 53,
+  "screenshotPath": "screenshots/1booking-search-flights.png"
+}
