@@ -87,7 +87,7 @@ export async function takeFlightResultsScreenshot(page: Page, fileName: string) 
  * Captures customer-facing flight results in smaller batches. (Crop it to 10 flights in a screenshot)
  *
  * Long result lists are hard for operators/customers to trace in one very tall
- * image. This helper groups visible flight cards into chunks of 15 by default.
+ * image. This helper groups visible flight cards into small chunks by default.
  */
 export async function takeFlightResultsBatchScreenshots(
   page: Page,
@@ -97,24 +97,23 @@ export async function takeFlightResultsBatchScreenshots(
   await ensureScreenshotDir();
   await removeExistingFlightResultScreenshots(fileNamePrefix);
 
-  const flightOptions = page
-    .getByRole('list', {
-      name: /Single ticket options/i,
-    })
-    .locator(':scope > div');
-  const visibleOptionCount = await countVisibleLocators(flightOptions);
+  const flightResults = page.getByRole('list', {
+    name: /Single ticket options/i,
+  });
+  const flightOptions = flightResults.locator(':scope > div');
+  const visibleOptionIndexes = await getVisibleLocatorIndexes(flightOptions);
 
-  if (visibleOptionCount === 0) {
+  if (visibleOptionIndexes.length === 0) {
     throw new Error('Could not locate visible flight options for screenshots.');
   }
 
   const paths: string[] = [];
 
-  for (let startIndex = 0; startIndex < visibleOptionCount; startIndex += batchSize) {
-    const endIndex = Math.min(startIndex + batchSize, visibleOptionCount);
+  for (let startIndex = 0; startIndex < visibleOptionIndexes.length; startIndex += batchSize) {
+    const batchIndexes = visibleOptionIndexes.slice(startIndex, startIndex + batchSize);
     const path = `${SCREENSHOT_DIR}/${fileNamePrefix}-${paths.length + 1}.png`;
 
-    await captureFlightOptionsBatch(page, flightOptions, startIndex, endIndex, path);
+    await captureFlightOptionsBatch(page, flightResults, flightOptions, batchIndexes, path);
     paths.push(path);
   }
 
@@ -150,17 +149,17 @@ function escapeRegExp(value: string) {
 /**
  * Counts visible locators without assuming hidden template elements are absent.
  */
-async function countVisibleLocators(locator: Locator) {
+async function getVisibleLocatorIndexes(locator: Locator) {
   const count = await locator.count();
-  let visibleCount = 0;
+  const indexes: number[] = [];
 
   for (let index = 0; index < count; index++) {
     if (await locator.nth(index).isVisible()) {
-      visibleCount++;
+      indexes.push(index);
     }
   }
 
-  return visibleCount;
+  return indexes;
 }
 
 /**
@@ -168,70 +167,70 @@ async function countVisibleLocators(locator: Locator) {
  */
 async function captureFlightOptionsBatch(
   page: Page,
+  flightResults: Locator,
   flightOptions: Locator,
-  startIndex: number,
-  endIndex: number,
+  batchIndexes: number[],
   path: string,
 ) {
   const originalViewport = page.viewportSize();
-  const firstOption = flightOptions.nth(startIndex);
-  const lastOption = flightOptions.nth(endIndex - 1);
-  const batchCount = endIndex - startIndex;
-  const {width: width_default, height: height_default } = ONE_BOOKING_VIEWPORT;
+  const batchCount = batchIndexes.length;
+  const { width: defaultWidth, height: defaultHeight } = ONE_BOOKING_VIEWPORT;
 
   await page.setViewportSize({
-    width: originalViewport?.width ?? width_default,
-    height: Math.max(originalViewport?.height ?? height_default, batchCount * 220 + 240),
+    width: originalViewport?.width ?? defaultWidth,
+    height: Math.max(originalViewport?.height ?? defaultHeight, batchCount * 220 + 240),
   });
-
-  await firstOption.evaluate((element) => {
-    const desiredTop = 24;
-    const rect = element.getBoundingClientRect();
-
-    window.scrollTo({
-      top: window.scrollY + rect.top - desiredTop,
-      behavior: 'instant',
-    });
-  });
-  await page.waitForTimeout(350);
-
-  const firstBox = await firstOption.boundingBox();
-  const lastBox = await lastOption.boundingBox();
-
-  if (!firstBox || !lastBox) {
-    throw new Error('Could not locate flight option batch area for screenshot.');
-  }
-
-  const clipX = Math.max(0, Math.floor(firstBox.x));
-  const clipY = Math.max(0, Math.floor(firstBox.y));
-  const clipWidth = Math.ceil(
-    Math.max(firstBox.x + firstBox.width, lastBox.x + lastBox.width) - clipX,
-  );
-  const clipHeight = Math.ceil(lastBox.y + lastBox.height - clipY);
-  const requiredViewportHeight = Math.ceil(clipY + clipHeight + 80);
-  const currentViewport = page.viewportSize();
-
-  if ((currentViewport?.height ?? 0) < requiredViewportHeight) {
-    await page.setViewportSize({
-      width: currentViewport?.width ?? originalViewport?.width ?? 1440,
-      height: requiredViewportHeight,
-    });
-    await page.waitForTimeout(250);
-  }
 
   try {
-    await page.screenshot({
+    await setFlightOptionsBatchVisibility(flightOptions, batchIndexes);
+    await flightResults.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(350);
+
+    await flightResults.screenshot({
       path,
-      clip: {
-        x: clipX,
-        y: clipY,
-        width: clipWidth,
-        height: clipHeight,
-      },
     });
   } finally {
+    await restoreFlightOptionsVisibility(flightOptions).catch(() => null);
+
     if (originalViewport) {
       await page.setViewportSize(originalViewport);
     }
   }
+}
+
+/**
+ * Temporarily hides flight cards outside the batch before locator screenshot.
+ */
+async function setFlightOptionsBatchVisibility(
+  flightOptions: Locator,
+  visibleIndexes: number[],
+) {
+  await flightOptions.evaluateAll((elements, indexes) => {
+    const visibleIndexSet = new Set(indexes as number[]);
+
+    elements.forEach((element, index) => {
+      if (!(element instanceof HTMLElement)) {
+        return;
+      }
+
+      element.dataset.originalDisplay = element.style.display;
+      element.style.display = visibleIndexSet.has(index) ? '' : 'none';
+    });
+  }, visibleIndexes);
+}
+
+/**
+ * Restores flight card display styles after a batch screenshot.
+ */
+async function restoreFlightOptionsVisibility(flightOptions: Locator) {
+  await flightOptions.evaluateAll((elements) => {
+    elements.forEach((element) => {
+      if (!(element instanceof HTMLElement)) {
+        return;
+      }
+
+      element.style.display = element.dataset.originalDisplay ?? '';
+      delete element.dataset.originalDisplay;
+    });
+  });
 }

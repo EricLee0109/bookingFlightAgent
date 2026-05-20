@@ -1,0 +1,36 @@
+{
+  "caseId": "BK-20260520-111959",
+  "status": "completed",
+  "rawMessage": "Anh muốn tìm chuyến bay 30/5 từ Hà Nội về HCM",
+  "createdAt": "2026-05-20T04:19:59.129Z",
+  "updatedAt": "2026-05-20T04:20:22.222Z",
+  "parsedRequest": {
+    "fromAirportCode": "HAN",
+    "fromAirportText": "Sân bay Nội Bài (HAN)",
+    "toAirportCode": "SGN",
+    "toAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "departureDate": "2026-05-30",
+    "returnDate": null,
+    "preferredTime": null,
+    "specificTime": null,
+    "tripType": "one_way",
+    "missingFields": []
+  },
+  "searchInput": {
+    "fromAirportCode": "HAN",
+    "fromAirportText": "Sân bay Nội Bài (HAN)",
+    "toAirportCode": "SGN",
+    "toAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "departureDate": "2026-05-30"
+  },
+  "flightCount": 60,
+  "screenshotPath": "screenshots/1booking-search-flights-1.png",
+  "screenshotPaths": [
+    "screenshots/1booking-search-flights-1.png",
+    "screenshots/1booking-search-flights-2.png",
+    "screenshots/1booking-search-flights-3.png",
+    "screenshots/1booking-search-flights-4.png",
+    "screenshots/1booking-search-flights-5.png",
+    "screenshots/1booking-search-flights-6.png"
+  ]
+}

@@ -24,6 +24,7 @@ import {
   formatSearchSuccessMessage,
 } from './telegram-formatters';
 import { handleTelegramSettingsCommand } from './telegram-settings-commands';
+import { createTelegramScreenshotArchive } from './telegram-screenshot-archive';
 
 /**
  * Handles one incoming Telegram message from an operator.
@@ -290,6 +291,15 @@ export async function handleTelegramMessage(
             : `Ảnh lịch trình chuyến bay ${index + 1}/${result.screenshotPaths.length}.`,
       });
     }
+
+    const archivePath = await createTelegramScreenshotArchive(
+      currentCase.caseId,
+      result.screenshotPaths,
+    );
+
+    await bot.sendDocument(chatId, archivePath, {
+      caption: 'Download All Files',
+    });
 
     return;
   }
