@@ -19,6 +19,7 @@ export type LocalFlightCase = {
   searchInput?: SearchFlightsInput;
   flightCount?: number;
   screenshotPath?: string;
+  screenshotPaths?: string[];
   errorMessage?: string;
   createdAt: string;
   updatedAt: string;

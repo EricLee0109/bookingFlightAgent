@@ -1,0 +1,32 @@
+{
+  "caseId": "BK-20260520-101956",
+  "status": "completed",
+  "rawMessage": "Anh muốn xem chuyến bay từ HCM ra Đà Nẵng vào ngày mai",
+  "createdAt": "2026-05-20T03:19:56.790Z",
+  "updatedAt": "2026-05-20T03:20:35.921Z",
+  "parsedRequest": {
+    "fromAirportCode": "SGN",
+    "fromAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "toAirportCode": "DAD",
+    "toAirportText": "Da Nang International Airport (DAD)",
+    "departureDate": "2026-05-21",
+    "returnDate": null,
+    "preferredTime": null,
+    "specificTime": null,
+    "tripType": "one_way",
+    "missingFields": []
+  },
+  "searchInput": {
+    "fromAirportCode": "SGN",
+    "fromAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "toAirportCode": "DAD",
+    "toAirportText": "Da Nang International Airport (DAD)",
+    "departureDate": "2026-05-21"
+  },
+  "flightCount": 24,
+  "screenshotPath": "screenshots/1booking-search-flights-1.png",
+  "screenshotPaths": [
+    "screenshots/1booking-search-flights-1.png",
+    "screenshots/1booking-search-flights-2.png"
+  ]
+}

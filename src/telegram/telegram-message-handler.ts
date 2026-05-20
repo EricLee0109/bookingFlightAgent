@@ -265,6 +265,7 @@ export async function handleTelegramMessage(
     status: 'completed',
     flightCount: result.flightCount,
     screenshotPath: result.screenshotPath,
+    screenshotPaths: result.screenshotPaths,
   });
   await appendLocalLog({
     level: 'info',
@@ -274,10 +275,24 @@ export async function handleTelegramMessage(
     meta: {
       flightCount: result.flightCount,
       screenshotPath: result.screenshotPath,
+      screenshotPaths: result.screenshotPaths,
     },
   });
 
   await bot.sendMessage(chatId, formatSearchSuccessMessage(result.flightCount));
+
+  if (result.screenshotPaths.length > 0) {
+    for (let index = 0; index < result.screenshotPaths.length; index++) {
+      await bot.sendPhoto(chatId, result.screenshotPaths[index], {
+        caption:
+          result.screenshotPaths.length === 1
+            ? 'Ảnh lịch trình chuyến bay từ 1Booking.'
+            : `Ảnh lịch trình chuyến bay ${index + 1}/${result.screenshotPaths.length}.`,
+      });
+    }
+
+    return;
+  }
 
   await bot.sendPhoto(chatId, result.screenshotPath, {
     caption: 'Ảnh lịch trình chuyến bay từ 1Booking.',

@@ -1,0 +1,28 @@
+{
+  "caseId": "BK-20260519-163328",
+  "status": "completed",
+  "rawMessage": "khách muốn bay từ hcm ra hn vào ngày mai",
+  "createdAt": "2026-05-19T09:33:28.270Z",
+  "updatedAt": "2026-05-19T09:34:02.456Z",
+  "parsedRequest": {
+    "fromAirportCode": "SGN",
+    "fromAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "toAirportCode": "HAN",
+    "toAirportText": "Sân bay Nội Bài (HAN)",
+    "departureDate": "2026-05-20",
+    "returnDate": null,
+    "preferredTime": null,
+    "specificTime": null,
+    "tripType": "one_way",
+    "missingFields": []
+  },
+  "searchInput": {
+    "fromAirportCode": "SGN",
+    "fromAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "toAirportCode": "HAN",
+    "toAirportText": "Sân bay Nội Bài (HAN)",
+    "departureDate": "2026-05-20"
+  },
+  "flightCount": 52,
+  "screenshotPath": "screenshots/1booking-search-flights.png"
+}

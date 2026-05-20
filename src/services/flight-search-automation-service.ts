@@ -10,11 +10,12 @@ export type FlightSearchAutomationResult =
       ok: true;
       flightCount: number;
       screenshotPath: string;
+      screenshotPaths: string[];
     }
   | {
       ok: false;
       message: string;
-    errorScreenshotPath: string | null;
+      errorScreenshotPath: string | null;
     };
 
 const MAX_ONE_BOOKING_SEARCH_ATTEMPTS = 2;
@@ -60,6 +61,7 @@ async function searchOneBookingFlightsUnlocked(
         ok: true,
         flightCount: result.flightCount,
         screenshotPath: result.screenshotPath,
+        screenshotPaths: result.screenshotPaths,
       };
     } catch (error) {
       lastError = error;

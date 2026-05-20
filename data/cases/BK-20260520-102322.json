@@ -1,0 +1,37 @@
+{
+  "caseId": "BK-20260520-102322",
+  "status": "completed",
+  "rawMessage": "tìm lại cho anh nhưng từ Hà Nội về HCM 26/06",
+  "createdAt": "2026-05-20T03:23:22.075Z",
+  "updatedAt": "2026-05-20T03:23:44.742Z",
+  "parsedRequest": {
+    "fromAirportCode": "HAN",
+    "fromAirportText": "Sân bay Nội Bài (HAN)",
+    "toAirportCode": "SGN",
+    "toAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "departureDate": "2026-06-26",
+    "returnDate": null,
+    "preferredTime": null,
+    "specificTime": null,
+    "tripType": "one_way",
+    "missingFields": []
+  },
+  "searchInput": {
+    "fromAirportCode": "HAN",
+    "fromAirportText": "Sân bay Nội Bài (HAN)",
+    "toAirportCode": "SGN",
+    "toAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "departureDate": "2026-06-26"
+  },
+  "flightCount": 68,
+  "screenshotPath": "screenshots/1booking-search-flights-1.png",
+  "screenshotPaths": [
+    "screenshots/1booking-search-flights-1.png",
+    "screenshots/1booking-search-flights-2.png",
+    "screenshots/1booking-search-flights-3.png",
+    "screenshots/1booking-search-flights-4.png",
+    "screenshots/1booking-search-flights-5.png",
+    "screenshots/1booking-search-flights-6.png",
+    "screenshots/1booking-search-flights-7.png"
+  ]
+}

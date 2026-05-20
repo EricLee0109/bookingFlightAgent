@@ -1,0 +1,22 @@
+{
+  "caseId": "BK-20260520-102306",
+  "status": "needs_input",
+  "rawMessage": "tìm lại cho anh nhưng từ Hà Nội về HCM",
+  "createdAt": "2026-05-20T03:23:06.474Z",
+  "updatedAt": "2026-05-20T03:23:08.639Z",
+  "parsedRequest": {
+    "fromAirportCode": "HAN",
+    "fromAirportText": "Sân bay Nội Bài (HAN)",
+    "toAirportCode": "SGN",
+    "toAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "departureDate": null,
+    "returnDate": null,
+    "preferredTime": null,
+    "specificTime": null,
+    "tripType": "one_way",
+    "missingFields": [
+      "departureDate"
+    ]
+  },
+  "errorMessage": "Missing fields: departureDate"
+}

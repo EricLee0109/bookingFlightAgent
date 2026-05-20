@@ -7,7 +7,7 @@ import {
   type SearchFlightsInput,
 } from './search-flight-input';
 import { submitFlightSearch } from './search-form';
-import { takeFlightResultsScreenshot } from './screenshots';
+import { takeFlightResultsBatchScreenshots } from './screenshots';
 import {
   throwIfOneBookingLoginModalVisible,
   waitForFlightResultsReady,
@@ -17,6 +17,7 @@ export type SearchFlightsResult = {
   success: boolean;
   flightCount: number;
   screenshotPath: string;
+  screenshotPaths: string[];
 };
 
 export type { SearchFlightsInput } from './search-flight-input';
@@ -63,14 +64,20 @@ export async function searchFlights(
 
   const flightCount = await waitForFlightResultsReady(page);
 
-  const screenshotPath = await takeFlightResultsScreenshot(
+  const screenshotPaths = await takeFlightResultsBatchScreenshots(
     page,
-    '1booking-search-flights.png',
+    '1booking-search-flights',
   );
+  const [screenshotPath] = screenshotPaths;
+
+  if (!screenshotPath) {
+    throw new Error('Expected at least one flight result screenshot.');
+  }
 
   return {
     success: true,
     flightCount,
     screenshotPath,
+    screenshotPaths,
   };
 }

@@ -15,7 +15,7 @@ async function main() {
     });
 
     console.log(
-      `Found ${result.flightCount} flight result(s). Screenshot saved at: ${result.screenshotPath}`,
+      `Found ${result.flightCount} flight result(s). Screenshot(s) saved at: ${result.screenshotPaths.join(', ')}`,
     );
   } catch (error) {
     console.error('1Booking search failed:', error);

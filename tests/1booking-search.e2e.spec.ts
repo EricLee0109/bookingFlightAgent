@@ -42,6 +42,11 @@ test('searches 1Booking flights with departure date', async ({ browser }) => {
     expect(result.success).toBe(true);
     expect(result.flightCount).toBeGreaterThan(0);
     expect(existsSync(result.screenshotPath)).toBe(true);
+    expect(result.screenshotPaths.length).toBeGreaterThan(0);
+    expect(result.screenshotPaths.length).toBe(Math.ceil(result.flightCount / 15));
+    for (const screenshotPath of result.screenshotPaths) {
+      expect(existsSync(screenshotPath)).toBe(true);
+    }
   } catch (error) {
     await takeFullPageScreenshot(page, '1booking-search-e2e-failed.png');
     throw error;
