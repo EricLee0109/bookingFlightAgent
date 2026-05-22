@@ -61,8 +61,8 @@ export function parseFlightSelectionMessage(
 
   const input = SelectMatchingFlightInputSchema.parse({
     caseId,
-    airlineCode: airline.code,
-    airlineName: airline.name,
+    airlineCode: airline?.code,
+    airlineName: airline?.name,
     departureTime,
     bookingClass,
   });
