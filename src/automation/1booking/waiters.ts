@@ -26,20 +26,47 @@ export async function throwIfOneBookingLoginModalVisible(
   page: Page,
   timeoutMs = 1500,
 ) {
-  const passwordInput = page.locator('input[type="password"]').first();
-  const loginModalVisible = await passwordInput
-    .waitFor({
-      state: 'visible',
-      timeout: timeoutMs,
-    })
-    .then(() => true)
-    .catch(() => false);
+  await page.waitForTimeout(timeoutMs).catch(() => null);
 
-  if (loginModalVisible) {
+  if (await hasOneBookingAuthExpiredState(page)) {
     throw new Error(
       '1Booking auth session expired or login is required. Run pnpm run save-auth:dev, then retry the search.',
     );
   }
+}
+
+/**
+ * Detects expired 1Booking auth from both the login modal and API 498 toast.
+ *
+ * 1Booking can show a delayed "Phiên đăng nhập đã hết hạn" notification before
+ * or alongside the password modal, so checking only the password input can miss
+ * the actual expired-session state.
+ */
+async function hasOneBookingAuthExpiredState(page: Page) {
+  const passwordInput = page.locator('input[type="password"]').first();
+  const loginModalVisible = await passwordInput
+    .isVisible({
+      timeout: 500,
+    })
+    .catch(() => false);
+
+  if (loginModalVisible) {
+    return true;
+  }
+
+  const bodyText = await page
+    .locator('body')
+    .innerText({
+      timeout: 500,
+    })
+    .catch(() => '');
+  const normalizedText = normalizeVietnameseUiText(bodyText);
+
+  return (
+    normalizedText.includes('loi 498') ||
+    normalizedText.includes('phien dang nhap da het han') ||
+    normalizedText.includes('dang nhap')
+  );
 }
 
 function parseFlightResultCount(text: string) {
@@ -102,6 +129,30 @@ async function hasVisibleProviderSearchLoading(page: Page) {
     .catch(() => false);
 }
 
+async function hasProviderSearchLoadingInBody(page: Page) {
+  const bodyText = await page
+    .locator('body')
+    .innerText({
+      timeout: 500,
+    })
+    .catch(() => '');
+  const normalizedText = normalizeVietnameseUiText(bodyText);
+
+  return normalizedText.includes('dang tim he thong');
+}
+
+/**
+ * Normalizes 1Booking Vietnamese UI text before loading-state detection.
+ */
+function normalizeVietnameseUiText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'd')
+    .toLowerCase();
+}
+
 /**
  * Waits for provider-level background fetching to finish after cards appear.
  *
@@ -114,7 +165,7 @@ export async function waitForProviderSearchToSettle(page: Page) {
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMs) {
-    if (!(await hasVisibleProviderSearchLoading(page))) {
+    if (!(await hasProviderSearchLoadingInBody(page))) {
       return;
     }
 

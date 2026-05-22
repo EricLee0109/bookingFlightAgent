@@ -1,7 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { type SearchFlightsInput } from '../automation/1booking/flight-search';
-import { type ParsedFlightRequest } from '../contracts/flight';
+import { type ParsedFlightRequest, type SelectedFlight } from '../contracts/flight';
+import { BOOKING_CASE_REGEX } from '../automation/1booking/constants';
 
 export type LocalFlightCaseStatus =
   | 'received'
@@ -9,6 +10,9 @@ export type LocalFlightCaseStatus =
   | 'needs_input'
   | 'searching'
   | 'completed'
+  | 'selecting'
+  | 'selected'
+  | 'selection_failed'
   | 'failed';
 
 export type LocalFlightCase = {
@@ -20,6 +24,9 @@ export type LocalFlightCase = {
   flightCount?: number;
   screenshotPath?: string;
   screenshotPaths?: string[];
+  selectedFlight?: SelectedFlight;
+  selectionScreenshotPath?: string;
+  selectionErrorMessage?: string;
   errorMessage?: string;
   createdAt: string;
   updatedAt: string;
@@ -83,6 +90,35 @@ export async function saveLocalFlightCase(flightCase: LocalFlightCase) {
     getCasePath(flightCase.caseId),
     `${JSON.stringify(flightCase, null, 2)}\n`,
   );
+}
+
+/**
+ * Reads one local flight case by id.
+ *
+ * Selection and hold-booking phases use this to continue from the previously
+ * saved search input instead of asking the operator to repeat the full request.
+ */
+export async function readLocalFlightCase(caseId: string) {
+  if (!BOOKING_CASE_REGEX.test(caseId)) {
+    throw new Error(`Invalid local case id: ${caseId}`);
+  }
+
+  try {
+    const rawCase = await fs.readFile(getCasePath(caseId), 'utf8');
+
+    return JSON.parse(rawCase) as LocalFlightCase;
+  } catch (error) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'ENOENT'
+    ) {
+      return null;
+    }
+
+    throw error;
+  }
 }
 
 /**

@@ -22,3 +22,6 @@ export const ONE_BOOKING_VIEWPORT = {
 
 // Default timeouts to stop automation if exceed
 export const DEFAULT_TIMEOUT = 30000;
+
+// Booking Case regex
+export const BOOKING_CASE_REGEX= /\bBK-\d{8}-\d{6}\b/i;

@@ -1,4 +1,5 @@
 import { type Page } from 'playwright';
+import { throwIfOneBookingLoginModalVisible } from './waiters';
 
 type AnchorBox = {
   x: number;
@@ -34,43 +35,48 @@ export async function clickVisibleAirportOption(
     hasText: new RegExp(`\\b${escapeRegExp(normalizedAirportCode)}\\b`),
   });
 
-  await page.waitForFunction(
-    ({ anchor, code, text }) =>
-      Array.from(document.querySelectorAll('p')).some((element) => {
-        const rect = element.getBoundingClientRect();
-        const isVisible = Boolean(rect.width || rect.height);
-        const optionCenterX = rect.x + rect.width / 2;
-        const anchorCenterX = anchor.x + anchor.width / 2;
-        const verticallyBelowAnchor =
-          rect.y >= anchor.y + anchor.height - 8 &&
-          rect.y <= anchor.y + 520;
-        const horizontallyNearAnchor =
-          Math.abs(optionCenterX - anchorCenterX) <= 360;
-        const optionText = element.textContent ?? '';
-        const normalizedOptionText = optionText
-          .normalize('NFD')
-          .replace(/\p{Diacritic}/gu, '')
-          .toLowerCase();
-        const normalizedExpectedText = text
-          .normalize('NFD')
-          .replace(/\p{Diacritic}/gu, '')
-          .toLowerCase();
+  try {
+    await page.waitForFunction(
+      ({ anchor, code, text }) =>
+        Array.from(document.querySelectorAll('p')).some((element) => {
+          const rect = element.getBoundingClientRect();
+          const isVisible = Boolean(rect.width || rect.height);
+          const optionCenterX = rect.x + rect.width / 2;
+          const anchorCenterX = anchor.x + anchor.width / 2;
+          const verticallyBelowAnchor =
+            rect.y >= anchor.y + anchor.height - 8 &&
+            rect.y <= anchor.y + 520;
+          const horizontallyNearAnchor =
+            Math.abs(optionCenterX - anchorCenterX) <= 360;
+          const optionText = element.textContent ?? '';
+          const normalizedOptionText = optionText
+            .normalize('NFD')
+            .replace(/\p{Diacritic}/gu, '')
+            .toLowerCase();
+          const normalizedExpectedText = text
+            .normalize('NFD')
+            .replace(/\p{Diacritic}/gu, '')
+            .toLowerCase();
 
-        return (
-          isVisible &&
-          verticallyBelowAnchor &&
-          horizontallyNearAnchor &&
-          (optionText.includes(`(${code})`) ||
-            normalizedOptionText.includes(normalizedExpectedText))
-        );
-      }),
-    {
-      anchor: anchorBox,
-      code: normalizedAirportCode,
-      text: airportText,
-    },
-    { timeout: 10000 },
-  );
+          return (
+            isVisible &&
+            verticallyBelowAnchor &&
+            horizontallyNearAnchor &&
+            (optionText.includes(`(${code})`) ||
+              normalizedOptionText.includes(normalizedExpectedText))
+          );
+        }),
+      {
+        anchor: anchorBox,
+        code: normalizedAirportCode,
+        text: airportText,
+      },
+      { timeout: 30000 },
+    );
+  } catch (error) {
+    await throwIfOneBookingLoginModalVisible(page, 0);
+    throw error;
+  }
 
   const count = await options.count();
 
@@ -99,6 +105,7 @@ export async function selectAirport(page: Page, input: SelectAirportInput) {
 
   await textbox.click();
   await textbox.fill(input.airportCode);
+  await throwIfOneBookingLoginModalVisible(page, 1000);
   const anchorBox = await textbox.boundingBox();
 
   if (!anchorBox) {

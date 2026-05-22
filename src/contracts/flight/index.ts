@@ -16,3 +16,12 @@ export {
   type AutomationSupportValidation,
   type SearchFlightInputValidation,
 } from './search-flight-validation';
+export {
+  BOOKING_CLASS_LABELS,
+  BookingClassSchema,
+  SelectMatchingFlightInputSchema,
+  type BookingClass,
+  type FlightSelectionCandidate,
+  type SelectedFlight,
+  type SelectMatchingFlightInput,
+} from './flight-selection';

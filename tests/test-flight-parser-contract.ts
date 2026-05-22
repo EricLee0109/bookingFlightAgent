@@ -12,10 +12,13 @@ import {
   createFlightRequestParser,
   getFlightParserProvider,
 } from '../src/agent/flight-request-parser-factory';
+import { parseFlightSelectionMessage } from '../src/agent/flight-selection-parser';
 import {
   buildFlightParserSystemPrompt,
   createOpenAIFlightRequestParser,
 } from '../src/agent/openai-flight-request-parser';
+import { matchFlightSelectionCandidate } from '../src/automation/1booking/flight-selection';
+import { throwIfOneBookingLoginModalVisible } from '../src/automation/1booking/waiters';
 import { ParsedFlightRequestSchema } from '../src/contracts/flight';
 
 const validOneWayRequest = {
@@ -156,6 +159,187 @@ function testAirportCatalogCodeLookup() {
 }
 
 /**
+ * Verifies that selection parsing extracts case id, airline, time, and ECO by default.
+ */
+function testFlightSelectionParserDefaultsEco() {
+  const result = parseFlightSelectionMessage(
+    'BK-20260520-155949 chọn Vietjet lúc 5h00',
+  );
+
+  assert.equal(result.isSelectionMessage, true);
+
+  if (!result.isSelectionMessage || !result.ok) {
+    throw new Error('Expected valid selection parse result.');
+  }
+
+  assert.equal(result.input.caseId, 'BK-20260520-155949');
+  assert.equal(result.input.airlineCode, 'VJ');
+  assert.equal(result.input.departureTime, '05:00');
+  assert.equal(result.input.bookingClass, 'ECO');
+}
+
+/**
+ * Verifies that selection parsing maps booking class aliases.
+ */
+function testFlightSelectionParserBookingClassAliases() {
+  const deluxe = parseFlightSelectionMessage(
+    'BK-20260520-155949 chọn VJ 05:00 deluxe',
+  );
+  const skyBoss = parseFlightSelectionMessage(
+    'BK-20260520-155949 chọn VJ 05:00 skyboss',
+  );
+  const skyBossBusiness = parseFlightSelectionMessage(
+    'BK-20260520-155949 chọn VJ 05:00 SkyBoss Business',
+  );
+
+  assert.equal(deluxe.isSelectionMessage && deluxe.ok && deluxe.input.bookingClass, 'DLX');
+  assert.equal(skyBoss.isSelectionMessage && skyBoss.ok && skyBoss.input.bookingClass, 'SGB');
+  assert.equal(
+    skyBossBusiness.isSelectionMessage &&
+      skyBossBusiness.ok &&
+      skyBossBusiness.input.bookingClass,
+    'SBB',
+  );
+}
+
+/**
+ * Verifies that selection parser asks for missing airline/time before automation.
+ */
+function testFlightSelectionParserRejectsMissingFields() {
+  const result = parseFlightSelectionMessage('BK-20260520-155949 chọn chuyến này');
+
+  assert.equal(result.isSelectionMessage, true);
+
+  if (!result.isSelectionMessage || result.ok) {
+    throw new Error('Expected invalid selection parse result.');
+  }
+
+  assert.deepEqual(result.missingFields, ['airline', 'departureTime']);
+}
+
+/**
+ * Verifies that matcher selects only exact airline, time, and booking class.
+ */
+function testFlightSelectionMatcher() {
+  const candidates = [
+    {
+      cardIndex: 0,
+      airlineCode: 'VJ',
+      airlineName: 'Vietjet Air',
+      flightNumber: 'VJ120',
+      departureTime: '05:00',
+      arrivalTime: '07:10',
+      bookingClass: 'ECO',
+      priceText: 'VND 2,322,200',
+    },
+    {
+      cardIndex: 1,
+      airlineCode: 'VJ',
+      airlineName: 'Vietjet Air',
+      flightNumber: 'VJ124',
+      departureTime: '06:05',
+      arrivalTime: '08:15',
+      bookingClass: 'ECO',
+      priceText: 'VND 2,322,200',
+    },
+  ] as const;
+
+  const match = matchFlightSelectionCandidate([...candidates], {
+    caseId: 'BK-20260520-155949',
+    airlineCode: 'VJ',
+    airlineName: 'Vietjet Air',
+    departureTime: '05:00',
+    bookingClass: 'ECO',
+  });
+
+  assert.equal(match.ok, true);
+
+  if (match.ok) {
+    assert.equal(match.candidate.flightNumber, 'VJ120');
+  }
+
+  const noMatch = matchFlightSelectionCandidate([...candidates], {
+    caseId: 'BK-20260520-155949',
+    airlineCode: 'VJ',
+    airlineName: 'Vietjet Air',
+    departureTime: '05:00',
+    bookingClass: 'DLX',
+  });
+
+  assert.equal(noMatch.ok, false);
+}
+
+/**
+ * Verifies that the auth waiter catches 1Booking API 498 expired-session UI.
+ */
+async function testOneBookingAuthExpiredToastDetection() {
+  const fakePage = {
+    async waitForTimeout() {
+      return null;
+    },
+    locator(selector: string) {
+      if (selector === 'input[type="password"]') {
+        return {
+          first() {
+            return {
+              async isVisible() {
+                return false;
+              },
+            };
+          },
+        };
+      }
+
+      return {
+        async innerText() {
+          return 'Lỗi 498 Phiên đăng nhập đã hết hạn';
+        },
+      };
+    },
+  };
+
+  await assert.rejects(
+    () => throwIfOneBookingLoginModalVisible(fakePage as never, 0),
+    /auth session expired/,
+  );
+}
+
+/**
+ * Verifies that the auth waiter still catches the direct password modal.
+ */
+async function testOneBookingAuthExpiredPasswordModalDetection() {
+  const fakePage = {
+    async waitForTimeout() {
+      return null;
+    },
+    locator(selector: string) {
+      if (selector === 'input[type="password"]') {
+        return {
+          first() {
+            return {
+              async isVisible() {
+                return true;
+              },
+            };
+          },
+        };
+      }
+
+      return {
+        async innerText() {
+          return '';
+        },
+      };
+    },
+  };
+
+  await assert.rejects(
+    () => throwIfOneBookingLoginModalVisible(fakePage as never, 0),
+    /auth session expired/,
+  );
+}
+
+/**
  * Verifies that parser provider selection defaults to mock and supports openai.
  */
 function testParserFactoryProviderSelection() {
@@ -251,6 +435,12 @@ async function main() {
   testAirportCatalogAliases();
   testOpenAIParserPromptIncludesAirportCatalog();
   testAirportCatalogCodeLookup();
+  testFlightSelectionParserDefaultsEco();
+  testFlightSelectionParserBookingClassAliases();
+  testFlightSelectionParserRejectsMissingFields();
+  testFlightSelectionMatcher();
+  await testOneBookingAuthExpiredToastDetection();
+  await testOneBookingAuthExpiredPasswordModalDetection();
   testParserFactoryProviderSelection();
   testOpenAIParserRequiresApiKey();
   await testOpenAIParserRejectsInvalidOutput();

@@ -1,4 +1,9 @@
-import { type ParsedFlightRequest } from '../contracts/flight';
+import {
+  BOOKING_CLASS_LABELS,
+  type FlightSelectionCandidate,
+  type ParsedFlightRequest,
+  type SelectMatchingFlightInput,
+} from '../contracts/flight';
 
 /**
  * Formats the parsed flight request into a readable Telegram message.
@@ -80,6 +85,76 @@ export function formatSearchFailedMessage() {
     '- UI 1Booking chưa load xong.',
     '- Selector thay đổi.',
     '- Không có chuyến phù hợp.',
+    '',
+    'Mình sẽ gửi screenshot lỗi bên dưới nếu có.',
+  ].join('\n');
+}
+
+/**
+ * Formats a selection parse error for Telegram.
+ *
+ * The operator must include the case id, airline, and departure time before the
+ * bot can safely rerun 1Booking and select a refreshed flight card.
+ */
+export function formatFlightSelectionParseFailedMessage(missingFields: string[]) {
+  return [
+    'Mình chưa đủ thông tin để chọn chuyến.',
+    '',
+    `Còn thiếu: ${missingFields.join(', ')}`,
+    '',
+    'Vui lòng gửi dạng:',
+    'BK-YYYYMMDD-HHMMSS chọn Vietjet lúc 05:00 hạng Eco',
+  ].join('\n');
+}
+
+/**
+ * Formats the selected-flight request before automation starts.
+ */
+export function formatFlightSelectionStartedMessage(
+  input: SelectMatchingFlightInput,
+) {
+  return [
+    `Đang mở lại case ${input.caseId} và kiểm tra chuyến còn khả dụng trên 1Booking...`,
+    '',
+    `Hãng: ${input.airlineName} (${input.airlineCode})`,
+    `Giờ bay: ${input.departureTime}`,
+    `Hạng đặt chỗ: ${BOOKING_CLASS_LABELS[input.bookingClass]} (${input.bookingClass})`,
+  ].join('\n');
+}
+
+/**
+ * Formats a successful selected-flight confirmation.
+ *
+ * Flight number is shown only after automation reads it from the matched card.
+ */
+export function formatFlightSelectionSuccessMessage(
+  selectedFlight: FlightSelectionCandidate,
+) {
+  return [
+    'Đã chọn đúng chuyến trên 1Booking.',
+    '',
+    `Hãng: ${selectedFlight.airlineName} (${selectedFlight.airlineCode})`,
+    `Mã chuyến: ${selectedFlight.flightNumber}`,
+    `Giờ bay: ${selectedFlight.departureTime}${
+      selectedFlight.arrivalTime ? ` - ${selectedFlight.arrivalTime}` : ''
+    }`,
+    `Hạng đặt chỗ: ${BOOKING_CLASS_LABELS[selectedFlight.bookingClass]} (${selectedFlight.bookingClass})`,
+    selectedFlight.priceText ? `Giá hiển thị: ${selectedFlight.priceText}` : null,
+    '',
+    'Mình đã bấm Giữ chỗ và dừng ở màn hình thông tin khách hàng để review.',
+  ]
+    .filter((line): line is string => line !== null)
+    .join('\n');
+}
+
+/**
+ * Formats a selection failure for Telegram.
+ */
+export function formatFlightSelectionFailedMessage(message: string) {
+  return [
+    'Không thể chọn chuyến trên 1Booking.',
+    '',
+    message,
     '',
     'Mình sẽ gửi screenshot lỗi bên dưới nếu có.',
   ].join('\n');

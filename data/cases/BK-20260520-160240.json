@@ -1,0 +1,26 @@
+{
+  "caseId": "BK-20260520-160240",
+  "status": "needs_input",
+  "rawMessage": "debug_on",
+  "createdAt": "2026-05-20T09:02:40.402Z",
+  "updatedAt": "2026-05-20T09:02:42.400Z",
+  "parsedRequest": {
+    "fromAirportCode": null,
+    "fromAirportText": null,
+    "toAirportCode": null,
+    "toAirportText": null,
+    "departureDate": null,
+    "returnDate": null,
+    "preferredTime": null,
+    "specificTime": null,
+    "tripType": "one_way",
+    "missingFields": [
+      "fromAirportCode",
+      "fromAirportText",
+      "toAirportCode",
+      "toAirportText",
+      "departureDate"
+    ]
+  },
+  "errorMessage": "Missing fields: fromAirportCode, fromAirportText, toAirportCode, toAirportText, departureDate"
+}

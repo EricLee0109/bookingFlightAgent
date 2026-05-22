@@ -1,4 +1,5 @@
 import TelegramBot from 'node-telegram-bot-api';
+import { parseFlightSelectionMessage } from '../agent/flight-selection-parser';
 import { createFlightRequestParser } from '../agent/flight-request-parser-factory';
 import {
   mapParsedRequestToSearchFlightsInput,
@@ -9,14 +10,20 @@ import {
   validateSearchFlightInput,
 } from '../contracts/flight';
 import { searchOneBookingFlights } from '../services/flight-search-automation-service';
+import { selectMatchingOneBookingFlight } from '../services/flight-selection-automation-service';
 import {
   createLocalFlightCase,
+  readLocalFlightCase,
   updateLocalFlightCase,
 } from '../storage/local-case-store';
 import { appendLocalLog } from '../storage/local-log-store';
 import { readLocalAgentSettings } from '../storage/local-settings-store';
 import { isAllowedTelegramOperator } from './telegram-access';
 import {
+  formatFlightSelectionFailedMessage,
+  formatFlightSelectionParseFailedMessage,
+  formatFlightSelectionStartedMessage,
+  formatFlightSelectionSuccessMessage,
   formatMissingFlightFieldsMessage,
   formatParserFailedMessage,
   formatParsedRequestMessage,
@@ -83,6 +90,28 @@ export async function handleTelegramMessage(
 
   if (!settings.agentEnabled) {
     await bot.sendMessage(chatId, 'Agent hiện đang tắt. Dùng /agent_on để bật lại.');
+    return;
+  }
+
+  const selectionParseResult = parseFlightSelectionMessage(text);
+
+  if (selectionParseResult.isSelectionMessage) {
+    if (!selectionParseResult.ok) {
+      await bot.sendMessage(
+        chatId,
+        formatFlightSelectionParseFailedMessage(
+          selectionParseResult.missingFields,
+        ),
+      );
+      return;
+    }
+
+    await handleTelegramFlightSelection(
+      bot,
+      chatId,
+      telegramUserId,
+      selectionParseResult.input,
+    );
     return;
   }
 
@@ -306,5 +335,121 @@ export async function handleTelegramMessage(
 
   await bot.sendPhoto(chatId, result.screenshotPath, {
     caption: 'Ảnh lịch trình chuyến bay từ 1Booking.',
+  });
+}
+
+/**
+ * Handles selecting a flight from a previous Telegram search case.
+ *
+ * The selection path updates the existing case memory and calls the dedicated
+ * 1Booking selection service instead of creating a new flight-search case.
+ */
+async function handleTelegramFlightSelection(
+  bot: TelegramBot,
+  chatId: number,
+  telegramUserId: number,
+  selectionInput: Parameters<typeof selectMatchingOneBookingFlight>[0],
+) {
+  const existingCase = await readLocalFlightCase(selectionInput.caseId);
+
+  if (!existingCase) {
+    await bot.sendMessage(
+      chatId,
+      formatFlightSelectionFailedMessage(
+        `Không tìm thấy case ${selectionInput.caseId}. Vui lòng kiểm tra lại caseId.`,
+      ),
+    );
+    return;
+  }
+
+  if (!existingCase.searchInput) {
+    await bot.sendMessage(
+      chatId,
+      formatFlightSelectionFailedMessage(
+        `Case ${selectionInput.caseId} chưa có searchInput. Vui lòng search chuyến trước rồi mới chọn.`,
+      ),
+    );
+    return;
+  }
+
+  let currentCase = await updateLocalFlightCase(existingCase, {
+    status: 'selecting',
+    selectionErrorMessage: undefined,
+  });
+
+  await appendLocalLog({
+    level: 'info',
+    event: 'flight_selection_requested',
+    caseId: selectionInput.caseId,
+    message: 'Received Telegram flight selection request.',
+    meta: {
+      telegramUserId,
+      chatId,
+      selectionInput,
+    },
+  });
+
+  await bot.sendMessage(
+    chatId,
+    formatFlightSelectionStartedMessage(selectionInput),
+  );
+
+  const result = await selectMatchingOneBookingFlight(selectionInput);
+
+  if (!result.ok) {
+    await updateLocalFlightCase(currentCase, {
+      status: 'selection_failed',
+      selectionErrorMessage: result.message,
+      selectionScreenshotPath: result.errorScreenshotPath ?? undefined,
+    });
+    await appendLocalLog({
+      level: 'error',
+      event: 'one_booking_selection_failed',
+      caseId: selectionInput.caseId,
+      message: result.message,
+      meta: {
+        errorScreenshotPath: result.errorScreenshotPath,
+      },
+    });
+
+    await bot.sendMessage(chatId, formatFlightSelectionFailedMessage(result.message));
+
+    if (result.errorScreenshotPath) {
+      await bot.sendPhoto(chatId, result.errorScreenshotPath, {
+        caption: 'Screenshot lỗi khi chọn chuyến trên 1Booking.',
+      });
+    }
+
+    return;
+  }
+
+  const selectedFlight = {
+    ...result.result.selectedFlight,
+    selectedAt: new Date().toISOString(),
+  };
+
+  currentCase = await updateLocalFlightCase(currentCase, {
+    status: 'selected',
+    selectedFlight,
+    selectionScreenshotPath: result.result.screenshotPath,
+  });
+  await appendLocalLog({
+    level: 'info',
+    event: 'one_booking_selection_completed',
+    caseId: currentCase.caseId,
+    message: '1Booking flight selection completed.',
+    meta: {
+      selectedFlight,
+      selectionScreenshotPath: result.result.screenshotPath,
+    },
+  });
+
+  await bot.sendMessage(
+    chatId,
+    formatFlightSelectionSuccessMessage(result.result.selectedFlight),
+  );
+  await bot.sendPhoto(chatId, result.result.screenshotPath, {
+    caption:
+      'Screenshot sau khi bấm Giữ chỗ và vào màn hình thông tin khách hàng.',
   });
 }

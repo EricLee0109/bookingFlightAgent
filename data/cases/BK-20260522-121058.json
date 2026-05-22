@@ -1,0 +1,46 @@
+{
+  "caseId": "BK-20260522-121058",
+  "status": "selected",
+  "rawMessage": "mình muốn check chuyến bay từ HCM ra Đà nẵng vào ngày 26 này",
+  "createdAt": "2026-05-22T05:10:58.724Z",
+  "updatedAt": "2026-05-22T06:12:43.675Z",
+  "parsedRequest": {
+    "fromAirportCode": "SGN",
+    "fromAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "toAirportCode": "DAD",
+    "toAirportText": "Da Nang International Airport (DAD)",
+    "departureDate": "2026-05-26",
+    "returnDate": null,
+    "preferredTime": null,
+    "specificTime": null,
+    "tripType": "one_way",
+    "missingFields": []
+  },
+  "searchInput": {
+    "fromAirportCode": "SGN",
+    "fromAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "toAirportCode": "DAD",
+    "toAirportText": "Da Nang International Airport (DAD)",
+    "departureDate": "2026-05-26"
+  },
+  "flightCount": 40,
+  "screenshotPath": "screenshots/1booking-search-flights-1.png",
+  "screenshotPaths": [
+    "screenshots/1booking-search-flights-1.png",
+    "screenshots/1booking-search-flights-2.png",
+    "screenshots/1booking-search-flights-3.png",
+    "screenshots/1booking-search-flights-4.png"
+  ],
+  "selectionScreenshotPath": "screenshots/BK-20260522-121058-selected-flight.png",
+  "selectedFlight": {
+    "cardIndex": 5,
+    "airlineCode": "VJ",
+    "airlineName": "Vietjet Air",
+    "flightNumber": "VJ648",
+    "departureTime": "20:00",
+    "arrivalTime": "21:20",
+    "bookingClass": "ECO",
+    "priceText": "VND\n1,482,600",
+    "selectedAt": "2026-05-22T06:12:43.675Z"
+  }
+}
