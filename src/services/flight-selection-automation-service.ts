@@ -34,7 +34,8 @@ export async function selectMatchingOneBookingFlight(
   input: SelectMatchingFlightInput,
 ): Promise<FlightSelectionAutomationResult> {
   try {
-    return await runWithAutomationLock('1booking-select-matching-flight', () =>
+    // use this lockName as Vietnamese for end-user understanding
+    return await runWithAutomationLock('✈️ Chọn chuyến bay', () =>
       selectMatchingOneBookingFlightUnlocked(input),
     );
   } catch (error) {

@@ -1,0 +1,47 @@
+{
+  "caseId": "BK-20260525-162456",
+  "status": "selected",
+  "rawMessage": "khách muốn đi chuyến TPHCM ra đà nẵng ngày 20/06",
+  "createdAt": "2026-05-25T09:24:56.818Z",
+  "updatedAt": "2026-05-25T09:52:24.377Z",
+  "parsedRequest": {
+    "fromAirportCode": "SGN",
+    "fromAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "toAirportCode": "DAD",
+    "toAirportText": "Da Nang International Airport (DAD)",
+    "departureDate": "2026-06-20",
+    "returnDate": null,
+    "preferredTime": null,
+    "specificTime": null,
+    "tripType": "one_way",
+    "missingFields": []
+  },
+  "searchInput": {
+    "fromAirportCode": "SGN",
+    "fromAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "toAirportCode": "DAD",
+    "toAirportText": "Da Nang International Airport (DAD)",
+    "departureDate": "2026-06-20"
+  },
+  "flightCount": 46,
+  "screenshotPath": "screenshots/1booking-search-flights-1.png",
+  "screenshotPaths": [
+    "screenshots/1booking-search-flights-1.png",
+    "screenshots/1booking-search-flights-2.png",
+    "screenshots/1booking-search-flights-3.png",
+    "screenshots/1booking-search-flights-4.png",
+    "screenshots/1booking-search-flights-5.png"
+  ],
+  "selectedFlight": {
+    "cardIndex": 0,
+    "airlineCode": "VJ",
+    "airlineName": "Vietjet Air",
+    "flightNumber": "VJ620",
+    "departureTime": "05:00",
+    "arrivalTime": "06:20",
+    "bookingClass": "ECO",
+    "priceText": "VND\n1,644,600",
+    "selectedAt": "2026-05-25T09:52:24.377Z"
+  },
+  "selectionScreenshotPath": "screenshots/BK-20260525-162456-selected-flight.png"
+}

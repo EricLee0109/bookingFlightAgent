@@ -33,7 +33,8 @@ export async function searchOneBookingFlights(
   input: SearchFlightsInput,
 ): Promise<FlightSearchAutomationResult> {
   try {
-    return await runWithAutomationLock('1booking-search-flights', () =>
+    // use this lockName as Vietnamese for end-user understanding
+    return await runWithAutomationLock('🔍 Tìm chuyến bay', () =>
       searchOneBookingFlightsUnlocked(input),
     );
   } catch (error) {

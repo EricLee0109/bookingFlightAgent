@@ -21,7 +21,7 @@ export async function runWithAutomationLock<T>(
   task: () => Promise<T>,
 ) {
   if (lockedBy) {
-    throw new Error(`Automation is busy. Current task: ${lockedBy}.`);
+    throw new Error(`⏳ Agent đang ${lockedBy}. Vui lòng chờ hoàn tất rồi gửi tiếp`);
   }
 
   lockedBy = lockName;

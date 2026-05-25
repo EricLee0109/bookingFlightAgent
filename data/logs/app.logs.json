@@ -823,5 +823,486 @@
       "selectionScreenshotPath": "screenshots/BK-20260522-121058-selected-flight.png"
     },
     "timestamp": "2026-05-22T06:12:43.677Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260525-162456",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-05-25T09:24:56.820Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_search_completed",
+    "caseId": "BK-20260525-162456",
+    "message": "1Booking search completed.",
+    "meta": {
+      "flightCount": 46,
+      "screenshotPath": "screenshots/1booking-search-flights-1.png",
+      "screenshotPaths": [
+        "screenshots/1booking-search-flights-1.png",
+        "screenshots/1booking-search-flights-2.png",
+        "screenshots/1booking-search-flights-3.png",
+        "screenshots/1booking-search-flights-4.png",
+        "screenshots/1booking-search-flights-5.png"
+      ]
+    },
+    "timestamp": "2026-05-25T09:25:19.089Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260525-162610",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-05-25T09:26:10.431Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_search_completed",
+    "caseId": "BK-20260525-162610",
+    "message": "1Booking search completed.",
+    "meta": {
+      "flightCount": 72,
+      "screenshotPath": "screenshots/1booking-search-flights-1.png",
+      "screenshotPaths": [
+        "screenshots/1booking-search-flights-1.png",
+        "screenshots/1booking-search-flights-2.png",
+        "screenshots/1booking-search-flights-3.png",
+        "screenshots/1booking-search-flights-4.png",
+        "screenshots/1booking-search-flights-5.png",
+        "screenshots/1booking-search-flights-6.png",
+        "screenshots/1booking-search-flights-7.png",
+        "screenshots/1booking-search-flights-8.png"
+      ]
+    },
+    "timestamp": "2026-05-25T09:26:33.094Z"
+  },
+  {
+    "level": "info",
+    "event": "flight_selection_requested",
+    "caseId": "BK-20260525-162456",
+    "message": "Received Telegram flight selection request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692,
+      "selectionInput": {
+        "caseId": "BK-20260525-162456",
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "departureTime": "05:00",
+        "bookingClass": "ECO"
+      }
+    },
+    "timestamp": "2026-05-25T09:27:33.817Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_selection_completed",
+    "caseId": "BK-20260525-162456",
+    "message": "1Booking flight selection completed.",
+    "meta": {
+      "selectedFlight": {
+        "cardIndex": 0,
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "flightNumber": "VJ620",
+        "departureTime": "05:00",
+        "arrivalTime": "06:20",
+        "bookingClass": "ECO",
+        "priceText": "VND\n1,644,600",
+        "selectedAt": "2026-05-25T09:28:01.492Z"
+      },
+      "selectionScreenshotPath": "screenshots/BK-20260525-162456-selected-flight.png"
+    },
+    "timestamp": "2026-05-25T09:28:01.494Z"
+  },
+  {
+    "level": "info",
+    "event": "flight_selection_requested",
+    "caseId": "BK-20260525-162456",
+    "message": "Received Telegram flight selection request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692,
+      "selectionInput": {
+        "caseId": "BK-20260525-162456",
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "departureTime": "05:00",
+        "bookingClass": "ECO"
+      }
+    },
+    "timestamp": "2026-05-25T09:42:37.960Z"
+  },
+  {
+    "level": "info",
+    "event": "flight_selection_requested",
+    "caseId": "BK-20260525-162456",
+    "message": "Received Telegram flight selection request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692,
+      "selectionInput": {
+        "caseId": "BK-20260525-162456",
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "departureTime": "05:00",
+        "bookingClass": "ECO"
+      }
+    },
+    "timestamp": "2026-05-25T09:42:40.570Z"
+  },
+  {
+    "level": "error",
+    "event": "one_booking_selection_failed",
+    "caseId": "BK-20260525-162456",
+    "message": "Automation is busy. Current task: 1booking-select-matching-flight.",
+    "meta": {
+      "errorScreenshotPath": null
+    },
+    "timestamp": "2026-05-25T09:42:40.934Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_selection_completed",
+    "caseId": "BK-20260525-162456",
+    "message": "1Booking flight selection completed.",
+    "meta": {
+      "selectedFlight": {
+        "cardIndex": 0,
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "flightNumber": "VJ620",
+        "departureTime": "05:00",
+        "arrivalTime": "06:20",
+        "bookingClass": "ECO",
+        "priceText": "VND\n1,644,600",
+        "selectedAt": "2026-05-25T09:43:07.355Z"
+      },
+      "selectionScreenshotPath": "screenshots/BK-20260525-162456-selected-flight.png"
+    },
+    "timestamp": "2026-05-25T09:43:07.358Z"
+  },
+  {
+    "level": "info",
+    "event": "flight_selection_requested",
+    "caseId": "BK-20260525-162456",
+    "message": "Received Telegram flight selection request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692,
+      "selectionInput": {
+        "caseId": "BK-20260525-162456",
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "departureTime": "05:00",
+        "bookingClass": "ECO"
+      }
+    },
+    "timestamp": "2026-05-25T09:45:21.904Z"
+  },
+  {
+    "level": "info",
+    "event": "flight_selection_requested",
+    "caseId": "BK-20260525-162456",
+    "message": "Received Telegram flight selection request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692,
+      "selectionInput": {
+        "caseId": "BK-20260525-162456",
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "departureTime": "05:00",
+        "bookingClass": "ECO"
+      }
+    },
+    "timestamp": "2026-05-25T09:45:25.560Z"
+  },
+  {
+    "level": "error",
+    "event": "one_booking_selection_failed",
+    "caseId": "BK-20260525-162456",
+    "message": "Automation is busy. Current task: 1booking-select-matching-flight.",
+    "meta": {
+      "errorScreenshotPath": null
+    },
+    "timestamp": "2026-05-25T09:45:25.925Z"
+  },
+  {
+    "level": "info",
+    "event": "flight_selection_requested",
+    "caseId": "BK-20260525-162456",
+    "message": "Received Telegram flight selection request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692,
+      "selectionInput": {
+        "caseId": "BK-20260525-162456",
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "departureTime": "05:00",
+        "bookingClass": "ECO"
+      }
+    },
+    "timestamp": "2026-05-25T09:45:53.539Z"
+  },
+  {
+    "level": "info",
+    "event": "flight_selection_requested",
+    "caseId": "BK-20260525-162456",
+    "message": "Received Telegram flight selection request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692,
+      "selectionInput": {
+        "caseId": "BK-20260525-162456",
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "departureTime": "05:00",
+        "bookingClass": "ECO"
+      }
+    },
+    "timestamp": "2026-05-25T09:45:58.637Z"
+  },
+  {
+    "level": "error",
+    "event": "one_booking_selection_failed",
+    "caseId": "BK-20260525-162456",
+    "message": "⏳ Agent đang xử lý request trước đó. Vui lòng chờ hoàn tất rồi gửi tiếp. Hiện có task đang chạy: 1booking-select-matching-flight.",
+    "meta": {
+      "errorScreenshotPath": null
+    },
+    "timestamp": "2026-05-25T09:45:59.021Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_selection_completed",
+    "caseId": "BK-20260525-162456",
+    "message": "1Booking flight selection completed.",
+    "meta": {
+      "selectedFlight": {
+        "cardIndex": 0,
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "flightNumber": "VJ620",
+        "departureTime": "05:00",
+        "arrivalTime": "06:20",
+        "bookingClass": "ECO",
+        "priceText": "VND\n1,644,600",
+        "selectedAt": "2026-05-25T09:46:43.173Z"
+      },
+      "selectionScreenshotPath": "screenshots/BK-20260525-162456-selected-flight.png"
+    },
+    "timestamp": "2026-05-25T09:46:43.174Z"
+  },
+  {
+    "level": "info",
+    "event": "flight_selection_requested",
+    "caseId": "BK-20260525-162456",
+    "message": "Received Telegram flight selection request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692,
+      "selectionInput": {
+        "caseId": "BK-20260525-162456",
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "departureTime": "05:00",
+        "bookingClass": "ECO"
+      }
+    },
+    "timestamp": "2026-05-25T09:47:45.284Z"
+  },
+  {
+    "level": "info",
+    "event": "flight_selection_requested",
+    "caseId": "BK-20260525-162456",
+    "message": "Received Telegram flight selection request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692,
+      "selectionInput": {
+        "caseId": "BK-20260525-162456",
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "departureTime": "05:00",
+        "bookingClass": "ECO"
+      }
+    },
+    "timestamp": "2026-05-25T09:47:48.568Z"
+  },
+  {
+    "level": "error",
+    "event": "one_booking_selection_failed",
+    "caseId": "BK-20260525-162456",
+    "message": "⏳ Agent đang xử lý request trước đó. Vui lòng chờ hoàn tất rồi gửi tiếp. Hiện có task đang chạy: Đang chọn chuyến bay.",
+    "meta": {
+      "errorScreenshotPath": null
+    },
+    "timestamp": "2026-05-25T09:47:48.930Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_selection_completed",
+    "caseId": "BK-20260525-162456",
+    "message": "1Booking flight selection completed.",
+    "meta": {
+      "selectedFlight": {
+        "cardIndex": 0,
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "flightNumber": "VJ620",
+        "departureTime": "05:00",
+        "arrivalTime": "06:20",
+        "bookingClass": "ECO",
+        "priceText": "VND\n1,644,600",
+        "selectedAt": "2026-05-25T09:48:13.400Z"
+      },
+      "selectionScreenshotPath": "screenshots/BK-20260525-162456-selected-flight.png"
+    },
+    "timestamp": "2026-05-25T09:48:13.402Z"
+  },
+  {
+    "level": "info",
+    "event": "flight_selection_requested",
+    "caseId": "BK-20260525-162456",
+    "message": "Received Telegram flight selection request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692,
+      "selectionInput": {
+        "caseId": "BK-20260525-162456",
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "departureTime": "05:00",
+        "bookingClass": "ECO"
+      }
+    },
+    "timestamp": "2026-05-25T09:50:14.604Z"
+  },
+  {
+    "level": "info",
+    "event": "flight_selection_requested",
+    "caseId": "BK-20260525-162456",
+    "message": "Received Telegram flight selection request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692,
+      "selectionInput": {
+        "caseId": "BK-20260525-162456",
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "departureTime": "05:00",
+        "bookingClass": "ECO"
+      }
+    },
+    "timestamp": "2026-05-25T09:50:17.985Z"
+  },
+  {
+    "level": "error",
+    "event": "one_booking_selection_failed",
+    "caseId": "BK-20260525-162456",
+    "message": "⏳ Agent đang xử lý request trước đó. Vui lòng chờ hoàn tất rồi gửi tiếp - Đang chọn chuyến bay",
+    "meta": {
+      "errorScreenshotPath": null
+    },
+    "timestamp": "2026-05-25T09:50:18.342Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_selection_completed",
+    "caseId": "BK-20260525-162456",
+    "message": "1Booking flight selection completed.",
+    "meta": {
+      "selectedFlight": {
+        "cardIndex": 0,
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "flightNumber": "VJ620",
+        "departureTime": "05:00",
+        "arrivalTime": "06:20",
+        "bookingClass": "ECO",
+        "priceText": "VND\n1,644,600",
+        "selectedAt": "2026-05-25T09:50:42.006Z"
+      },
+      "selectionScreenshotPath": "screenshots/BK-20260525-162456-selected-flight.png"
+    },
+    "timestamp": "2026-05-25T09:50:42.008Z"
+  },
+  {
+    "level": "info",
+    "event": "flight_selection_requested",
+    "caseId": "BK-20260525-162456",
+    "message": "Received Telegram flight selection request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692,
+      "selectionInput": {
+        "caseId": "BK-20260525-162456",
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "departureTime": "05:00",
+        "bookingClass": "ECO"
+      }
+    },
+    "timestamp": "2026-05-25T09:51:56.457Z"
+  },
+  {
+    "level": "info",
+    "event": "flight_selection_requested",
+    "caseId": "BK-20260525-162456",
+    "message": "Received Telegram flight selection request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692,
+      "selectionInput": {
+        "caseId": "BK-20260525-162456",
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "departureTime": "05:00",
+        "bookingClass": "ECO"
+      }
+    },
+    "timestamp": "2026-05-25T09:51:59.092Z"
+  },
+  {
+    "level": "error",
+    "event": "one_booking_selection_failed",
+    "caseId": "BK-20260525-162456",
+    "message": "⏳ Agent đang ✈️ Chọn chuyến bay. Vui lòng chờ hoàn tất rồi gửi tiếp",
+    "meta": {
+      "errorScreenshotPath": null
+    },
+    "timestamp": "2026-05-25T09:51:59.460Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_selection_completed",
+    "caseId": "BK-20260525-162456",
+    "message": "1Booking flight selection completed.",
+    "meta": {
+      "selectedFlight": {
+        "cardIndex": 0,
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "flightNumber": "VJ620",
+        "departureTime": "05:00",
+        "arrivalTime": "06:20",
+        "bookingClass": "ECO",
+        "priceText": "VND\n1,644,600",
+        "selectedAt": "2026-05-25T09:52:24.377Z"
+      },
+      "selectionScreenshotPath": "screenshots/BK-20260525-162456-selected-flight.png"
+    },
+    "timestamp": "2026-05-25T09:52:24.379Z"
   }
 ]
