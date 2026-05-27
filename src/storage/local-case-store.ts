@@ -5,16 +5,44 @@ import { type ParsedFlightRequest, type SelectedFlight } from '../contracts/flig
 import { BOOKING_CASE_REGEX } from '../automation/1booking/constants';
 
 export type LocalFlightCaseStatus =
-  | 'received'
-  | 'parsed'
-  | 'needs_input'
-  | 'searching'
-  | 'completed'
-  | 'selecting'
-  | 'selected'
-  | 'selection_failed'
-  | 'failed';
+  | 'CASE_CREATED'
+  | 'SEARCH_REQUESTED'
+  | 'SEARCH_RUNNING'
+  | 'SEARCH_DONE'
+  | 'OPTIONS_SENT'
+  | 'CUSTOMER_SELECTED_OPTION'
+  | 'OPTION_MATCHED'
+  | 'AWAITING_PASSENGER_INFO'
+  | 'PASSENGER_INFO_RECEIVED'
+  | 'PASSENGER_INFO_PARSED'
+  | 'PASSENGER_INFO_NEEDS_REVIEW'
+  | 'PASSENGER_INFO_CONFIRMED'
+  | 'FILL_PASSENGER_RUNNING'
+  | 'FILL_PASSENGER_DONE'
+  | 'READY_TO_HOLD'
+  | 'HOLD_RUNNING'
+  | 'HOLD_SUCCESS'
+  | 'PNR_EXTRACTED'
+  | 'NEEDS_INPUT'
+  | 'SEARCH_FAILED'
+  | 'OPTION_MATCH_FAILED'
+  | 'PASSENGER_INFO_FAILED'
+  | 'FILL_PASSENGER_FAILED'
+  | 'HOLD_FAILED'
+  | 'PNR_EXTRACT_FAILED'
+  | 'CASE_FAILED';
 
+/**
+ * Local case memory for one Telegram flight request.
+ *
+ * Status lifecycle is intentionally explicit so future phases can resume from
+ * search, option matching, passenger info, form fill, hold, and PNR extraction.
+ *
+ * Important:
+ * - `FILL_PASSENGER_DONE` only means Playwright finished entering passenger data.
+ * - It does not mean 1Booking has held the booking yet.
+ * - The booking is held only after `HOLD_SUCCESS`.
+ */
 export type LocalFlightCase = {
   caseId: string;
   status: LocalFlightCaseStatus;
@@ -65,7 +93,7 @@ export async function createLocalFlightCase(rawMessage: string) {
   const now = new Date().toISOString();
   const flightCase: LocalFlightCase = {
     caseId: createLocalCaseId(),
-    status: 'received',
+    status: 'CASE_CREATED',
     rawMessage,
     createdAt: now,
     updatedAt: now,

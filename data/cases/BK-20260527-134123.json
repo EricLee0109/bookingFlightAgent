@@ -1,0 +1,26 @@
+{
+  "caseId": "BK-20260527-134123",
+  "status": "NEEDS_INPUT",
+  "rawMessage": "danh sách khách hàng",
+  "createdAt": "2026-05-27T06:41:23.320Z",
+  "updatedAt": "2026-05-27T06:41:26.338Z",
+  "parsedRequest": {
+    "fromAirportCode": null,
+    "fromAirportText": null,
+    "toAirportCode": null,
+    "toAirportText": null,
+    "departureDate": null,
+    "returnDate": null,
+    "preferredTime": null,
+    "specificTime": null,
+    "tripType": "one_way",
+    "missingFields": [
+      "fromAirportCode",
+      "fromAirportText",
+      "toAirportCode",
+      "toAirportText",
+      "departureDate"
+    ]
+  },
+  "errorMessage": "Missing fields: fromAirportCode, fromAirportText, toAirportCode, toAirportText, departureDate"
+}

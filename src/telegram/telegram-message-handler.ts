@@ -148,7 +148,7 @@ export async function handleTelegramMessage(
         : 'AI parser failed with an unknown error.';
 
     await updateLocalFlightCase(flightCase, {
-      status: 'failed',
+      status: 'CASE_FAILED',
       errorMessage,
     });
     await appendLocalLog({
@@ -160,9 +160,9 @@ export async function handleTelegramMessage(
     await bot.sendMessage(chatId, formatParserFailedMessage());
     return;
   }
-
+  
   let currentCase = await updateLocalFlightCase(flightCase, {
-    status: 'parsed',
+    status: 'SEARCH_REQUESTED',
     parsedRequest,
   });
 
@@ -189,7 +189,7 @@ export async function handleTelegramMessage(
 
   if (missingFields.length > 0) {
     await updateLocalFlightCase(currentCase, {
-      status: 'needs_input',
+      status: 'NEEDS_INPUT',
       errorMessage: `Missing fields: ${missingFields.join(', ')}`,
     });
     await appendLocalLog({
@@ -210,7 +210,7 @@ export async function handleTelegramMessage(
       'Automation does not support this flight request yet.';
 
     await updateLocalFlightCase(currentCase, {
-      status: 'failed',
+      status: 'CASE_FAILED',
       errorMessage: reason,
     });
     await appendLocalLog({
@@ -234,7 +234,7 @@ export async function handleTelegramMessage(
         : 'Không thể chuyển yêu cầu đã parse sang input tìm chuyến.';
 
     await updateLocalFlightCase(currentCase, {
-      status: 'failed',
+      status: 'CASE_FAILED',
       errorMessage,
     });
     await appendLocalLog({
@@ -248,7 +248,7 @@ export async function handleTelegramMessage(
   }
 
   currentCase = await updateLocalFlightCase(currentCase, {
-    status: 'searching',
+    status: 'SEARCH_RUNNING',
     searchInput,
   });
 
@@ -266,7 +266,7 @@ export async function handleTelegramMessage(
 
   if (!result.ok) {
     await updateLocalFlightCase(currentCase, {
-      status: 'failed',
+      status: 'SEARCH_FAILED',
       errorMessage: result.message,
       screenshotPath: result.errorScreenshotPath ?? undefined,
     });
@@ -291,8 +291,8 @@ export async function handleTelegramMessage(
     return;
   }
 
-  await updateLocalFlightCase(currentCase, {
-    status: 'completed',
+  currentCase = await updateLocalFlightCase(currentCase, {
+    status: 'SEARCH_DONE',
     flightCount: result.flightCount,
     screenshotPath: result.screenshotPath,
     screenshotPaths: result.screenshotPaths,
@@ -330,11 +330,19 @@ export async function handleTelegramMessage(
       caption: 'Download All Files',
     });
 
+    await updateLocalFlightCase(currentCase, {
+      status: 'OPTIONS_SENT',
+    });
+
     return;
   }
 
   await bot.sendPhoto(chatId, result.screenshotPath, {
     caption: 'Ảnh lịch trình chuyến bay từ 1Booking.',
+  });
+
+  await updateLocalFlightCase(currentCase, {
+    status: 'OPTIONS_SENT',
   });
 }
 
@@ -373,7 +381,7 @@ async function handleTelegramFlightSelection(
   }
 
   let currentCase = await updateLocalFlightCase(existingCase, {
-    status: 'selecting',
+    status: 'CUSTOMER_SELECTED_OPTION',
     selectionErrorMessage: undefined,
   });
 
@@ -398,7 +406,7 @@ async function handleTelegramFlightSelection(
 
   if (!result.ok) {
     await updateLocalFlightCase(currentCase, {
-      status: 'selection_failed',
+      status: 'OPTION_MATCH_FAILED',
       selectionErrorMessage: result.message,
       selectionScreenshotPath: result.errorScreenshotPath ?? undefined,
     });
@@ -429,9 +437,12 @@ async function handleTelegramFlightSelection(
   };
 
   currentCase = await updateLocalFlightCase(currentCase, {
-    status: 'selected',
+    status: 'OPTION_MATCHED',
     selectedFlight,
     selectionScreenshotPath: result.result.screenshotPath,
+  });
+  currentCase = await updateLocalFlightCase(currentCase, {
+    status: 'AWAITING_PASSENGER_INFO',
   });
   await appendLocalLog({
     level: 'info',

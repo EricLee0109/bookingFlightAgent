@@ -75,9 +75,9 @@ test('selects a matching ECO flight and opens passenger information page', async
 
   const searchInput = {
     fromAirportCode: 'SGN',
-    fromAirportText: 'SÃ¢n bay TÃ¢n SÆ¡n Nháº¥t (SGN)',
+    fromAirportText: 'Sân bay Tân Sơn Nhất (SGN)',
     toAirportCode: 'HAN',
-    toAirportText: 'SÃ¢n bay Ná»™i BÃ i (HAN)',
+    toAirportText: 'Sân bay Nội Bài (HAN)',
     departureDate: '2026-06-20',
   };
 

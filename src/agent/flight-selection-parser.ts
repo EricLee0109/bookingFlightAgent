@@ -7,6 +7,15 @@ import {
 } from '../contracts/flight';
 import { resolveAirlineFromText } from './airline-catalog';
 
+/**
+ * Agent component for parsing an operator's selected flight message. - MVP selection deterministic INSTEAD OF openAI
+ *
+ * This parser handles the selection intent after search results were already
+ * sent to the customer. It produces a validated selection contract only.
+ * 1Booking availability, flight number, and card selection are verified later
+ * by the selection automation service.
+ */
+
 export type FlightSelectionParseResult =
   | {
       isSelectionMessage: false;
@@ -81,6 +90,11 @@ export function formatBookingClass(bookingClass: BookingClass) {
   return `${BOOKING_CLASS_LABELS[bookingClass]} (${bookingClass})`;
 }
 
+/**
+ * Extracts and normalizes the requested departure time to HH:mm.
+ *
+ * Supported MVP examples: "5h", "5h00", "05:00", "5 gio".
+ */
 function extractDepartureTime(rawMessage: string) {
   const normalized = normalizeVietnameseText(rawMessage);
   const match = normalized.match(

@@ -11,6 +11,15 @@ import {
 } from './airport-resolver';
 
 /**
+ * Agent boundary for converting validated parser output into automation input.
+ *
+ * This component is intentionally separate from the OpenAI parser and
+ * Playwright flow. It is the final safety gate that normalizes airports,
+ * validates required fields, blocks unsupported trip types, and returns only
+ * the exact shape accepted by 1Booking search automation.
+ */
+
+/**
  * Converts a parsed flight request into the exact input shape required by
  * the 1Booking Playwright search flow.
  *

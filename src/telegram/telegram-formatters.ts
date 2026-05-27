@@ -6,6 +6,15 @@ import {
 } from '../contracts/flight';
 
 /**
+ * Telegram presentation component.
+ *
+ * This file only formats operator-facing Telegram text. It must not parse raw
+ * messages, call OpenAI, validate contracts, map automation input, or run
+ * Playwright. Parser logic belongs in src/agent, and automation logic belongs
+ * in src/automation or src/services.
+ */
+
+/**
  * Formats the parsed flight request into a readable Telegram message.
  *
  * This message helps the operator quickly verify what the Agent understood

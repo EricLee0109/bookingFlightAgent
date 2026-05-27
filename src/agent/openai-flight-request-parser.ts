@@ -7,6 +7,16 @@ import {
 import { AIRPORT_CATALOG } from './airport-catalog';
 import { type FlightRequestParser } from './flight-request-parser';
 
+/**
+ * Agent component for parsing raw operator text into the canonical flight request contract. - openAI
+ *
+ * Boundary rules:
+ * - Owns OpenAI prompt construction and structured output validation.
+ * - Does not format Telegram messages.
+ * - Does not map data to Playwright automation input.
+ * - Does not call 1Booking automation.
+ */
+
 type ParsedMessage = {
   parsed?: ParsedFlightRequest | null;
   content?: string | null;
@@ -103,7 +113,9 @@ export function createOpenAIFlightRequestParser(
 /**
  * Builds the stable parser instruction used for Telegram flight requests.
  *
- * Map AIRPORT_CATALOG inside can let's openAI knows
+ * The airport catalog is included here so OpenAI can resolve common Vietnamese
+ * airport names and aliases into our canonical IATA code/text pair.
+ *
  * Keep business rules here so raw model output is constrained before it reaches
  * validation, mapping, or browser automation.
  */

@@ -6,7 +6,11 @@
   "scripts": {
     "telegram:dev": "tsx scripts/start-telegram-agent.ts",
     "save-auth:dev": "tsx scripts/save-auth.ts",
+    "passengers:bootstrap:sample": "tsx scripts/bootstrap-passengers-sample.ts",
+    "passengers:bootstrap:full": "tsx scripts/bootstrap-passengers-full.ts",
+    "passengers:stats": "tsx scripts/passenger-db-stats.ts",
     "test:parser": "tsx tests/test-flight-parser-contract.ts",
+    "test:passengers": "tsx tests/test-passenger-cache-contract.ts",
     "test:e2e:1booking": "playwright test tests/1booking-search.e2e.spec.ts",
     "test:e2e:1booking:headed": "playwright test tests/1booking-search.e2e.spec.ts --headed"
   },
@@ -22,6 +26,7 @@
     "tsx": "^4.21.0"
   },
   "dependencies": {
+    "better-sqlite3": "^12.10.0",
     "dotenv": "^17.4.2",
     "fflate": "^0.8.3",
     "node-telegram-bot-api": "^0.67.0",

@@ -1,5 +1,13 @@
 import { AIRPORT_CATALOG } from './airport-catalog';
 
+/**
+ * Agent helper for resolving airport aliases against the local catalog.
+ *
+ * This component supports parser and mapper recovery only. Playwright
+ * automation should receive canonical airport code/text values after this
+ * boundary has already run.
+ */
+
 export type ResolvedAirport = {
   code: string;
   text: string;
