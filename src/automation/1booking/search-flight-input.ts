@@ -12,11 +12,11 @@ import { formatIsoDateForOneBooking } from './dates';
  * parsed and validated before it is mapped into this type.
  */
 export type SearchFlightsInput = {
-  fromAirportCode: string;
-  fromAirportText: string;
-  toAirportCode: string;
-  toAirportText: string;
-  departureDate: string;
+  fromAirportCode: string | null;
+  fromAirportText: string | null;
+  toAirportCode: string | null;
+  toAirportText: string | null;
+  departureDate: string | null;
 };
 
 export type SearchFlightsInputValidation = {

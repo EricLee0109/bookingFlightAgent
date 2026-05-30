@@ -141,8 +141,8 @@ function extractBookingClass(rawMessage: string): BookingClass {
  */
 function normalizeVietnameseText(value: string) {
   return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .normalize('NFD') //convert Vietnamese Unicode to unaccented (khong co dau) Vietnamese, and drop mark to next space -> Ex: ơ -> o; á -> a
+    .replace(/[\u0300-\u036f]/g, '') //remove mark of Vietnamese Unicode after normalize NFD drop mark -> Ex: không -> kho^ng -> khong
     .replace(/đ/g, 'd')
     .replace(/Đ/g, 'd')
     .toLowerCase();
