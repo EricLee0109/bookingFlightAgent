@@ -170,11 +170,17 @@ function testPassengerStoreAndResolver() {
     const resolver = new PassengerResolver(store);
     const exactResult = resolver.resolve('chi Lanh');
 
-    assert.equal(exactResult.ok, true);
+    assert.equal(exactResult.status, 'matched_but_missing_fields');
 
-    if (exactResult.ok) {
+    if (exactResult.status === 'matched_but_missing_fields') {
       assert.equal(exactResult.profile.normalizedFullName, 'NGUYEN THI LANH');
       assert.equal(exactResult.reason, 'missing_required_field');
+      assert.deepEqual(exactResult.missingFields, [
+        'dob',
+        'idType',
+        'idNumber',
+        'idExpiry',
+      ]);
     }
 
     assert.equal(store.getStats().confidenceScoreCount, 1);
@@ -189,9 +195,14 @@ function testPassengerStoreAndResolver() {
 
     const ambiguousResult = resolver.resolve('Lanh');
 
-    assert.equal(ambiguousResult.ok, false);
+    assert.equal(ambiguousResult.status, 'ambiguous');
     assert.equal(ambiguousResult.reason, 'ambiguous_candidate');
-    assert.equal(ambiguousResult.candidates.length, 2);
+    assert.equal(
+      ambiguousResult.status === 'ambiguous'
+        ? ambiguousResult.candidates.length
+        : 0,
+      2,
+    );
     assert.equal(store.getStats().confidenceScoreCount, 3);
   } finally {
     store.close();

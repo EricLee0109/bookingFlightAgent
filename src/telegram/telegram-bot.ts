@@ -1,5 +1,6 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { handleTelegramMessage } from './telegram-message-handler';
+import { handleTelegramCallbackQuery } from './telegram-passenger-message-handler';
 
 /**
  * Starts the Telegram Agent using long polling.
@@ -35,6 +36,21 @@ export async function startTelegramAgent() {
         await bot.sendMessage(
           message.chat.id,
           '❌ Có lỗi ngoài ý muốn khi xử lý request. Vui lòng kiểm tra log local.',
+        );
+      }
+    }
+  });
+
+  bot.on('callback_query', async (callbackQuery) => {
+    try {
+      await handleTelegramCallbackQuery(bot, callbackQuery);
+    } catch (error) {
+      console.error('Telegram callback handler crashed:', error);
+
+      if (callbackQuery.message?.chat.id) {
+        await bot.sendMessage(
+          callbackQuery.message.chat.id,
+          'Có lỗi khi xử lý lựa chọn khách. Vui lòng kiểm tra log local.',
         );
       }
     }

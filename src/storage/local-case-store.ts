@@ -2,6 +2,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { type SearchFlightsInput } from '../automation/1booking/flight-search';
 import { type ParsedFlightRequest, type SelectedFlight } from '../contracts/flight';
+import { type ParsedPassengerMessage } from '../contracts/passenger';
+import { type PassengerProfile } from '../passengers/passenger-types';
 import { BOOKING_CASE_REGEX } from '../automation/1booking/constants';
 
 export type LocalFlightCaseStatus =
@@ -53,8 +55,11 @@ export type LocalFlightCase = {
   screenshotPath?: string;
   screenshotPaths?: string[];
   selectedFlight?: SelectedFlight;
+  parsedPassengerMessage?: ParsedPassengerMessage;
+  attachedPassenger?: PassengerProfile;
   selectionScreenshotPath?: string;
   selectionErrorMessage?: string;
+  passengerErrorMessage?: string;
   errorMessage?: string;
   createdAt: string;
   updatedAt: string;

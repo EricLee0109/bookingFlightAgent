@@ -47,6 +47,7 @@ type PassengerProfileRow = {
   document_number: string | null;
   document_expiry_date: string | null;
   document_country: string | null;
+  email: string | null;
   source: PassengerProfileInput['source'];
   seen_count: number;
   raw_source_json: string | null;
@@ -91,6 +92,7 @@ export class PassengerStore {
         document_number TEXT,
         document_expiry_date TEXT,
         document_country TEXT,
+        email TEXT,
         source TEXT NOT NULL,
         seen_count INTEGER NOT NULL DEFAULT 1,
         raw_source_json TEXT,
@@ -137,6 +139,8 @@ export class PassengerStore {
       CREATE INDEX IF NOT EXISTS idx_confidence_score_profile_created_at
         ON confidence_score(passenger_profile_id, created_at);
     `);
+
+    this.ensurePassengerProfileColumn('email', 'TEXT');
   }
 
   /**
@@ -189,13 +193,19 @@ export class PassengerStore {
           normalized_full_name,
           title,
           gender,
+          date_of_birth,
+          document_type,
+          document_number,
+          document_expiry_date,
+          document_country,
+          email,
           source,
           seen_count,
           raw_source_json,
           created_at,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
         ON CONFLICT (
           passenger_type,
           normalized_last_name,
@@ -206,6 +216,12 @@ export class PassengerStore {
         DO UPDATE SET
           last_name = excluded.last_name,
           first_name = excluded.first_name,
+          date_of_birth = COALESCE(excluded.date_of_birth, passenger_profiles.date_of_birth),
+          document_type = COALESCE(excluded.document_type, passenger_profiles.document_type),
+          document_number = COALESCE(excluded.document_number, passenger_profiles.document_number),
+          document_expiry_date = COALESCE(excluded.document_expiry_date, passenger_profiles.document_expiry_date),
+          document_country = COALESCE(excluded.document_country, passenger_profiles.document_country),
+          email = COALESCE(excluded.email, passenger_profiles.email),
           source = excluded.source,
           seen_count = passenger_profiles.seen_count + 1,
           raw_source_json = excluded.raw_source_json,
@@ -222,6 +238,12 @@ export class PassengerStore {
         normalizedFullName,
         title,
         gender,
+        input.dateOfBirth ?? null,
+        input.documentType ?? null,
+        input.documentNumber ?? null,
+        input.documentExpiryDate ?? null,
+        input.documentCountry ?? null,
+        input.email ?? null,
         input.source,
         input.rawSourceJson ?? null,
         now,
@@ -293,6 +315,59 @@ export class PassengerStore {
   }
 
   /**
+   * Finds profiles whose canonical normalized full name matches exactly.
+   */
+  findProfilesByNormalizedFullName(rawFullName: string) {
+    this.migrate();
+    const normalizedFullName = normalizePassengerText(rawFullName);
+    const rows = this.db
+      .prepare(
+        `
+        SELECT *
+        FROM passenger_profiles
+        WHERE normalized_full_name = ?
+        ORDER BY seen_count DESC, updated_at DESC;
+      `,
+      )
+      .all(normalizedFullName) as PassengerProfileRow[];
+
+    return rows.map(mapPassengerProfileRow);
+  }
+
+  /**
+   * Returns cached passenger profiles for local scoring.
+   *
+   * The local MVP cache is intentionally small enough to score in process.
+   */
+  listPassengerProfiles(limit = 5000) {
+    this.migrate();
+    const rows = this.db
+      .prepare(
+        `
+        SELECT *
+        FROM passenger_profiles
+        ORDER BY seen_count DESC, updated_at DESC
+        LIMIT ?;
+      `,
+      )
+      .all(limit) as PassengerProfileRow[];
+
+    return rows.map(mapPassengerProfileRow);
+  }
+
+  /**
+   * Reads one cached passenger profile by local id.
+   */
+  getPassengerProfileById(profileId: number) {
+    this.migrate();
+    const row = this.db
+      .prepare('SELECT * FROM passenger_profiles WHERE id = ?;')
+      .get(profileId) as PassengerProfileRow | undefined;
+
+    return row ? mapPassengerProfileRow(row) : null;
+  }
+
+  /**
    * Persists resolver confidence evidence for audit and future tuning.
    */
   insertConfidenceScore(input: ConfidenceScoreInput) {
@@ -359,6 +434,24 @@ export class PassengerStore {
 
     return rows.map((row) => row.normalized_alias);
   }
+
+  /**
+   * Adds a nullable column when an existing local DB predates a schema field.
+   *
+   * SQLite CREATE TABLE IF NOT EXISTS does not evolve existing tables, so the
+   * lean local store applies small additive migrations explicitly.
+   */
+  private ensurePassengerProfileColumn(columnName: string, sqlType: string) {
+    const columns = this.db
+      .prepare('PRAGMA table_info(passenger_profiles);')
+      .all() as Array<{ name: string }>;
+
+    if (!columns.some((column) => column.name === columnName)) {
+      this.db.exec(
+        `ALTER TABLE passenger_profiles ADD COLUMN ${columnName} ${sqlType};`,
+      );
+    }
+  }
 }
 
 function mapPassengerProfileRow(row: PassengerProfileRow): PassengerProfile {
@@ -377,6 +470,7 @@ function mapPassengerProfileRow(row: PassengerProfileRow): PassengerProfile {
     documentNumber: row.document_number,
     documentExpiryDate: row.document_expiry_date,
     documentCountry: row.document_country,
+    email: row.email,
     source: row.source,
     seenCount: row.seen_count,
     rawSourceJson: row.raw_source_json,

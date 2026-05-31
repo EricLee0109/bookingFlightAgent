@@ -31,6 +31,8 @@ import {
   formatSearchSuccessMessage,
 } from './telegram-formatters';
 import { handleTelegramSettingsCommand } from './telegram-settings-commands';
+import { setActivePassengerCase } from './telegram-passenger-context';
+import { tryHandleTelegramPassengerMessage } from './telegram-passenger-message-handler';
 import { createTelegramScreenshotArchive } from './telegram-screenshot-archive';
 
 /**
@@ -112,6 +114,10 @@ export async function handleTelegramMessage(
       telegramUserId,
       selectionParseResult.input,
     );
+    return;
+  }
+
+  if (await tryHandleTelegramPassengerMessage(bot, chatId, text)) {
     return;
   }
 
@@ -444,6 +450,7 @@ async function handleTelegramFlightSelection(
   currentCase = await updateLocalFlightCase(currentCase, {
     status: 'AWAITING_PASSENGER_INFO',
   });
+  setActivePassengerCase(chatId, currentCase.caseId);
   await appendLocalLog({
     level: 'info',
     event: 'one_booking_selection_completed',

@@ -4,6 +4,7 @@ import {
   type ParsedFlightRequest,
   type SelectMatchingFlightInput,
 } from '../contracts/flight';
+import { type PassengerProfile } from '../passengers/passenger-types';
 
 /**
  * Telegram presentation component.
@@ -167,4 +168,99 @@ export function formatFlightSelectionFailedMessage(message: string) {
     '',
     'Mình sẽ gửi screenshot lỗi bên dưới nếu có.',
   ].join('\n');
+}
+
+/**
+ * Formats a ready local passenger candidate before final operator confirmation.
+ */
+export function formatPassengerMatchedMessage(profile: PassengerProfile) {
+  return [
+    'Mình đã tìm thấy khách phù hợp:',
+    '',
+    ...formatPassengerSummaryLines(profile),
+    '',
+    'Vui lòng xác nhận trước khi gắn khách vào case.',
+  ].join('\n');
+}
+
+/**
+ * Formats an ambiguous local resolver result before candidate buttons.
+ */
+export function formatPassengerAmbiguousMessage(candidateCount: number) {
+  return [
+    `Mình tìm thấy ${candidateCount} khách có tên gần giống.`,
+    '',
+    'Vui lòng chọn đúng khách bên dưới.',
+  ].join('\n');
+}
+
+/**
+ * Formats a local resolver miss and requests manual passenger details.
+ */
+export function formatPassengerNotFoundMessage() {
+  return [
+    'Mình chưa tìm thấy khách phù hợp trong dữ liệu local.',
+    '',
+    'Vui lòng nhập họ tên đầy đủ và thông tin khách để mình lưu lại.',
+  ].join('\n');
+}
+
+/**
+ * Formats only the passenger fields still required before later form fill.
+ */
+export function formatPassengerMissingFieldsMessage(
+  profile: PassengerProfile,
+  missingFields: string[],
+) {
+  return [
+    `Mình đã tìm thấy ${profile.normalizedFullName}, nhưng còn thiếu thông tin.`,
+    '',
+    `Vui lòng bổ sung: ${missingFields.join(', ')}`,
+  ].join('\n');
+}
+
+/**
+ * Formats successful passenger attachment without starting Playwright fill.
+ */
+export function formatPassengerAttachedMessage(
+  caseId: string,
+  profile: PassengerProfile,
+) {
+  return [
+    `Đã gắn khách vào case ${caseId}.`,
+    '',
+    ...formatPassengerSummaryLines(profile),
+    '',
+    'Chưa chạy bước nhập form 1Booking.',
+  ].join('\n');
+}
+
+/**
+ * Formats a passenger AI parser failure for local operator troubleshooting.
+ */
+export function formatPassengerParserFailedMessage() {
+  return [
+    'Không thể phân tích thông tin khách bằng AI parser.',
+    '',
+    'Vui lòng kiểm tra OPENAI_API_KEY và thử lại.',
+  ].join('\n');
+}
+
+/**
+ * Formats the missing active-case instruction for passenger messages.
+ */
+export function formatPassengerCaseRequiredMessage() {
+  return 'Vui lòng gửi kèm case BK-YYYYMMDD-HHMMSS hoặc chọn chuyến trước.';
+}
+
+function formatPassengerSummaryLines(profile: PassengerProfile) {
+  return [
+    `Khách: ${profile.normalizedFullName}`,
+    `Danh xưng: ${profile.title}`,
+    `Ngày sinh: ${profile.dateOfBirth ?? 'Chưa có'}`,
+    `Giấy tờ: ${profile.documentType ?? 'Chưa có'} - ${
+      profile.documentNumber ?? 'Chưa có'
+    }`,
+    `Ngày hết hạn: ${profile.documentExpiryDate ?? 'Chưa có'}`,
+  ];
 }

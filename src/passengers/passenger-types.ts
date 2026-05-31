@@ -12,7 +12,10 @@ export type PassengerAliasType =
 
 export type ConfidenceReason =
   | 'exact_alias'
+  | 'full_name_exact'
+  | 'token_match'
   | 'unique_given_name'
+  | 'fuzzy_match'
   | 'ambiguous_candidate'
   | 'missing_required_field'
   | 'no_match';
@@ -31,6 +34,12 @@ export type PassengerProfileInput = {
   firstName: string;
   title: string;
   gender: boolean | null;
+  dateOfBirth?: string | null;
+  documentType?: string | null;
+  documentNumber?: string | null;
+  documentExpiryDate?: string | null;
+  documentCountry?: string | null;
+  email?: string | null;
   source: PassengerSource;
   rawSourceJson?: string | null;
 };
@@ -45,6 +54,7 @@ export type PassengerProfile = PassengerProfileInput & {
   documentNumber: string | null;
   documentExpiryDate: string | null;
   documentCountry: string | null;
+  email: string | null;
   seenCount: number;
   createdAt: string;
   updatedAt: string;
@@ -67,14 +77,30 @@ export type ConfidenceScoreInput = {
 
 export type PassengerResolveResult =
   | {
-      ok: true;
+      status: 'matched';
       profile: PassengerProfile;
       confidenceScore: number;
       reason: ConfidenceReason;
+      missingFields: [];
     }
   | {
-      ok: false;
+      status: 'matched_but_missing_fields';
+      profile: PassengerProfile;
       confidenceScore: number;
-      reason: ConfidenceReason;
+      reason: 'missing_required_field';
+      missingFields: string[];
+    }
+  | {
+      status: 'ambiguous';
+      confidenceScore: number;
+      reason: 'ambiguous_candidate';
       candidates: PassengerProfile[];
+      missingFields: [];
+    }
+  | {
+      status: 'not_found';
+      confidenceScore: 0;
+      reason: 'no_match';
+      candidates: [];
+      missingFields: [];
     };

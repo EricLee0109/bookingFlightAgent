@@ -52,6 +52,13 @@ export function parseFlightSelectionMessage(
 
   const airline = resolveAirlineFromText(rawMessage);
   const departureTime = extractDepartureTime(rawMessage.replace(caseId, ''));
+
+  if (!airline && !departureTime && !mentionsFlightSelection(rawMessage)) {
+    return {
+      isSelectionMessage: false,
+    };
+  }
+
   const bookingClass = extractBookingClass(rawMessage);
   const missingFields: string[] = [];
 
@@ -109,6 +116,16 @@ function extractDepartureTime(rawMessage: string) {
   const minute = (match[2] ?? '00').padStart(2, '0');
 
   return `${hour}:${minute}`;
+}
+
+/**
+ * Detects explicit flight-selection wording without claiming unrelated case
+ * messages such as `BK-... lay chi Lanh`.
+ */
+function mentionsFlightSelection(rawMessage: string) {
+  const normalized = normalizeVietnameseText(rawMessage);
+
+  return /\b(chon\s+chuyen|chon\s+flight|flight)\b/.test(normalized);
 }
 
 /**
