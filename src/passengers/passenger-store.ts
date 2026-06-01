@@ -43,10 +43,6 @@ type PassengerProfileRow = {
   title: string;
   gender: number;
   date_of_birth: string | null;
-  document_type: string | null;
-  document_number: string | null;
-  document_expiry_date: string | null;
-  document_country: string | null;
   source: PassengerProfileInput['source'];
   seen_count: number;
   raw_source_json: string | null;
@@ -98,10 +94,6 @@ export class PassengerStore {
         title TEXT NOT NULL DEFAULT 'UNKNOWN',
         gender INTEGER NOT NULL DEFAULT -1,
         date_of_birth TEXT,
-        document_type TEXT,
-        document_number TEXT,
-        document_expiry_date TEXT,
-        document_country TEXT,
         source TEXT NOT NULL,
         seen_count INTEGER NOT NULL DEFAULT 1,
         raw_source_json TEXT,
@@ -169,6 +161,10 @@ export class PassengerStore {
     `);
 
     this.dropTableColumnIfExists('passenger_profiles', 'email');
+    this.dropTableColumnIfExists('passenger_profiles', 'document_type');
+    this.dropTableColumnIfExists('passenger_profiles', 'document_number');
+    this.dropTableColumnIfExists('passenger_profiles', 'document_expiry_date');
+    this.dropTableColumnIfExists('passenger_profiles', 'document_country');
     this.ensureTableColumn('passenger_aliases', 'weight', 'INTEGER NOT NULL DEFAULT 50');
   }
 
@@ -223,17 +219,13 @@ export class PassengerStore {
           title,
           gender,
           date_of_birth,
-          document_type,
-          document_number,
-          document_expiry_date,
-          document_country,
           source,
           seen_count,
           raw_source_json,
           created_at,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
         ON CONFLICT (
           passenger_type,
           normalized_last_name,
@@ -245,10 +237,6 @@ export class PassengerStore {
           last_name = excluded.last_name,
           first_name = excluded.first_name,
           date_of_birth = COALESCE(excluded.date_of_birth, passenger_profiles.date_of_birth),
-          document_type = COALESCE(excluded.document_type, passenger_profiles.document_type),
-          document_number = COALESCE(excluded.document_number, passenger_profiles.document_number),
-          document_expiry_date = COALESCE(excluded.document_expiry_date, passenger_profiles.document_expiry_date),
-          document_country = COALESCE(excluded.document_country, passenger_profiles.document_country),
           source = excluded.source,
           seen_count = passenger_profiles.seen_count + 1,
           raw_source_json = excluded.raw_source_json,
@@ -266,10 +254,6 @@ export class PassengerStore {
         title,
         gender,
         input.dateOfBirth ?? null,
-        input.documentType ?? null,
-        input.documentNumber ?? null,
-        input.documentExpiryDate ?? null,
-        input.documentCountry ?? null,
         input.source,
         input.rawSourceJson ?? null,
         now,
@@ -282,7 +266,6 @@ export class PassengerStore {
         passengerProfileId: profile.id,
         lastName: profile.lastName,
         firstName: profile.firstName,
-        rawMention: input.rawMention,
       }),
     );
 
@@ -290,10 +273,9 @@ export class PassengerStore {
   }
 
   /**
-   * Upserts a complete manually provided passenger by normalized name and DOB.
+   * Upserts a manually provided passenger by normalized name and gender.
    *
-   * Existing fields are preserved by default. Pass `overwriteExisting` only
-   * when the operator explicitly corrects a previously stored value.
+   * DOB is optional and enriches an existing cached profile when provided.
    */
   upsertManualPassenger(
     input: PassengerProfileInput & {
@@ -311,12 +293,21 @@ export class PassengerStore {
         SELECT *
         FROM passenger_profiles
         WHERE normalized_full_name = ?
-          AND date_of_birth = ?
-        ORDER BY updated_at DESC
+          AND gender = ?
+          AND (date_of_birth IS ? OR date_of_birth IS NULL OR ? IS NULL)
+        ORDER BY
+          CASE WHEN date_of_birth IS ? THEN 0 ELSE 1 END,
+          updated_at DESC
         LIMIT 1;
       `,
       )
-      .get(normalizedFullName, input.dateOfBirth ?? null) as
+      .get(
+        normalizedFullName,
+        toStoredGender(input.gender),
+        input.dateOfBirth ?? null,
+        input.dateOfBirth ?? null,
+        input.dateOfBirth ?? null,
+      ) as
       | PassengerProfileRow
       | undefined;
 
@@ -340,10 +331,6 @@ export class PassengerStore {
           title = ?,
           gender = ?,
           date_of_birth = ?,
-          document_type = ?,
-          document_number = ?,
-          document_expiry_date = ?,
-          document_country = ?,
           source = ?,
           seen_count = seen_count + 1,
           raw_source_json = ?,
@@ -363,22 +350,6 @@ export class PassengerStore {
           chooseValue(previous.gender, input.gender, overwriteExisting),
         ),
         chooseValue(previous.dateOfBirth, input.dateOfBirth, overwriteExisting),
-        chooseValue(previous.documentType, input.documentType, overwriteExisting),
-        chooseValue(
-          previous.documentNumber,
-          input.documentNumber,
-          overwriteExisting,
-        ),
-        chooseValue(
-          previous.documentExpiryDate,
-          input.documentExpiryDate,
-          overwriteExisting,
-        ),
-        chooseValue(
-          previous.documentCountry,
-          input.documentCountry,
-          overwriteExisting,
-        ),
         input.source,
         input.rawSourceJson ?? previous.rawSourceJson,
         now,
@@ -391,7 +362,6 @@ export class PassengerStore {
         passengerProfileId: profile.id,
         lastName: profile.lastName,
         firstName: profile.firstName,
-        rawMention: input.rawMention,
       }),
     );
 
@@ -711,10 +681,6 @@ function mapPassengerProfileRow(row: PassengerProfileRow): PassengerProfile {
     title: row.title,
     gender: fromStoredGender(row.gender),
     dateOfBirth: row.date_of_birth,
-    documentType: row.document_type,
-    documentNumber: row.document_number,
-    documentExpiryDate: row.document_expiry_date,
-    documentCountry: row.document_country,
     source: row.source,
     seenCount: row.seen_count,
     rawSourceJson: row.raw_source_json,

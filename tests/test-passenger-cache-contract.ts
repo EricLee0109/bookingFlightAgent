@@ -170,17 +170,11 @@ function testPassengerStoreAndResolver() {
     const resolver = new PassengerResolver(store);
     const exactResult = resolver.resolve('chi Lanh');
 
-    assert.equal(exactResult.status, 'matched_but_missing_fields');
+    assert.equal(exactResult.status, 'matched');
 
-    if (exactResult.status === 'matched_but_missing_fields') {
+    if (exactResult.status === 'matched') {
       assert.equal(exactResult.profile.normalizedFullName, 'NGUYEN THI LANH');
-      assert.equal(exactResult.reason, 'missing_required_field');
-      assert.deepEqual(exactResult.missingFields, [
-        'dob',
-        'idType',
-        'idNumber',
-        'idExpiry',
-      ]);
+      assert.deepEqual(exactResult.missingFields, []);
     }
 
     assert.equal(store.getStats().confidenceScoreCount, 1);

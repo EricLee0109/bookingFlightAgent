@@ -67,11 +67,10 @@ export class PassengerResolutionService {
       return this.resolver.resolve(enrichedProfile.normalizedFullName, options);
     }
 
-    const query =
-      mention.fullName ?? mention.displayName ?? mention.rawMention ?? '';
+    const query = mention.fullName ?? '';
 
     if (
-      mention.fullName &&
+      isCompletePassengerName(mention.fullName) &&
       this.store.findProfilesByNormalizedFullName(mention.fullName).length === 0
     ) {
       return this.upsertNewPassenger(mention, options.caseId);
@@ -133,18 +132,14 @@ export class PassengerResolutionService {
     const nameParts = mention.fullName?.trim().split(/\s+/).filter(Boolean) ?? [];
     const gender = inferGender(mention);
     const profile = this.store.upsertManualPassenger({
-      passengerType: mapPassengerType(mention.passengerTypeHint),
+      passengerType: 0,
       lastName: nameParts[0],
       firstName: nameParts.slice(1).join(' '),
-      title: mapPassengerTitle(mention, gender),
+      title: mapPassengerTitle(gender),
       gender,
       dateOfBirth: mention.dob,
-      documentType: mention.idType,
-      documentNumber: mention.idNumber,
-      documentExpiryDate: mention.idExpiry,
       source: 'operator_input',
       rawSourceJson: JSON.stringify(mention),
-      rawMention: mention.rawMention,
     });
     const passengerInfo = mapPassengerProfileToPassengerInfo(profile);
 
@@ -198,15 +193,10 @@ export class PassengerResolutionService {
       lastName: profile.lastName,
       firstName: profile.firstName,
       title: profile.title,
-      gender: profile.gender,
+      gender: inferGender(mention) ?? profile.gender,
       dateOfBirth: mention.dob ?? profile.dateOfBirth,
-      documentType: mention.idType ?? profile.documentType,
-      documentNumber: mention.idNumber ?? profile.documentNumber,
-      documentExpiryDate: mention.idExpiry ?? profile.documentExpiryDate,
-      documentCountry: profile.documentCountry,
       source: 'operator_input',
       rawSourceJson: JSON.stringify(mention),
-      rawMention: mention.rawMention,
     });
   }
 }
@@ -217,54 +207,30 @@ export class PassengerResolutionService {
 export function getMissingNewPassengerFields(mention: PassengerMention) {
   const missingFields: string[] = [];
 
-  if (!mention.fullName?.trim()) missingFields.push('fullName');
-  if (!mention.dob) missingFields.push('dob');
-  if (!mention.idNumber) missingFields.push('idNumber');
-  if (!mention.idExpiry) missingFields.push('idExpiry');
+  if (!isCompletePassengerName(mention.fullName)) missingFields.push('fullName');
+  if (!mention.gender) missingFields.push('gender');
 
   return missingFields;
 }
 
-function mapPassengerType(passengerType: PassengerMention['passengerTypeHint']) {
-  if (passengerType === 'child') return 1;
-  if (passengerType === 'infant') return 2;
-
-  return 0;
-}
-
-function mapPassengerTitle(
-  mention: PassengerMention,
-  gender: boolean | null,
-) {
-  if (mention.passengerTypeHint === 'child') {
-    return gender === true ? 'MSTR' : 'MISS';
-  }
-
+function mapPassengerTitle(gender: boolean | null) {
   return gender === true ? 'MR' : gender === false ? 'MS' : 'UNKNOWN';
 }
 
 function inferGender(mention: PassengerMention) {
-  if (mention.genderHint === 'male') return true;
-  if (mention.genderHint === 'female') return false;
-
-  const honorific = mention.honorific?.toLowerCase();
-
-  if (honorific === 'anh' || honorific === 'ong' || honorific === 'chu') {
-    return true;
-  }
-
-  if (honorific === 'chi' || honorific === 'co' || honorific === 'ba') {
-    return false;
-  }
+  if (mention.gender === 'male') return true;
+  if (mention.gender === 'female') return false;
 
   return null;
 }
 
 function hasPassengerDetails(mention: PassengerMention) {
-  return Boolean(
-    mention.dob ||
-      mention.idType ||
-      mention.idNumber ||
-      mention.idExpiry,
-  );
+  return Boolean(mention.gender || mention.dob);
+}
+
+/**
+ * Requires at least family and given-name tokens before saving a manual profile.
+ */
+function isCompletePassengerName(fullName: string | null) {
+  return (fullName?.trim().split(/\s+/).filter(Boolean).length ?? 0) >= 2;
 }

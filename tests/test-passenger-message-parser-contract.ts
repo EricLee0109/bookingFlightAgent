@@ -31,18 +31,9 @@ const parsedPassengerMessage: ParsedPassengerMessage = {
   caseCode: 'BK-20260525-162456',
   passengerMentions: [
     {
-      rawMention: 'chị Lanh',
-      displayName: 'Lanh',
-      fullName: null,
-      honorific: 'chị',
-      genderHint: 'female',
-      passengerTypeHint: 'adult',
+      fullName: 'Lanh',
+      gender: 'female',
       dob: null,
-      age: null,
-      idType: null,
-      idNumber: null,
-      idExpiry: null,
-      rawQuickInput: null,
     },
   ],
   missingFields: [],
@@ -136,7 +127,7 @@ function testPassengerResolverStates() {
     assert.equal(resolver.resolve('Lanh').status, 'ambiguous');
     assert.equal(
       resolver.resolve('Nguyễn Thị Lành').status,
-      'matched_but_missing_fields',
+      'matched',
     );
     assert.equal(resolver.resolve('Ten Khong Ton Tai').status, 'not_found');
 
@@ -156,8 +147,7 @@ function testPassengerResolverStates() {
 }
 
 /**
- * Verifies that quick operator details enrich a matched local profile and make
- * it ready for later form fill without starting Playwright.
+ * Verifies that an optional DOB enriches a matched local profile.
  */
 function testPassengerProfileEnrichment() {
   const store = new PassengerStore(TEST_DB_PATH);
@@ -165,28 +155,15 @@ function testPassengerProfileEnrichment() {
   try {
     const service = new PassengerResolutionService(store);
     const result = service.resolveMention({
-      rawMention: 'Nguyễn Thị Lành sinh 14/02/1990 CCCD 012345678901',
-      displayName: 'Nguyễn Thị Lành',
       fullName: 'Nguyễn Thị Lành',
-      honorific: 'chị',
-      genderHint: 'female',
-      passengerTypeHint: 'adult',
+      gender: 'female',
       dob: '1990-02-14',
-      age: null,
-      idType: 'cccd',
-      idNumber: '012345678901',
-      idExpiry: '2030-02-14',
-      rawQuickInput:
-        'Nguyễn Thị Lành sinh 14/02/1990 CCCD 012345678901 hết hạn 14/02/2030',
     });
 
     assert.equal(result.status, 'matched');
 
     if (result.status === 'matched') {
       assert.equal(result.profile.dateOfBirth, '1990-02-14');
-      assert.equal(result.profile.documentType, 'cccd');
-      assert.equal(result.profile.documentNumber, '012345678901');
-      assert.equal(result.profile.documentExpiryDate, '2030-02-14');
     }
   } finally {
     store.close();
@@ -203,19 +180,9 @@ function testNewPassengerUpsertAndCaseAttachment() {
   try {
     const service = new PassengerResolutionService(store);
     const completeMention = {
-      rawMention: 'chị Phát',
-      displayName: 'Nguyễn Thị Phát',
       fullName: 'Nguyễn Thị Phát',
-      honorific: 'chị',
-      genderHint: 'female' as const,
-      passengerTypeHint: 'adult' as const,
-      dob: '1992-03-15',
-      age: null,
-      idType: 'cccd' as const,
-      idNumber: '079092001234',
-      idExpiry: '2032-03-15',
-      rawQuickInput:
-        'Nguyễn Thị Phát sinh 15/03/1992 CCCD 079092001234 hết hạn 15/03/2032',
+      gender: 'female' as const,
+      dob: null,
     };
     const firstResult = service.resolveMention(completeMention, {
       caseId: 'BK-20260525-162456',
@@ -230,12 +197,13 @@ function testNewPassengerUpsertAndCaseAttachment() {
     assert.equal(firstResult.passengerInfo.lastName, 'NGUYỄN');
     assert.equal(firstResult.passengerInfo.firstName, 'THỊ PHÁT');
     assert.equal(firstResult.passengerInfo.gender, 'F');
+    assert.equal(firstResult.passengerInfo.dob, null);
     assert.equal(firstResult.casePassenger.status, 'passenger_ready');
     assert.equal(
       store.getCasePassenger('BK-20260525-162456')?.passengerProfileId,
       firstResult.profile.id,
     );
-    assert.equal(store.findProfilesByAlias('chị Phát').length, 1);
+    assert.equal(store.findProfilesByAlias('Phát').length, 1);
 
     const profileCountBeforeDuplicate = store.getStats().profileCount;
     const duplicateResult = service.upsertNewPassenger(
@@ -267,18 +235,9 @@ function testIncompleteNewPassengerIsNotInserted() {
     const profileCountBefore = store.getStats().profileCount;
     const result = service.resolveMention(
       {
-        rawMention: 'Trần Văn Mới',
-        displayName: 'Trần Văn Mới',
         fullName: 'Trần Văn Mới',
-        honorific: 'anh',
-        genderHint: 'male',
-        passengerTypeHint: 'adult',
+        gender: null,
         dob: null,
-        age: null,
-        idType: null,
-        idNumber: null,
-        idExpiry: null,
-        rawQuickInput: null,
       },
       {
         caseId: 'BK-20260525-162456',
@@ -288,25 +247,16 @@ function testIncompleteNewPassengerIsNotInserted() {
     assert.equal(result.status, 'new_passenger_missing_fields');
 
     if (result.status === 'new_passenger_missing_fields') {
-      assert.deepEqual(result.missingFields, ['dob', 'idNumber', 'idExpiry']);
+      assert.deepEqual(result.missingFields, ['gender']);
     }
 
     assert.equal(store.getStats().profileCount, profileCountBefore);
 
     const nicknameOnlyResult = service.resolveMention(
       {
-        rawMention: 'chị Khách Mới',
-        displayName: 'Khách Mới',
         fullName: null,
-        honorific: 'chị',
-        genderHint: 'female',
-        passengerTypeHint: 'adult',
+        gender: 'female',
         dob: null,
-        age: null,
-        idType: null,
-        idNumber: null,
-        idExpiry: null,
-        rawQuickInput: null,
       },
       {
         caseId: 'BK-20260525-162456',
@@ -316,12 +266,7 @@ function testIncompleteNewPassengerIsNotInserted() {
     assert.equal(nicknameOnlyResult.status, 'new_passenger_missing_fields');
 
     if (nicknameOnlyResult.status === 'new_passenger_missing_fields') {
-      assert.deepEqual(nicknameOnlyResult.missingFields, [
-        'fullName',
-        'dob',
-        'idNumber',
-        'idExpiry',
-      ]);
+      assert.deepEqual(nicknameOnlyResult.missingFields, ['fullName']);
     }
 
     assert.equal(store.getStats().profileCount, profileCountBefore);

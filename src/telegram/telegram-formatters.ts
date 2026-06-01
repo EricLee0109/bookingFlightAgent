@@ -226,7 +226,7 @@ export function formatPassengerNotFoundMessage() {
   return [
     'Mình chưa tìm thấy khách phù hợp trong dữ liệu local.',
     '',
-    'Vui lòng nhập họ tên đầy đủ và thông tin khách để mình lưu lại.',
+    'Vui lòng nhập họ tên đầy đủ và giới tính để mình lưu lại. Ngày sinh có thể bổ sung nếu cần.',
   ].join('\n');
 }
 
@@ -295,11 +295,13 @@ export function formatPassengerCaseRequiredMessage() {
 function formatPassengerSummaryLines(profile: PassengerProfile) {
   return [
     `Khách: ${profile.normalizedFullName}`,
-    `Danh xưng: ${profile.title}`,
-    `Ngày sinh: ${profile.dateOfBirth ?? 'Chưa có'}`,
-    `Giấy tờ: ${profile.documentType ?? 'Chưa có'} - ${
-      profile.documentNumber ?? 'Chưa có'
+    `Giới tính: ${
+      profile.gender === true
+        ? 'Nam'
+        : profile.gender === false
+          ? 'Nữ'
+          : 'Chưa có'
     }`,
-    `Ngày hết hạn: ${profile.documentExpiryDate ?? 'Chưa có'}`,
+    `Ngày sinh: ${profile.dateOfBirth ?? 'Không bắt buộc'}`,
   ];
 }

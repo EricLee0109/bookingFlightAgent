@@ -10,8 +10,7 @@ export type PassengerAliasType =
   | 'given_name'
   | 'last_name'
   | 'last_two_tokens'
-  | 'family_given_name'
-  | 'manual_mention';
+  | 'family_given_name';
 
 export type ConfidenceReason =
   | 'exact_alias'
@@ -38,13 +37,8 @@ export type PassengerProfileInput = {
   title: string;
   gender: boolean | null;
   dateOfBirth?: string | null;
-  documentType?: string | null;
-  documentNumber?: string | null;
-  documentExpiryDate?: string | null;
-  documentCountry?: string | null;
   source: PassengerSource;
   rawSourceJson?: string | null;
-  rawMention?: string | null;
 };
 
 export type PassengerProfile = PassengerProfileInput & {
@@ -53,10 +47,6 @@ export type PassengerProfile = PassengerProfileInput & {
   normalizedFirstName: string;
   normalizedFullName: string;
   dateOfBirth: string | null;
-  documentType: string | null;
-  documentNumber: string | null;
-  documentExpiryDate: string | null;
-  documentCountry: string | null;
   seenCount: number;
   createdAt: string;
   updatedAt: string;
@@ -71,14 +61,10 @@ export type PassengerAliasInput = {
 };
 
 export type PassengerInfo = {
-  title: 'MR' | 'MS' | 'MRS' | 'MSTR' | 'MISS' | null;
+  gender: 'M' | 'F' | null;
   lastName: string;
   firstName: string;
   dob: string | null;
-  gender: 'M' | 'F' | null;
-  idType: 'cccd' | 'cmnd' | 'passport' | 'other' | null;
-  idNumber: string | null;
-  idExpiry: string | null;
 };
 
 export type CasePassenger = {

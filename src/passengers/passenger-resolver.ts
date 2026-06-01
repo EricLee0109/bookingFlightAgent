@@ -155,14 +155,14 @@ export class PassengerResolver {
 
 /**
  * Returns fields that must exist before later Playwright passenger form fill.
+ *
+ * DOB stays optional in the lean hold-booking MVP.
  */
 export function getMissingRequiredPassengerFields(profile: PassengerProfile) {
   const missingFields: string[] = [];
 
-  if (!profile.dateOfBirth) missingFields.push('dob');
-  if (!profile.documentType) missingFields.push('idType');
-  if (!profile.documentNumber) missingFields.push('idNumber');
-  if (!profile.documentExpiryDate) missingFields.push('idExpiry');
+  if (!profile.normalizedFullName) missingFields.push('fullName');
+  if (profile.gender === null) missingFields.push('gender');
 
   return missingFields;
 }

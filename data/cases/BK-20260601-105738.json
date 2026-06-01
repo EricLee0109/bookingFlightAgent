@@ -1,0 +1,83 @@
+{
+  "caseId": "BK-20260601-105738",
+  "status": "PASSENGER_INFO_CONFIRMED",
+  "rawMessage": "mình muốn bay từ HCM ra đà nẵng vào ngày 20/06",
+  "createdAt": "2026-06-01T03:57:38.996Z",
+  "updatedAt": "2026-06-01T04:01:32.514Z",
+  "parsedRequest": {
+    "fromAirportCode": "SGN",
+    "fromAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "toAirportCode": "DAD",
+    "toAirportText": "Da Nang International Airport (DAD)",
+    "departureDate": "2026-06-20",
+    "returnDate": null,
+    "preferredTime": null,
+    "specificTime": null,
+    "tripType": "one_way",
+    "missingFields": []
+  },
+  "searchInput": {
+    "fromAirportCode": "SGN",
+    "fromAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "toAirportCode": "DAD",
+    "toAirportText": "Da Nang International Airport (DAD)",
+    "departureDate": "2026-06-20"
+  },
+  "flightCount": 47,
+  "screenshotPath": "screenshots/1booking-search-flights-1.png",
+  "screenshotPaths": [
+    "screenshots/1booking-search-flights-1.png",
+    "screenshots/1booking-search-flights-2.png",
+    "screenshots/1booking-search-flights-3.png",
+    "screenshots/1booking-search-flights-4.png",
+    "screenshots/1booking-search-flights-5.png"
+  ],
+  "selectionScreenshotPath": "screenshots/BK-20260601-105738-selected-flight.png",
+  "selectedFlight": {
+    "cardIndex": 11,
+    "airlineCode": "VJ",
+    "airlineName": "Vietjet Air",
+    "flightNumber": "VJ646",
+    "departureTime": "20:40",
+    "arrivalTime": "22:00",
+    "bookingClass": "ECO",
+    "priceText": "VND\n1,644,600",
+    "selectedAt": "2026-06-01T04:01:02.199Z"
+  },
+  "parsedPassengerMessage": {
+    "intent": "attach_passenger",
+    "caseCode": null,
+    "passengerMentions": [
+      {
+        "fullName": "Lành",
+        "gender": "female",
+        "dob": null
+      }
+    ],
+    "missingFields": [],
+    "confidence": 0.96
+  },
+  "attachedPassenger": {
+    "id": 3,
+    "passengerType": 0,
+    "lastName": "NGUYEN",
+    "firstName": "THI LANH",
+    "normalizedLastName": "NGUYEN",
+    "normalizedFirstName": "THI LANH",
+    "normalizedFullName": "NGUYEN THI LANH",
+    "title": "MS",
+    "gender": false,
+    "dateOfBirth": null,
+    "source": "operator_input",
+    "seenCount": 14,
+    "rawSourceJson": "{\"fullName\":\"Lành\",\"gender\":\"female\",\"dob\":null}",
+    "createdAt": "2026-05-26T09:35:53.506Z",
+    "updatedAt": "2026-06-01T04:01:24.165Z"
+  },
+  "attachedPassengerInfo": {
+    "gender": "F",
+    "lastName": "NGUYEN",
+    "firstName": "THI LANH",
+    "dob": null
+  }
+}

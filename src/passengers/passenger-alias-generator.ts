@@ -14,7 +14,6 @@ export function generatePassengerAliases(input: {
   passengerProfileId: number;
   lastName: string;
   firstName: string;
-  rawMention?: string | null;
 }) {
   const aliases = new Map<string, PassengerAliasInput>();
   const normalizedLastName = normalizePassengerText(input.lastName);
@@ -53,16 +52,6 @@ export function generatePassengerAliases(input: {
       lastTwoTokens,
       'last_two_tokens',
       75,
-    );
-  }
-
-  if (input.rawMention) {
-    addAlias(
-      aliases,
-      input.passengerProfileId,
-      input.rawMention,
-      'manual_mention',
-      90,
     );
   }
 

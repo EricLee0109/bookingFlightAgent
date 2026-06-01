@@ -1,0 +1,28 @@
+{
+  "caseId": "BK-20260601-105716",
+  "status": "SEARCH_FAILED",
+  "rawMessage": "mình muốn bay từ HCM ra đà nẵng vào ngày 10/06",
+  "createdAt": "2026-06-01T03:57:16.729Z",
+  "updatedAt": "2026-06-01T03:57:22.780Z",
+  "parsedRequest": {
+    "fromAirportCode": "SGN",
+    "fromAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "toAirportCode": "DAD",
+    "toAirportText": "Da Nang International Airport (DAD)",
+    "departureDate": "2026-06-10",
+    "returnDate": null,
+    "preferredTime": null,
+    "specificTime": null,
+    "tripType": "one_way",
+    "missingFields": []
+  },
+  "searchInput": {
+    "fromAirportCode": "SGN",
+    "fromAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "toAirportCode": "DAD",
+    "toAirportText": "Da Nang International Airport (DAD)",
+    "departureDate": "2026-06-10"
+  },
+  "errorMessage": "1Booking auth session expired or login is required. Run pnpm run save-auth:dev, then retry the search.",
+  "screenshotPath": "screenshots/1booking-telegram-search-failed-attempt-1.png"
+}

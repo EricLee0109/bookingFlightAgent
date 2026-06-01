@@ -236,8 +236,8 @@ export async function tryHandleTelegramPassengerMessage(
 /**
  * Merges a quick follow-up answer with the previous passenger draft.
  *
- * Example: after the bot asks for DOB and document details, the operator can
- * send only `sinh 14/02/1990 CCCD ...` without repeating the passenger name.
+ * Example: after the bot asks for gender, the operator can answer without
+ * repeating a previously supplied full name.
  */
 function mergePassengerMentions(
   previousMention: PassengerMention | undefined,
@@ -248,19 +248,9 @@ function mergePassengerMentions(
   }
 
   return {
-    rawMention: nextMention.rawMention || previousMention.rawMention,
-    displayName: nextMention.displayName ?? previousMention.displayName,
     fullName: nextMention.fullName ?? previousMention.fullName,
-    honorific: nextMention.honorific ?? previousMention.honorific,
-    genderHint: nextMention.genderHint ?? previousMention.genderHint,
-    passengerTypeHint:
-      nextMention.passengerTypeHint ?? previousMention.passengerTypeHint,
+    gender: nextMention.gender ?? previousMention.gender,
     dob: nextMention.dob ?? previousMention.dob,
-    age: nextMention.age ?? previousMention.age,
-    idType: nextMention.idType ?? previousMention.idType,
-    idNumber: nextMention.idNumber ?? previousMention.idNumber,
-    idExpiry: nextMention.idExpiry ?? previousMention.idExpiry,
-    rawQuickInput: nextMention.rawQuickInput ?? previousMention.rawQuickInput,
   };
 }
 
@@ -452,7 +442,7 @@ function isPassengerReadyCaseStatus(status: string) {
 }
 
 function looksLikePassengerMessage(rawMessage: string) {
-  return /(dùng|dung|lấy|lay)\s+(chị|chi|anh|cô|co|chú|chu|bác|bac|em|bé|be|khách|khach)|khách\s+là|khach\s+la|sinh\s+\d|cccd|cmnd|passport|hộ\s+chiếu|ho\s+chieu|không\s+phải\s+khách|khong\s+phai\s+khach|đúng\s+rồi\s+dùng\s+khách|dung\s+khach/i.test(
+  return /(dùng|dung|lấy|lay)\s+(chị|chi|anh|cô|co|chú|chu|bác|bac|em|bé|be|khách|khach)|khách\s+là|khach\s+la|sinh\s+\d|không\s+phải\s+khách|khong\s+phai\s+khach|đúng\s+rồi\s+dùng\s+khách|dung\s+khach/i.test(
     rawMessage,
   );
 }
