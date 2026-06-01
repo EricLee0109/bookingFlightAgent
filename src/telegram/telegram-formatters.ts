@@ -220,6 +220,19 @@ export function formatPassengerMissingFieldsMessage(
 }
 
 /**
+ * Formats missing fields for a passenger who is not stored locally yet.
+ */
+export function formatNewPassengerMissingFieldsMessage(
+  missingFields: string[],
+) {
+  return [
+    'Mình chưa đủ thông tin để lưu khách mới.',
+    '',
+    `Vui lòng bổ sung: ${missingFields.join(', ')}`,
+  ].join('\n');
+}
+
+/**
  * Formats successful passenger attachment without starting Playwright fill.
  */
 export function formatPassengerAttachedMessage(
@@ -231,6 +244,7 @@ export function formatPassengerAttachedMessage(
     '',
     ...formatPassengerSummaryLines(profile),
     '',
+    'Trạng thái: passenger_ready.',
     'Chưa chạy bước nhập form 1Booking.',
   ].join('\n');
 }

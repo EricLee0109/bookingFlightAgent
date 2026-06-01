@@ -1322,5 +1322,34 @@
     "caseId": "BK-20260527-134123",
     "message": "Missing fields: fromAirportCode, fromAirportText, toAirportCode, toAirportText, departureDate",
     "timestamp": "2026-05-27T06:41:26.339Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260601-092749",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-06-01T02:27:49.550Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_search_completed",
+    "caseId": "BK-20260601-092749",
+    "message": "1Booking search completed.",
+    "meta": {
+      "flightCount": 42,
+      "screenshotPath": "screenshots/1booking-search-flights-1.png",
+      "screenshotPaths": [
+        "screenshots/1booking-search-flights-1.png",
+        "screenshots/1booking-search-flights-2.png",
+        "screenshots/1booking-search-flights-3.png",
+        "screenshots/1booking-search-flights-4.png",
+        "screenshots/1booking-search-flights-5.png"
+      ]
+    },
+    "timestamp": "2026-06-01T02:28:43.565Z"
   }
 ]

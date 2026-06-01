@@ -8,7 +8,10 @@ export type PassengerAliasType =
   | 'full_name'
   | 'first_name'
   | 'given_name'
-  | 'last_name';
+  | 'last_name'
+  | 'last_two_tokens'
+  | 'family_given_name'
+  | 'manual_mention';
 
 export type ConfidenceReason =
   | 'exact_alias'
@@ -39,9 +42,9 @@ export type PassengerProfileInput = {
   documentNumber?: string | null;
   documentExpiryDate?: string | null;
   documentCountry?: string | null;
-  email?: string | null;
   source: PassengerSource;
   rawSourceJson?: string | null;
+  rawMention?: string | null;
 };
 
 export type PassengerProfile = PassengerProfileInput & {
@@ -54,7 +57,6 @@ export type PassengerProfile = PassengerProfileInput & {
   documentNumber: string | null;
   documentExpiryDate: string | null;
   documentCountry: string | null;
-  email: string | null;
   seenCount: number;
   createdAt: string;
   updatedAt: string;
@@ -65,6 +67,29 @@ export type PassengerAliasInput = {
   aliasText: string;
   normalizedAlias: string;
   aliasType: PassengerAliasType;
+  weight: number;
+};
+
+export type PassengerInfo = {
+  title: 'MR' | 'MS' | 'MRS' | 'MSTR' | 'MISS' | null;
+  lastName: string;
+  firstName: string;
+  dob: string | null;
+  gender: 'M' | 'F' | null;
+  idType: 'cccd' | 'cmnd' | 'passport' | 'other' | null;
+  idNumber: string | null;
+  idExpiry: string | null;
+};
+
+export type CasePassenger = {
+  id: number;
+  caseId: string;
+  passengerProfileId: number;
+  passengerIndex: number;
+  passengerInfo: PassengerInfo;
+  status: 'passenger_ready';
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type ConfidenceScoreInput = {

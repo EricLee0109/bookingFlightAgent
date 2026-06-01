@@ -42,7 +42,6 @@ const parsedPassengerMessage: ParsedPassengerMessage = {
       idType: null,
       idNumber: null,
       idExpiry: null,
-      email: null,
       rawQuickInput: null,
     },
   ],
@@ -177,7 +176,6 @@ function testPassengerProfileEnrichment() {
       idType: 'cccd',
       idNumber: '012345678901',
       idExpiry: '2030-02-14',
-      email: null,
       rawQuickInput:
         'Nguyễn Thị Lành sinh 14/02/1990 CCCD 012345678901 hết hạn 14/02/2030',
     });
@@ -190,6 +188,143 @@ function testPassengerProfileEnrichment() {
       assert.equal(result.profile.documentNumber, '012345678901');
       assert.equal(result.profile.documentExpiryDate, '2030-02-14');
     }
+  } finally {
+    store.close();
+  }
+}
+
+/**
+ * Verifies Phase D manual upsert, alias generation, duplicate prevention,
+ * PassengerInfo mapping, and case_passengers attachment.
+ */
+function testNewPassengerUpsertAndCaseAttachment() {
+  const store = new PassengerStore(TEST_DB_PATH);
+
+  try {
+    const service = new PassengerResolutionService(store);
+    const completeMention = {
+      rawMention: 'chị Phát',
+      displayName: 'Nguyễn Thị Phát',
+      fullName: 'Nguyễn Thị Phát',
+      honorific: 'chị',
+      genderHint: 'female' as const,
+      passengerTypeHint: 'adult' as const,
+      dob: '1992-03-15',
+      age: null,
+      idType: 'cccd' as const,
+      idNumber: '079092001234',
+      idExpiry: '2032-03-15',
+      rawQuickInput:
+        'Nguyễn Thị Phát sinh 15/03/1992 CCCD 079092001234 hết hạn 15/03/2032',
+    };
+    const firstResult = service.resolveMention(completeMention, {
+      caseId: 'BK-20260525-162456',
+    });
+
+    assert.equal(firstResult.status, 'passenger_ready');
+
+    if (firstResult.status !== 'passenger_ready') {
+      throw new Error('Expected a passenger_ready manual upsert result.');
+    }
+
+    assert.equal(firstResult.passengerInfo.lastName, 'NGUYỄN');
+    assert.equal(firstResult.passengerInfo.firstName, 'THỊ PHÁT');
+    assert.equal(firstResult.passengerInfo.gender, 'F');
+    assert.equal(firstResult.casePassenger.status, 'passenger_ready');
+    assert.equal(
+      store.getCasePassenger('BK-20260525-162456')?.passengerProfileId,
+      firstResult.profile.id,
+    );
+    assert.equal(store.findProfilesByAlias('chị Phát').length, 1);
+
+    const profileCountBeforeDuplicate = store.getStats().profileCount;
+    const duplicateResult = service.upsertNewPassenger(
+      completeMention,
+      'BK-20260525-162456',
+    );
+
+    assert.equal(duplicateResult.status, 'passenger_ready');
+
+    if (duplicateResult.status === 'passenger_ready') {
+      assert.equal(duplicateResult.profile.id, firstResult.profile.id);
+    }
+
+    assert.equal(store.getStats().profileCount, profileCountBeforeDuplicate);
+  } finally {
+    store.close();
+  }
+}
+
+/**
+ * Verifies incomplete manual input asks only for missing fields and is not
+ * inserted into SQLite.
+ */
+function testIncompleteNewPassengerIsNotInserted() {
+  const store = new PassengerStore(TEST_DB_PATH);
+
+  try {
+    const service = new PassengerResolutionService(store);
+    const profileCountBefore = store.getStats().profileCount;
+    const result = service.resolveMention(
+      {
+        rawMention: 'Trần Văn Mới',
+        displayName: 'Trần Văn Mới',
+        fullName: 'Trần Văn Mới',
+        honorific: 'anh',
+        genderHint: 'male',
+        passengerTypeHint: 'adult',
+        dob: null,
+        age: null,
+        idType: null,
+        idNumber: null,
+        idExpiry: null,
+        rawQuickInput: null,
+      },
+      {
+        caseId: 'BK-20260525-162456',
+      },
+    );
+
+    assert.equal(result.status, 'new_passenger_missing_fields');
+
+    if (result.status === 'new_passenger_missing_fields') {
+      assert.deepEqual(result.missingFields, ['dob', 'idNumber', 'idExpiry']);
+    }
+
+    assert.equal(store.getStats().profileCount, profileCountBefore);
+
+    const nicknameOnlyResult = service.resolveMention(
+      {
+        rawMention: 'chị Khách Mới',
+        displayName: 'Khách Mới',
+        fullName: null,
+        honorific: 'chị',
+        genderHint: 'female',
+        passengerTypeHint: 'adult',
+        dob: null,
+        age: null,
+        idType: null,
+        idNumber: null,
+        idExpiry: null,
+        rawQuickInput: null,
+      },
+      {
+        caseId: 'BK-20260525-162456',
+      },
+    );
+
+    assert.equal(nicknameOnlyResult.status, 'new_passenger_missing_fields');
+
+    if (nicknameOnlyResult.status === 'new_passenger_missing_fields') {
+      assert.deepEqual(nicknameOnlyResult.missingFields, [
+        'fullName',
+        'dob',
+        'idNumber',
+        'idExpiry',
+      ]);
+    }
+
+    assert.equal(store.getStats().profileCount, profileCountBefore);
   } finally {
     store.close();
   }
@@ -221,6 +356,8 @@ async function main() {
   await testOpenAIPassengerMessageParser();
   testPassengerResolverStates();
   testPassengerProfileEnrichment();
+  testNewPassengerUpsertAndCaseAttachment();
+  testIncompleteNewPassengerIsNotInserted();
   testTelegramPassengerContextAndRouting();
 
   console.log('Passenger message parser contract tests passed.');

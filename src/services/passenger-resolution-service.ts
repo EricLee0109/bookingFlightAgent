@@ -1,18 +1,40 @@
 import { type PassengerMention } from '../contracts/passenger';
+import { mapPassengerProfileToPassengerInfo } from '../passengers/passenger-info-mapper';
 import {
   getMissingRequiredPassengerFields,
   PassengerResolver,
   type PassengerResolverOptions,
 } from '../passengers/passenger-resolver';
 import { PassengerStore } from '../passengers/passenger-store';
-import { type PassengerProfile } from '../passengers/passenger-types';
+import {
+  type CasePassenger,
+  type PassengerInfo,
+  type PassengerProfile,
+  type PassengerResolveResult,
+} from '../passengers/passenger-types';
 
 export type ResolvePassengerMentionOptions = PassengerResolverOptions & {
+  caseId?: string;
   pendingPassengerProfileId?: number;
 };
 
+export type PassengerMentionResolutionResult =
+  | PassengerResolveResult
+  | {
+      status: 'new_passenger_missing_fields';
+      mention: PassengerMention;
+      missingFields: string[];
+    }
+  | {
+      status: 'passenger_ready';
+      profile: PassengerProfile;
+      passengerInfo: PassengerInfo;
+      casePassenger: CasePassenger;
+      missingFields: [];
+    };
+
 /**
- * Coordinates local passenger matching and profile enrichment.
+ * Coordinates local passenger matching, manual profile upsert, and case attach.
  *
  * This service is the boundary between parsed passenger mentions and SQLite.
  * It does not call OpenAI, Telegram, Playwright, or 1Booking automation.
@@ -27,11 +49,14 @@ export class PassengerResolutionService {
   /**
    * Resolves a mention, applying newly provided fields to an explicit pending
    * profile when the operator is answering a missing-fields question.
+   *
+   * If no cached profile exists, a new profile is saved only after all fields
+   * required by the future 1Booking fill step are present.
    */
   resolveMention(
     mention: PassengerMention,
     options: ResolvePassengerMentionOptions = {},
-  ) {
+  ): PassengerMentionResolutionResult {
     const pendingProfile = options.pendingPassengerProfileId
       ? this.store.getPassengerProfileById(options.pendingPassengerProfileId)
       : null;
@@ -44,14 +69,18 @@ export class PassengerResolutionService {
 
     const query =
       mention.fullName ?? mention.displayName ?? mention.rawMention ?? '';
+
+    if (
+      mention.fullName &&
+      this.store.findProfilesByNormalizedFullName(mention.fullName).length === 0
+    ) {
+      return this.upsertNewPassenger(mention, options.caseId);
+    }
+
     let result = this.resolver.resolve(query, options);
 
-    if (result.status === 'not_found' && mention.fullName) {
-      const createdProfile = this.createProfileFromMention(mention);
-
-      if (createdProfile) {
-        result = this.resolver.resolve(createdProfile.normalizedFullName, options);
-      }
+    if (result.status === 'not_found') {
+      return this.upsertNewPassenger(mention, options.caseId);
     }
 
     if (
@@ -61,7 +90,7 @@ export class PassengerResolutionService {
     ) {
       const enrichedProfile = this.enrichProfile(result.profile, mention);
 
-      return this.resolver.resolve(enrichedProfile.normalizedFullName, options);
+      result = this.resolver.resolve(enrichedProfile.normalizedFullName, options);
     }
 
     return result;
@@ -81,6 +110,88 @@ export class PassengerResolutionService {
     return getMissingRequiredPassengerFields(profile);
   }
 
+  /**
+   * Saves a complete new passenger and optionally attaches it to a case.
+   *
+   * Missing required fields are returned to Telegram without inserting an
+   * incomplete manual profile.
+   */
+  upsertNewPassenger(
+    mention: PassengerMention,
+    caseId?: string,
+  ): PassengerMentionResolutionResult {
+    const missingFields = getMissingNewPassengerFields(mention);
+
+    if (missingFields.length > 0) {
+      return {
+        status: 'new_passenger_missing_fields',
+        mention,
+        missingFields,
+      };
+    }
+
+    const nameParts = mention.fullName?.trim().split(/\s+/).filter(Boolean) ?? [];
+    const gender = inferGender(mention);
+    const profile = this.store.upsertManualPassenger({
+      passengerType: mapPassengerType(mention.passengerTypeHint),
+      lastName: nameParts[0],
+      firstName: nameParts.slice(1).join(' '),
+      title: mapPassengerTitle(mention, gender),
+      gender,
+      dateOfBirth: mention.dob,
+      documentType: mention.idType,
+      documentNumber: mention.idNumber,
+      documentExpiryDate: mention.idExpiry,
+      source: 'operator_input',
+      rawSourceJson: JSON.stringify(mention),
+      rawMention: mention.rawMention,
+    });
+    const passengerInfo = mapPassengerProfileToPassengerInfo(profile);
+
+    if (!caseId) {
+      return {
+        status: 'matched',
+        profile,
+        confidenceScore: 1,
+        reason: 'full_name_exact',
+        missingFields: [],
+      };
+    }
+
+    const casePassenger = this.attachPassengerToCase(caseId, profile);
+
+    return {
+      status: 'passenger_ready',
+      profile,
+      passengerInfo,
+      casePassenger,
+      missingFields: [],
+    };
+  }
+
+  /**
+   * Converts and stores a validated passenger snapshot for later Playwright
+   * form fill. This method does not run browser automation or click hold.
+   */
+  attachPassengerToCase(caseId: string, profile: PassengerProfile) {
+    const missingFields = getMissingRequiredPassengerFields(profile);
+
+    if (missingFields.length > 0) {
+      throw new Error(
+        `Cannot attach passenger to case. Missing fields: ${missingFields.join(', ')}`,
+      );
+    }
+
+    const passengerInfo = mapPassengerProfileToPassengerInfo(profile);
+
+    return this.store.upsertCasePassenger({
+      caseId,
+      passengerProfileId: profile.id,
+      passengerInfo,
+      status: 'passenger_ready',
+    });
+  }
+
   private enrichProfile(profile: PassengerProfile, mention: PassengerMention) {
     return this.store.upsertPassengerProfile({
       passengerType: profile.passengerType,
@@ -93,36 +204,25 @@ export class PassengerResolutionService {
       documentNumber: mention.idNumber ?? profile.documentNumber,
       documentExpiryDate: mention.idExpiry ?? profile.documentExpiryDate,
       documentCountry: profile.documentCountry,
-      email: mention.email ?? profile.email,
       source: 'operator_input',
       rawSourceJson: JSON.stringify(mention),
+      rawMention: mention.rawMention,
     });
   }
+}
 
-  private createProfileFromMention(mention: PassengerMention) {
-    const nameParts = mention.fullName?.trim().split(/\s+/).filter(Boolean) ?? [];
+/**
+ * Returns fields required before inserting a new manual passenger profile.
+ */
+export function getMissingNewPassengerFields(mention: PassengerMention) {
+  const missingFields: string[] = [];
 
-    if (nameParts.length < 2) {
-      return null;
-    }
+  if (!mention.fullName?.trim()) missingFields.push('fullName');
+  if (!mention.dob) missingFields.push('dob');
+  if (!mention.idNumber) missingFields.push('idNumber');
+  if (!mention.idExpiry) missingFields.push('idExpiry');
 
-    const gender = inferGender(mention);
-
-    return this.store.upsertPassengerProfile({
-      passengerType: mapPassengerType(mention.passengerTypeHint),
-      lastName: nameParts[0],
-      firstName: nameParts.slice(1).join(' '),
-      title: gender === true ? 'MR' : gender === false ? 'MS' : 'UNKNOWN',
-      gender,
-      dateOfBirth: mention.dob,
-      documentType: mention.idType,
-      documentNumber: mention.idNumber,
-      documentExpiryDate: mention.idExpiry,
-      email: mention.email,
-      source: 'operator_input',
-      rawSourceJson: JSON.stringify(mention),
-    });
-  }
+  return missingFields;
 }
 
 function mapPassengerType(passengerType: PassengerMention['passengerTypeHint']) {
@@ -130,6 +230,17 @@ function mapPassengerType(passengerType: PassengerMention['passengerTypeHint']) 
   if (passengerType === 'infant') return 2;
 
   return 0;
+}
+
+function mapPassengerTitle(
+  mention: PassengerMention,
+  gender: boolean | null,
+) {
+  if (mention.passengerTypeHint === 'child') {
+    return gender === true ? 'MSTR' : 'MISS';
+  }
+
+  return gender === true ? 'MR' : gender === false ? 'MS' : 'UNKNOWN';
 }
 
 function inferGender(mention: PassengerMention) {
@@ -154,7 +265,6 @@ function hasPassengerDetails(mention: PassengerMention) {
     mention.dob ||
       mention.idType ||
       mention.idNumber ||
-      mention.idExpiry ||
-      mention.email,
+      mention.idExpiry,
   );
 }

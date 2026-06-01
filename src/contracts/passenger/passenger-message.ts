@@ -22,7 +22,6 @@ export const PassengerMentionSchema = z
     idType: z.enum(['cccd', 'cmnd', 'passport', 'other']).nullable(),
     idNumber: z.string().nullable(),
     idExpiry: z.string().nullable(),
-    email: z.string().nullable(),
     rawQuickInput: z.string().nullable(),
   })
   .strict();

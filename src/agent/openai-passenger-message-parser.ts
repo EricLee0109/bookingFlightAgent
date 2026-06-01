@@ -110,7 +110,7 @@ export function buildPassengerParserSystemPrompt() {
     'Intent rules:',
     '- attach_passenger: operator asks to use an existing passenger for a case.',
     '- provide_new_passenger: operator provides a passenger identity or quick passenger details.',
-    '- update_passenger_fields: operator adds missing DOB, identity document, expiry, or email.',
+    '- update_passenger_fields: operator adds missing DOB, identity document, or expiry.',
     '- confirm_passenger: operator confirms the currently proposed passenger.',
     '- reject_passenger: operator rejects the proposed passenger or asks for another match.',
     '- unknown: passenger intent is unclear.',

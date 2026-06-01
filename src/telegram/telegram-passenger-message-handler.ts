@@ -4,9 +4,12 @@ import { BOOKING_CASE_REGEX } from '../automation/1booking/constants';
 import { PassengerStore } from '../passengers/passenger-store';
 import {
   type PassengerProfile,
-  type PassengerResolveResult,
 } from '../passengers/passenger-types';
-import { PassengerResolutionService } from '../services/passenger-resolution-service';
+import { type PassengerMention } from '../contracts/passenger';
+import {
+  PassengerResolutionService,
+  type PassengerMentionResolutionResult,
+} from '../services/passenger-resolution-service';
 import {
   readLocalFlightCase,
   updateLocalFlightCase,
@@ -18,6 +21,7 @@ import {
   formatPassengerCaseRequiredMessage,
   formatPassengerMatchedMessage,
   formatPassengerMissingFieldsMessage,
+  formatNewPassengerMissingFieldsMessage,
   formatPassengerNotFoundMessage,
   formatPassengerParserFailedMessage,
 } from './telegram-formatters';
@@ -201,8 +205,17 @@ export async function tryHandleTelegramPassengerMessage(
     return true;
   }
 
+  const effectiveMention =
+    parsedPassengerMessage.intent === 'update_passenger_fields'
+      ? mergePassengerMentions(
+          existingCase.parsedPassengerMessage?.passengerMentions[0],
+          mention,
+        )
+      : mention;
+
   await withPassengerResolutionService(async (service) => {
-    const result = service.resolveMention(mention, {
+    const result = service.resolveMention(effectiveMention, {
+      caseId: currentCase.caseId,
       excludeProfileIds:
         parsedPassengerMessage.intent === 'reject_passenger'
           ? pendingProfileIds
@@ -221,6 +234,37 @@ export async function tryHandleTelegramPassengerMessage(
 }
 
 /**
+ * Merges a quick follow-up answer with the previous passenger draft.
+ *
+ * Example: after the bot asks for DOB and document details, the operator can
+ * send only `sinh 14/02/1990 CCCD ...` without repeating the passenger name.
+ */
+function mergePassengerMentions(
+  previousMention: PassengerMention | undefined,
+  nextMention: PassengerMention,
+) {
+  if (!previousMention) {
+    return nextMention;
+  }
+
+  return {
+    rawMention: nextMention.rawMention || previousMention.rawMention,
+    displayName: nextMention.displayName ?? previousMention.displayName,
+    fullName: nextMention.fullName ?? previousMention.fullName,
+    honorific: nextMention.honorific ?? previousMention.honorific,
+    genderHint: nextMention.genderHint ?? previousMention.genderHint,
+    passengerTypeHint:
+      nextMention.passengerTypeHint ?? previousMention.passengerTypeHint,
+    dob: nextMention.dob ?? previousMention.dob,
+    age: nextMention.age ?? previousMention.age,
+    idType: nextMention.idType ?? previousMention.idType,
+    idNumber: nextMention.idNumber ?? previousMention.idNumber,
+    idExpiry: nextMention.idExpiry ?? previousMention.idExpiry,
+    rawQuickInput: nextMention.rawQuickInput ?? previousMention.rawQuickInput,
+  };
+}
+
+/**
  * Renders local resolver outcomes as natural Telegram messages and buttons.
  */
 async function renderPassengerResolution(
@@ -228,8 +272,36 @@ async function renderPassengerResolution(
   chatId: number,
   flightCase: LocalPassengerReadyCase,
   service: PassengerResolutionService,
-  result: PassengerResolveResult,
+  result: PassengerMentionResolutionResult,
 ) {
+  if (result.status === 'new_passenger_missing_fields') {
+    clearPendingPassengerProfiles(chatId);
+    await updateLocalFlightCase(flightCase, {
+      status: 'PASSENGER_INFO_NEEDS_REVIEW',
+      passengerErrorMessage: `Missing new passenger fields: ${result.missingFields.join(', ')}`,
+    });
+    await bot.sendMessage(
+      chatId,
+      formatNewPassengerMissingFieldsMessage(result.missingFields),
+    );
+    return;
+  }
+
+  if (result.status === 'passenger_ready') {
+    clearPendingPassengerProfiles(chatId);
+    await updateLocalFlightCase(flightCase, {
+      status: 'PASSENGER_INFO_CONFIRMED',
+      attachedPassenger: result.profile,
+      attachedPassengerInfo: result.passengerInfo,
+      passengerErrorMessage: undefined,
+    });
+    await bot.sendMessage(
+      chatId,
+      formatPassengerAttachedMessage(flightCase.caseId, result.profile),
+    );
+    return;
+  }
+
   if (result.status === 'not_found') {
     clearPendingPassengerProfiles(chatId);
     await updateLocalFlightCase(flightCase, {
@@ -344,6 +416,10 @@ async function attachConfirmedPassenger(
   await updateLocalFlightCase(flightCase, {
     status: 'PASSENGER_INFO_CONFIRMED',
     attachedPassenger: profile,
+    attachedPassengerInfo: service.attachPassengerToCase(
+      flightCase.caseId,
+      profile,
+    ).passengerInfo,
     passengerErrorMessage: undefined,
   });
   clearPendingPassengerProfiles(chatId);

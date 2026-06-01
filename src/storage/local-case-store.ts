@@ -3,7 +3,10 @@ import path from 'node:path';
 import { type SearchFlightsInput } from '../automation/1booking/flight-search';
 import { type ParsedFlightRequest, type SelectedFlight } from '../contracts/flight';
 import { type ParsedPassengerMessage } from '../contracts/passenger';
-import { type PassengerProfile } from '../passengers/passenger-types';
+import {
+  type PassengerInfo,
+  type PassengerProfile,
+} from '../passengers/passenger-types';
 import { BOOKING_CASE_REGEX } from '../automation/1booking/constants';
 
 export type LocalFlightCaseStatus =
@@ -57,6 +60,7 @@ export type LocalFlightCase = {
   selectedFlight?: SelectedFlight;
   parsedPassengerMessage?: ParsedPassengerMessage;
   attachedPassenger?: PassengerProfile;
+  attachedPassengerInfo?: PassengerInfo;
   selectionScreenshotPath?: string;
   selectionErrorMessage?: string;
   passengerErrorMessage?: string;

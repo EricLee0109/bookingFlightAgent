@@ -1,0 +1,35 @@
+{
+  "caseId": "BK-20260601-092749",
+  "status": "OPTIONS_SENT",
+  "rawMessage": "mình muốn bay chuyến hồ chí minh ra hà nội vòa ngày 25/06",
+  "createdAt": "2026-06-01T02:27:49.549Z",
+  "updatedAt": "2026-06-01T02:28:53.747Z",
+  "parsedRequest": {
+    "fromAirportCode": "SGN",
+    "fromAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "toAirportCode": "HAN",
+    "toAirportText": "Sân bay Nội Bài (HAN)",
+    "departureDate": "2026-06-25",
+    "returnDate": null,
+    "preferredTime": null,
+    "specificTime": null,
+    "tripType": "one_way",
+    "missingFields": []
+  },
+  "searchInput": {
+    "fromAirportCode": "SGN",
+    "fromAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "toAirportCode": "HAN",
+    "toAirportText": "Sân bay Nội Bài (HAN)",
+    "departureDate": "2026-06-25"
+  },
+  "flightCount": 42,
+  "screenshotPath": "screenshots/1booking-search-flights-1.png",
+  "screenshotPaths": [
+    "screenshots/1booking-search-flights-1.png",
+    "screenshots/1booking-search-flights-2.png",
+    "screenshots/1booking-search-flights-3.png",
+    "screenshots/1booking-search-flights-4.png",
+    "screenshots/1booking-search-flights-5.png"
+  ]
+}
