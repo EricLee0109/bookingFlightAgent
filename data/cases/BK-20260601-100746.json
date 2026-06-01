@@ -1,0 +1,26 @@
+{
+  "caseId": "BK-20260601-100746",
+  "status": "NEEDS_INPUT",
+  "rawMessage": "chọn mình chuyến bay Vietjet lúc 10h45",
+  "createdAt": "2026-06-01T03:07:46.286Z",
+  "updatedAt": "2026-06-01T03:07:48.560Z",
+  "parsedRequest": {
+    "fromAirportCode": null,
+    "fromAirportText": null,
+    "toAirportCode": null,
+    "toAirportText": null,
+    "departureDate": null,
+    "returnDate": null,
+    "preferredTime": "specific_time",
+    "specificTime": "10:45",
+    "tripType": "one_way",
+    "missingFields": [
+      "fromAirportCode",
+      "fromAirportText",
+      "toAirportCode",
+      "toAirportText",
+      "departureDate"
+    ]
+  },
+  "errorMessage": "Missing fields: fromAirportCode, fromAirportText, toAirportCode, toAirportText, departureDate"
+}

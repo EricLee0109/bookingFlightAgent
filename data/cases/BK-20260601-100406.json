@@ -1,0 +1,68 @@
+{
+  "caseId": "BK-20260601-100406",
+  "status": "PASSENGER_INFO_NEEDS_REVIEW",
+  "rawMessage": "mình muốn bay từ HCM ra đà nẵng vào ngày 10/06",
+  "createdAt": "2026-06-01T03:04:06.202Z",
+  "updatedAt": "2026-06-01T03:09:27.857Z",
+  "parsedRequest": {
+    "fromAirportCode": "SGN",
+    "fromAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "toAirportCode": "DAD",
+    "toAirportText": "Da Nang International Airport (DAD)",
+    "departureDate": "2026-06-10",
+    "returnDate": null,
+    "preferredTime": null,
+    "specificTime": null,
+    "tripType": "one_way",
+    "missingFields": []
+  },
+  "searchInput": {
+    "fromAirportCode": "SGN",
+    "fromAirportText": "Sân bay Tân Sơn Nhất (SGN)",
+    "toAirportCode": "DAD",
+    "toAirportText": "Da Nang International Airport (DAD)",
+    "departureDate": "2026-06-10"
+  },
+  "flightCount": 21,
+  "screenshotPath": "screenshots/1booking-search-flights-1.png",
+  "screenshotPaths": [
+    "screenshots/1booking-search-flights-1.png",
+    "screenshots/1booking-search-flights-2.png",
+    "screenshots/1booking-search-flights-3.png"
+  ],
+  "selectedFlight": {
+    "cardIndex": 47,
+    "airlineCode": "VJ",
+    "airlineName": "Vietjet Air",
+    "flightNumber": "VJ634",
+    "departureTime": "10:45",
+    "arrivalTime": "12:05",
+    "bookingClass": "ECO",
+    "priceText": "VND\n2,433,000",
+    "selectedAt": "2026-06-01T03:08:56.547Z"
+  },
+  "selectionScreenshotPath": "screenshots/BK-20260601-100406-selected-flight.png",
+  "parsedPassengerMessage": {
+    "intent": "attach_passenger",
+    "caseCode": null,
+    "passengerMentions": [
+      {
+        "rawMention": "chị Lanh",
+        "displayName": "Lanh",
+        "fullName": null,
+        "honorific": "chị",
+        "genderHint": "female",
+        "passengerTypeHint": null,
+        "dob": null,
+        "age": null,
+        "idType": null,
+        "idNumber": null,
+        "idExpiry": null,
+        "rawQuickInput": null
+      }
+    ],
+    "missingFields": [],
+    "confidence": 0.92
+  },
+  "passengerErrorMessage": "Missing passenger fields: dob, idType, idNumber, idExpiry"
+}

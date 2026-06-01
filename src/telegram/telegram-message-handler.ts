@@ -22,6 +22,7 @@ import { isAllowedTelegramOperator } from './telegram-access';
 import {
   formatFlightSelectionFailedMessage,
   formatFlightSelectionParseFailedMessage,
+  formatLatestCaseFlightSelectionResolvedMessage,
   formatFlightSelectionStartedMessage,
   formatFlightSelectionSuccessMessage,
   formatMissingFlightFieldsMessage,
@@ -31,6 +32,10 @@ import {
   formatSearchSuccessMessage,
 } from './telegram-formatters';
 import { handleTelegramSettingsCommand } from './telegram-settings-commands';
+import {
+  getLatestFlightSearchCase,
+  setLatestFlightSearchCase,
+} from './telegram-flight-selection-context';
 import { setActivePassengerCase } from './telegram-passenger-context';
 import { tryHandleTelegramPassengerMessage } from './telegram-passenger-message-handler';
 import { createTelegramScreenshotArchive } from './telegram-screenshot-archive';
@@ -95,7 +100,10 @@ export async function handleTelegramMessage(
     return;
   }
 
-  const selectionParseResult = parseFlightSelectionMessage(text);
+  const latestSearchCase = getLatestFlightSearchCase(chatId);
+  const selectionParseResult = parseFlightSelectionMessage(text, {
+    latestCaseId: latestSearchCase?.latestSearchCaseId,
+  });
 
   if (selectionParseResult.isSelectionMessage) {
     if (!selectionParseResult.ok) {
@@ -106,6 +114,15 @@ export async function handleTelegramMessage(
         ),
       );
       return;
+    }
+
+    if (selectionParseResult.resolvedCaseFromContext) {
+      await bot.sendMessage(
+        chatId,
+        formatLatestCaseFlightSelectionResolvedMessage(
+          selectionParseResult.input,
+        ),
+      );
     }
 
     await handleTelegramFlightSelection(
@@ -303,6 +320,7 @@ export async function handleTelegramMessage(
     screenshotPath: result.screenshotPath,
     screenshotPaths: result.screenshotPaths,
   });
+  setLatestFlightSearchCase(chatId, currentCase.caseId);
   await appendLocalLog({
     level: 'info',
     event: 'one_booking_search_completed',
@@ -336,10 +354,9 @@ export async function handleTelegramMessage(
       caption: 'Download All Files',
     });
 
-    await updateLocalFlightCase(currentCase, {
+    currentCase = await updateLocalFlightCase(currentCase, {
       status: 'OPTIONS_SENT',
     });
-
     return;
   }
 
@@ -347,7 +364,7 @@ export async function handleTelegramMessage(
     caption: 'Ảnh lịch trình chuyến bay từ 1Booking.',
   });
 
-  await updateLocalFlightCase(currentCase, {
+  currentCase = await updateLocalFlightCase(currentCase, {
     status: 'OPTIONS_SENT',
   });
 }

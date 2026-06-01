@@ -126,9 +126,34 @@ export function formatFlightSelectionStartedMessage(
   return [
     `Đang mở lại case ${input.caseId} và kiểm tra chuyến còn khả dụng trên 1Booking...`,
     '',
-    `Hãng: ${input.airlineName} (${input.airlineCode})`,
+    `Hãng: ${
+      input.airlineName && input.airlineCode
+        ? `${input.airlineName} (${input.airlineCode})`
+        : 'Chưa chỉ định - sẽ đối chiếu danh sách live'
+    }`,
     `Giờ bay: ${input.departureTime}`,
     `Hạng đặt chỗ: ${BOOKING_CLASS_LABELS[input.bookingClass]} (${input.bookingClass})`,
+  ].join('\n');
+}
+
+/**
+ * Formats the resolved latest-case selection before Playwright refresh starts.
+ */
+export function formatLatestCaseFlightSelectionResolvedMessage(
+  input: SelectMatchingFlightInput,
+) {
+  return [
+    `Mình hiểu "case này" là ${input.caseId}.`,
+    '',
+    `Giờ bay: ${input.departureTime}`,
+    `Hãng: ${
+      input.airlineName && input.airlineCode
+        ? `${input.airlineName} (${input.airlineCode})`
+        : 'Chưa chỉ định'
+    }`,
+    `Hạng đặt chỗ: ${BOOKING_CLASS_LABELS[input.bookingClass]} (${input.bookingClass})`,
+    '',
+    'Mình sẽ kiểm tra lại danh sách chuyến live trước khi chọn.',
   ].join('\n');
 }
 

@@ -14,8 +14,8 @@ export const BOOKING_CLASS_LABELS: Record<BookingClass, string> = {
 
 export const SelectMatchingFlightInputSchema = z.object({
   caseId: z.string().regex(BOOKING_CASE_REGEX),
-  airlineCode: z.string().min(2),
-  airlineName: z.string().min(1),
+  airlineCode: z.string().min(2).nullable(),
+  airlineName: z.string().min(1).nullable(),
   departureTime: z.string().regex(/^\d{2}:\d{2}$/),
   bookingClass: BookingClassSchema.default('ECO'),
 });

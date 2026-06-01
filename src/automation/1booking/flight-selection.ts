@@ -94,7 +94,8 @@ export async function extractFlightSelectionCandidates(page: Page) {
 }
 
 /**
- * Matches the requested airline, departure time, and booking class.
+ * Matches the requested departure time and booking class, plus airline when
+ * the operator explicitly provided one.
  *
  * The function refuses to choose when the refreshed result list has no exact
  * candidate or more than one candidate.
@@ -105,7 +106,7 @@ export function matchFlightSelectionCandidate(
 ): FlightSelectionMatchResult {
   const matches = candidates.filter(
     (candidate) =>
-      candidate.airlineCode === input.airlineCode &&
+      (!input.airlineCode || candidate.airlineCode === input.airlineCode) &&
       candidate.departureTime === input.departureTime &&
       candidate.bookingClass === input.bookingClass,
   );
@@ -133,7 +134,13 @@ export function matchFlightSelectionCandidate(
     ok: false,
     reason: 'no_match',
     candidates: [],
-    message: `No available flight matched ${input.airlineCode} ${input.departureTime} ${input.bookingClass}.`,
+    message: `No available flight matched ${[
+      input.airlineCode,
+      input.departureTime,
+      input.bookingClass,
+    ]
+      .filter(Boolean)
+      .join(' ')}.`,
   };
 }
 

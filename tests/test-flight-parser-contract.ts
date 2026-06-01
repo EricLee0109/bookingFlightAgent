@@ -20,6 +20,10 @@ import {
 import { matchFlightSelectionCandidate } from '../src/automation/1booking/flight-selection';
 import { throwIfOneBookingLoginModalVisible } from '../src/automation/1booking/waiters';
 import { ParsedFlightRequestSchema } from '../src/contracts/flight';
+import {
+  getLatestFlightSearchCase,
+  setLatestFlightSearchCase,
+} from '../src/telegram/telegram-flight-selection-context';
 
 const validOneWayRequest = {
   fromAirportCode: 'HAN',
@@ -203,7 +207,10 @@ function testFlightSelectionParserBookingClassAliases() {
 }
 
 /**
- * Verifies that selection parser asks for missing airline/time before automation.
+ * Verifies that selection parser asks for missing time before automation.
+ *
+ * Airline is optional because refreshed live cards can still identify one
+ * unique match by departure time and booking class.
  */
 function testFlightSelectionParserRejectsMissingFields() {
   const result = parseFlightSelectionMessage('BK-20260520-155949 chọn chuyến này');
@@ -214,7 +221,58 @@ function testFlightSelectionParserRejectsMissingFields() {
     throw new Error('Expected invalid selection parse result.');
   }
 
-  assert.deepEqual(result.missingFields, ['airline', 'departureTime']);
+  assert.deepEqual(result.missingFields, ['departureTime']);
+}
+
+/**
+ * Verifies natural `case nay` selection resolves against per-chat latest case
+ * context without requiring the operator to repeat the BK id or airline.
+ */
+function testFlightSelectionParserUsesLatestCaseContext() {
+  const result = parseFlightSelectionMessage(
+    'mình lấy chuyến 8h40 của case này',
+    {
+      latestCaseId: 'BK-20260601-092749',
+    },
+  );
+
+  assert.equal(result.isSelectionMessage, true);
+
+  if (!result.isSelectionMessage || !result.ok) {
+    throw new Error('Expected valid latest-case selection parse result.');
+  }
+
+  assert.equal(result.resolvedCaseFromContext, true);
+  assert.equal(result.input.caseId, 'BK-20260601-092749');
+  assert.equal(result.input.departureTime, '08:40');
+  assert.equal(result.input.airlineCode, null);
+  assert.equal(result.input.bookingClass, 'ECO');
+}
+
+/**
+ * Verifies `case nay` asks for a case id when no latest search context exists.
+ */
+function testFlightSelectionParserRequiresLatestCaseContext() {
+  const result = parseFlightSelectionMessage('chọn chuyến 8h40 của case này');
+
+  assert.equal(result.isSelectionMessage, true);
+
+  if (!result.isSelectionMessage || result.ok) {
+    throw new Error('Expected missing latest-case parse result.');
+  }
+
+  assert.deepEqual(result.missingFields, ['caseId']);
+}
+
+/**
+ * Verifies per-chat latest flight search context storage.
+ */
+function testLatestFlightSearchCaseContext() {
+  setLatestFlightSearchCase(456, 'BK-20260601-092749');
+
+  assert.deepEqual(getLatestFlightSearchCase(456), {
+    latestSearchCaseId: 'BK-20260601-092749',
+  });
 }
 
 /**
@@ -267,6 +325,45 @@ function testFlightSelectionMatcher() {
   });
 
   assert.equal(noMatch.ok, false);
+
+  const timeOnlyMatch = matchFlightSelectionCandidate([...candidates], {
+    caseId: 'BK-20260520-155949',
+    airlineCode: null,
+    airlineName: null,
+    departureTime: '06:05',
+    bookingClass: 'ECO',
+  });
+
+  assert.equal(timeOnlyMatch.ok, true);
+
+  const ambiguousTimeOnlyMatch = matchFlightSelectionCandidate(
+    [
+      ...candidates,
+      {
+        cardIndex: 2,
+        airlineCode: 'VN',
+        airlineName: 'Vietnam Airlines',
+        flightNumber: 'VN124',
+        departureTime: '06:05',
+        arrivalTime: '08:15',
+        bookingClass: 'ECO',
+        priceText: 'VND 2,422,200',
+      },
+    ],
+    {
+      caseId: 'BK-20260520-155949',
+      airlineCode: null,
+      airlineName: null,
+      departureTime: '06:05',
+      bookingClass: 'ECO',
+    },
+  );
+
+  assert.equal(ambiguousTimeOnlyMatch.ok, false);
+
+  if (!ambiguousTimeOnlyMatch.ok) {
+    assert.equal(ambiguousTimeOnlyMatch.reason, 'multiple_matches');
+  }
 }
 
 /**
@@ -438,6 +535,9 @@ async function main() {
   testFlightSelectionParserDefaultsEco();
   testFlightSelectionParserBookingClassAliases();
   testFlightSelectionParserRejectsMissingFields();
+  testFlightSelectionParserUsesLatestCaseContext();
+  testFlightSelectionParserRequiresLatestCaseContext();
+  testLatestFlightSearchCaseContext();
   testFlightSelectionMatcher();
   await testOneBookingAuthExpiredToastDetection();
   await testOneBookingAuthExpiredPasswordModalDetection();

@@ -24,6 +24,7 @@ export type FlightSelectionParseResult =
       isSelectionMessage: true;
       ok: true;
       input: SelectMatchingFlightInput;
+      resolvedCaseFromContext: boolean;
     }
   | {
       isSelectionMessage: true;
@@ -31,6 +32,10 @@ export type FlightSelectionParseResult =
       missingFields: string[];
       message: string;
     };
+
+export type FlightSelectionParserOptions = {
+  latestCaseId?: string | null;
+};
 
 /**
  * Parses an operator selection message into the safe selection contract.
@@ -41,17 +46,34 @@ export type FlightSelectionParseResult =
  */
 export function parseFlightSelectionMessage(
   rawMessage: string,
+  options: FlightSelectionParserOptions = {},
 ): FlightSelectionParseResult {
-  const caseId = rawMessage.match(BOOKING_CASE_REGEX)?.[0]?.toUpperCase();
+  const explicitCaseId = rawMessage.match(BOOKING_CASE_REGEX)?.[0]?.toUpperCase();
+  const usesLatestCaseContext = mentionsLatestCaseReference(rawMessage);
+  const caseId =
+    explicitCaseId ??
+    (usesLatestCaseContext ? options.latestCaseId?.toUpperCase() : null);
 
   if (!caseId) {
+    if (usesLatestCaseContext && mentionsFlightSelection(rawMessage)) {
+      return {
+        isSelectionMessage: true,
+        ok: false,
+        missingFields: ['caseId'],
+        message:
+          'Cannot resolve latest case. Please search flights first or send an explicit BK case id.',
+      };
+    }
+
     return {
       isSelectionMessage: false,
     };
   }
 
   const airline = resolveAirlineFromText(rawMessage);
-  const departureTime = extractDepartureTime(rawMessage.replace(caseId, ''));
+  const departureTime = extractDepartureTime(
+    explicitCaseId ? rawMessage.replace(explicitCaseId, '') : rawMessage,
+  );
 
   if (!airline && !departureTime && !mentionsFlightSelection(rawMessage)) {
     return {
@@ -62,7 +84,6 @@ export function parseFlightSelectionMessage(
   const bookingClass = extractBookingClass(rawMessage);
   const missingFields: string[] = [];
 
-  if (!airline) missingFields.push('airline');
   if (!departureTime) missingFields.push('departureTime');
 
   if (missingFields.length > 0) {
@@ -77,8 +98,8 @@ export function parseFlightSelectionMessage(
 
   const input = SelectMatchingFlightInputSchema.parse({
     caseId,
-    airlineCode: airline?.code,
-    airlineName: airline?.name,
+    airlineCode: airline?.code ?? null,
+    airlineName: airline?.name ?? null,
     departureTime,
     bookingClass,
   });
@@ -87,6 +108,7 @@ export function parseFlightSelectionMessage(
     isSelectionMessage: true,
     ok: true,
     input,
+    resolvedCaseFromContext: !explicitCaseId && usesLatestCaseContext,
   };
 }
 
@@ -126,6 +148,17 @@ function mentionsFlightSelection(rawMessage: string) {
   const normalized = normalizeVietnameseText(rawMessage);
 
   return /\b(chon\s+chuyen|chon\s+flight|flight)\b/.test(normalized);
+}
+
+/**
+ * Detects natural references to the latest search case in the current chat.
+ */
+function mentionsLatestCaseReference(rawMessage: string) {
+  const normalized = normalizeVietnameseText(rawMessage);
+
+  return /\b(case|booking)\s+(nay|vua roi|gan nhat|moi nhat|truoc do)\b/.test(
+    normalized,
+  );
 }
 
 /**
