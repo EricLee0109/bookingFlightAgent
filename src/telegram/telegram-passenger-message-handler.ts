@@ -10,6 +10,7 @@ import {
   PassengerResolutionService,
   type PassengerMentionResolutionResult,
 } from '../services/passenger-resolution-service';
+import { fillPassengerAndHoldOneBookingCase } from '../services/passenger-hold-automation-service';
 import {
   readLocalFlightCase,
   updateLocalFlightCase,
@@ -19,6 +20,11 @@ import {
   formatPassengerAmbiguousMessage,
   formatPassengerAttachedMessage,
   formatPassengerCaseRequiredMessage,
+  formatPassengerHoldFailedMessage,
+  formatPassengerHoldMissingDobMessage,
+  formatPassengerHoldNeedsReviewMessage,
+  formatPassengerHoldRunningMessage,
+  formatPassengerHoldSuccessMessage,
   formatPassengerMatchedMessage,
   formatPassengerMissingFieldsMessage,
   formatNewPassengerMissingFieldsMessage,
@@ -49,8 +55,7 @@ type LocalPassengerReadyCase = NonNullable<
  * - Call the passenger AI parser and local SQLite resolution service.
  * - Render local resolver outcomes and inline buttons.
  * - Attach a confirmed ready profile to local case memory.
- *
- * This component intentionally stops before Playwright passenger form fill.
+ * - Trigger the separated Playwright fill-and-hold service.
  */
 
 /**
@@ -227,6 +232,21 @@ export async function tryHandleTelegramPassengerMessage(
           : undefined,
     });
 
+    if (
+      parsedPassengerMessage.intent === 'update_passenger_fields' &&
+      result.status === 'matched' &&
+      currentCase.attachedPassenger?.id === result.profile.id
+    ) {
+      await attachConfirmedPassenger(
+        bot,
+        chatId,
+        currentCase,
+        service,
+        result.profile,
+      );
+      return;
+    }
+
     await renderPassengerResolution(bot, chatId, currentCase, service, result);
   });
 
@@ -278,8 +298,8 @@ async function renderPassengerResolution(
   }
 
   if (result.status === 'passenger_ready') {
-    clearPendingPassengerProfiles(chatId);
-    await updateLocalFlightCase(flightCase, {
+    setPendingPassengerProfiles(chatId, flightCase.caseId, [result.profile.id]);
+    const updatedCase = await updateLocalFlightCase(flightCase, {
       status: 'PASSENGER_INFO_CONFIRMED',
       attachedPassenger: result.profile,
       attachedPassengerInfo: result.passengerInfo,
@@ -289,6 +309,7 @@ async function renderPassengerResolution(
       chatId,
       formatPassengerAttachedMessage(flightCase.caseId, result.profile),
     );
+    await runAutomaticPassengerHold(bot, chatId, updatedCase);
     return;
   }
 
@@ -384,7 +405,7 @@ async function renderChosenPassengerCandidate(
 }
 
 /**
- * Attaches a confirmed ready passenger to a booking case without Playwright.
+ * Attaches a confirmed ready passenger and starts separated hold automation.
  */
 async function attachConfirmedPassenger(
   bot: TelegramBot,
@@ -403,7 +424,7 @@ async function attachConfirmedPassenger(
     return;
   }
 
-  await updateLocalFlightCase(flightCase, {
+  const updatedCase = await updateLocalFlightCase(flightCase, {
     status: 'PASSENGER_INFO_CONFIRMED',
     attachedPassenger: profile,
     attachedPassengerInfo: service.attachPassengerToCase(
@@ -412,11 +433,76 @@ async function attachConfirmedPassenger(
     ).passengerInfo,
     passengerErrorMessage: undefined,
   });
-  clearPendingPassengerProfiles(chatId);
+  setPendingPassengerProfiles(chatId, flightCase.caseId, [profile.id]);
   await bot.sendMessage(
     chatId,
     formatPassengerAttachedMessage(flightCase.caseId, profile),
   );
+  await runAutomaticPassengerHold(bot, chatId, updatedCase);
+}
+
+/**
+ * Runs automatic passenger fill and hold after passenger_ready confirmation.
+ *
+ * Success sends text only. Error screenshots remain enabled for local support.
+ */
+async function runAutomaticPassengerHold(
+  bot: TelegramBot,
+  chatId: number,
+  flightCase: LocalPassengerReadyCase,
+) {
+  await bot.sendMessage(
+    chatId,
+    formatPassengerHoldRunningMessage(flightCase.caseId),
+  );
+
+  const result = await fillPassengerAndHoldOneBookingCase(flightCase.caseId);
+
+  if (result.ok) {
+    clearPendingPassengerProfiles(chatId);
+    await bot.sendMessage(
+      chatId,
+      formatPassengerHoldSuccessMessage(
+        flightCase.caseId,
+        result.pnrCode,
+        result.pnrWarning,
+      ),
+    );
+    return;
+  }
+
+  if (result.reason === 'needs_input') {
+    const profile = flightCase.attachedPassenger;
+
+    if (profile) {
+      setPendingPassengerProfiles(chatId, flightCase.caseId, [profile.id]);
+      await bot.sendMessage(chatId, formatPassengerHoldMissingDobMessage(profile));
+      return;
+    }
+  }
+
+  if (result.reason === 'needs_review') {
+    await bot.sendMessage(
+      chatId,
+      formatPassengerHoldNeedsReviewMessage(result.message),
+    );
+
+    if (result.errorScreenshotPath) {
+      await bot.sendPhoto(chatId, result.errorScreenshotPath, {
+        caption: 'Screenshot trạng thái giữ chỗ cần kiểm tra thủ công.',
+      });
+    }
+
+    return;
+  }
+
+  await bot.sendMessage(chatId, formatPassengerHoldFailedMessage(result.message));
+
+  if (result.errorScreenshotPath) {
+    await bot.sendPhoto(chatId, result.errorScreenshotPath, {
+      caption: 'Screenshot lỗi khi tự động nhập thông tin và giữ chỗ.',
+    });
+  }
 }
 
 async function withPassengerResolutionService(
@@ -438,6 +524,8 @@ function isPassengerReadyCaseStatus(status: string) {
     'PASSENGER_INFO_PARSED',
     'PASSENGER_INFO_NEEDS_REVIEW',
     'PASSENGER_INFO_FAILED',
+    'FILL_PASSENGER_FAILED',
+    'HOLD_FAILED',
   ]).has(status);
 }
 

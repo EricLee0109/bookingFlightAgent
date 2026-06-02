@@ -4,12 +4,32 @@ import path from 'node:path';
 import { createOpenAIPassengerMessageParser } from '../src/agent/openai-passenger-message-parser';
 import { parseFlightSelectionMessage } from '../src/agent/flight-selection-parser';
 import {
+  assertSafeFinalHoldCtaText,
+  buildPassengerQuickInput,
+  isDurableHeldOrderTerminalState,
+  PostSubmitHoldError,
+} from '../src/automation/1booking/hold-booking';
+import {
+  buildExactFlightNumberPattern,
+  extractPnrCodesFromHeldOrderText,
+  isValidPnrCode,
+} from '../src/automation/1booking/pnr';
+import {
   ParsedPassengerMessageSchema,
   type ParsedPassengerMessage,
 } from '../src/contracts/passenger';
 import { PassengerResolver } from '../src/passengers/passenger-resolver';
 import { PassengerStore } from '../src/passengers/passenger-store';
 import { PassengerResolutionService } from '../src/services/passenger-resolution-service';
+import {
+  getHoldAutomationFailureStatus,
+  getMissingHoldPassengerFields,
+  getPnrExtractionStatus,
+} from '../src/services/passenger-hold-automation-service';
+import {
+  recoverHeldBookingCase,
+  validateRecoverableHoldCase,
+} from '../src/services/passenger-hold-recovery-service';
 import {
   getTelegramPassengerContext,
   setActivePassengerCase,
@@ -19,6 +39,12 @@ import {
   buildPassengerCandidateKeyboard,
   parsePassengerCallbackData,
 } from '../src/telegram/telegram-passenger-keyboards';
+import {
+  formatPassengerHoldNeedsReviewMessage,
+  formatPassengerHoldSuccessMessage,
+} from '../src/telegram/telegram-formatters';
+import { parseHoldRecoveryMessage } from '../src/telegram/telegram-hold-recovery';
+import { type LocalFlightCase } from '../src/storage/local-case-store';
 
 const TEST_DIR = path.resolve(
   process.cwd(),
@@ -203,6 +229,14 @@ function testNewPassengerUpsertAndCaseAttachment() {
       store.getCasePassenger('BK-20260525-162456')?.passengerProfileId,
       firstResult.profile.id,
     );
+    assert.equal(
+      store.markCasePassengerSuccessfulHold('BK-20260525-162456').status,
+      'successful_hold',
+    );
+    assert.equal(
+      store.getCasePassenger('BK-20260525-162456')?.status,
+      'successful_hold',
+    );
     assert.equal(store.findProfilesByAlias('Phát').length, 1);
 
     const profileCountBeforeDuplicate = store.getStats().profileCount;
@@ -276,6 +310,267 @@ function testIncompleteNewPassengerIsNotInserted() {
 }
 
 /**
+ * Verifies native 1Booking quick input formatting and VN-only DOB preflight.
+ */
+function testPassengerQuickInputAndAirlineDobRules() {
+  const femalePassenger = {
+    gender: 'F' as const,
+    lastName: 'NGUYEN',
+    firstName: 'THI LANH',
+    dob: null,
+  };
+  const flight = {
+    cardIndex: 1,
+    airlineCode: 'VJ',
+    airlineName: 'Vietjet Air',
+    flightNumber: 'VJ123',
+    departureTime: '08:40',
+    arrivalTime: '10:00',
+    bookingClass: 'ECO' as const,
+    priceText: 'VND 1,000,000',
+    selectedAt: '2026-06-02T00:00:00.000Z',
+  };
+
+  assert.equal(
+    buildPassengerQuickInput({
+      gender: 'M',
+      lastName: 'NGUYEN',
+      firstName: 'VAN A',
+      dob: null,
+    }),
+    'Mr NGUYEN/ VAN A',
+  );
+  assert.equal(
+    buildPassengerQuickInput({
+      ...femalePassenger,
+      dob: '1995-01-02',
+    }),
+    'Ms NGUYEN/ THI LANH 02/01/1995',
+  );
+  assert.throws(() =>
+    buildPassengerQuickInput({
+      ...femalePassenger,
+      gender: null,
+    }),
+  );
+  assert.deepEqual(
+    getMissingHoldPassengerFields({
+      selectedFlight: flight,
+      attachedPassengerInfo: femalePassenger,
+    }),
+    [],
+  );
+  assert.deepEqual(
+    getMissingHoldPassengerFields({
+      selectedFlight: {
+        ...flight,
+        airlineCode: 'VN',
+        airlineName: 'Vietnam Airlines',
+        flightNumber: 'VN123',
+      },
+      attachedPassengerInfo: femalePassenger,
+    }),
+    ['dob'],
+  );
+}
+
+/**
+ * Verifies that final hold automation permits only `Giữ chỗ`.
+ *
+ * Ticket issuance is permanently forbidden and must fail before any click.
+ */
+function testSafeFinalHoldCtaGuard() {
+  assert.doesNotThrow(() => assertSafeFinalHoldCtaText('Giữ chỗ'));
+  assert.doesNotThrow(() => assertSafeFinalHoldCtaText('Giu cho'));
+  assert.throws(
+    () => assertSafeFinalHoldCtaText('Xuất vé ngay'),
+    /must never click "Xuất vé ngay"/,
+  );
+  assert.throws(() => assertSafeFinalHoldCtaText('Hủy'));
+}
+
+/**
+ * Verifies PNR validation and extraction from one held-order card snapshot.
+ */
+function testHeldBookingPnrExtraction() {
+  const exactFlightNumber = buildExactFlightNumberPattern('VJ634');
+
+  assert.equal(exactFlightNumber.test('VJ634'), true);
+  assert.equal(exactFlightNumber.test(' VJ634 '), true);
+  assert.equal(exactFlightNumber.test('VJ634A321'), false);
+  assert.equal(isValidPnrCode('VNT56E'), true);
+  assert.equal(isValidPnrCode('#HS2200389000081'), false);
+  assert.equal(isValidPnrCode('VJ630'), false);
+  assert.equal(isValidPnrCode('H1_ECO'), false);
+  assert.equal(isValidPnrCode('VNT56!'), false);
+  assert.deepEqual(
+    extractPnrCodesFromHeldOrderText(
+      ['VJ630', 'H1_ECO', 'Đang giữ chỗ', 'VNT56E'].join('\n'),
+      'VJ630',
+    ),
+    ['VNT56E'],
+  );
+}
+
+/**
+ * Verifies submitted hold failures require manual review instead of retry.
+ */
+function testSubmittedHoldFailureSafety() {
+  const postSubmitError = new PostSubmitHoldError(
+    'terminal_order_page',
+    new Error('Order page timed out.'),
+    'https://pro.1booking.vn/order/123',
+  );
+
+  assert.equal(
+    getHoldAutomationFailureStatus(
+      postSubmitError,
+      false,
+      true,
+    ),
+    'HOLD_NEEDS_REVIEW',
+  );
+  assert.equal(
+    getHoldAutomationFailureStatus(new Error('Before final click.'), false, true),
+    'HOLD_FAILED',
+  );
+  assert.equal(
+    getHoldAutomationFailureStatus(new Error('Passenger fill failed.'), false, false),
+    'FILL_PASSENGER_FAILED',
+  );
+  assert.equal(postSubmitError.checkpoint, 'terminal_order_page');
+  assert.equal(postSubmitError.originalCauseMessage, 'Order page timed out.');
+  assert.equal(postSubmitError.currentUrl, 'https://pro.1booking.vn/order/123');
+  assert.equal(
+    isDurableHeldOrderTerminalState({
+      orderId: '#HS2200389000085',
+      hasExpectedHeldFlight: true,
+    }),
+    true,
+  );
+  assert.equal(
+    isDurableHeldOrderTerminalState({
+      orderId: '#HS2200389000085',
+      hasExpectedHeldFlight: false,
+    }),
+    false,
+  );
+  assert.equal(getPnrExtractionStatus('VNT56E'), 'PNR_EXTRACTED');
+  assert.equal(getPnrExtractionStatus(null), 'HOLD_SUCCESS');
+}
+
+/**
+ * Verifies explicit no-browser recovery for manually reviewed held bookings.
+ */
+async function testPassengerHoldRecovery() {
+  const flightCase: LocalFlightCase = {
+    caseId: 'BK-20260602-145601',
+    status: 'HOLD_NEEDS_REVIEW' as const,
+    rawMessage: 'test',
+    createdAt: '2026-06-02T00:00:00.000Z',
+    updatedAt: '2026-06-02T00:00:00.000Z',
+  };
+  let updatedCase: LocalFlightCase = flightCase;
+  let markedPassengerCaseId: string | null = null;
+
+  assert.deepEqual(parseHoldRecoveryMessage('hello'), {
+    isRecoveryMessage: false,
+  });
+  assert.deepEqual(
+    parseHoldRecoveryMessage('recover BK-20260602-145601 PNR HXGUQ9'),
+    {
+      isRecoveryMessage: true,
+      ok: true,
+      caseId: 'BK-20260602-145601',
+      pnrCode: 'HXGUQ9',
+    },
+  );
+  assert.equal(
+    parseHoldRecoveryMessage('recover BK-20260602-145601 PNR BAD').ok,
+    true,
+  );
+  assert.match(
+    validateRecoverableHoldCase({
+      ...flightCase,
+      status: 'SEARCH_DONE',
+    }) ?? '',
+    /không ở trạng thái cần recover hold/,
+  );
+
+  const result = await recoverHeldBookingCase(
+    {
+      caseId: flightCase.caseId,
+      pnrCode: 'HXGUQ9',
+    },
+    {
+      async readCase() {
+        return updatedCase;
+      },
+      async updateCase(_flightCase, patch) {
+        updatedCase = {
+          ...updatedCase,
+          ...patch,
+          updatedAt: '2026-06-02T00:01:00.000Z',
+        };
+
+        return updatedCase;
+      },
+      markPassengerSuccessfulHold(caseId) {
+        markedPassengerCaseId = caseId;
+      },
+      async appendLog() {},
+      now: () => '2026-06-02T00:01:00.000Z',
+    },
+  );
+
+  assert.deepEqual(result, {
+    ok: true,
+    caseId: flightCase.caseId,
+    pnrCode: 'HXGUQ9',
+  });
+  assert.equal(markedPassengerCaseId, flightCase.caseId);
+  assert.equal(updatedCase.status, 'PNR_EXTRACTED');
+  assert.equal(updatedCase.pnrCode, 'HXGUQ9');
+  assert.equal(updatedCase.errorMessage, undefined);
+
+  const malformed = await recoverHeldBookingCase(
+    {
+      caseId: flightCase.caseId,
+      pnrCode: 'BAD',
+    },
+    {
+      async readCase() {
+        return flightCase;
+      },
+    },
+  );
+
+  assert.equal(malformed.ok, false);
+}
+
+/**
+ * Verifies Telegram success includes PNR or a non-retry manual-check warning.
+ */
+function testPassengerHoldTelegramMessages() {
+  assert.match(
+    formatPassengerHoldSuccessMessage('BK-20260602-133338', 'VNT56E'),
+    /PNR: VNT56E/,
+  );
+  assert.match(
+    formatPassengerHoldSuccessMessage(
+      'BK-20260602-133338',
+      null,
+      'Please check the existing order manually.',
+    ),
+    /PNR: Chưa extract được/,
+  );
+  assert.match(
+    formatPassengerHoldNeedsReviewMessage('Order page timed out.'),
+    /tránh giữ chỗ trùng/,
+  );
+}
+
+/**
  * Verifies passenger context and prevents passenger messages from being claimed
  * by the flight-selection parser merely because they include a case code.
  */
@@ -303,6 +598,12 @@ async function main() {
   testPassengerProfileEnrichment();
   testNewPassengerUpsertAndCaseAttachment();
   testIncompleteNewPassengerIsNotInserted();
+  testPassengerQuickInputAndAirlineDobRules();
+  testSafeFinalHoldCtaGuard();
+  testHeldBookingPnrExtraction();
+  testSubmittedHoldFailureSafety();
+  await testPassengerHoldRecovery();
+  testPassengerHoldTelegramMessages();
   testTelegramPassengerContextAndRouting();
 
   console.log('Passenger message parser contract tests passed.');

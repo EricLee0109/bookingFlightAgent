@@ -32,6 +32,7 @@ import {
   formatSearchSuccessMessage,
 } from './telegram-formatters';
 import { handleTelegramSettingsCommand } from './telegram-settings-commands';
+import { tryHandleTelegramHoldRecoveryMessage } from './telegram-hold-recovery';
 import {
   getLatestFlightSearchCase,
   setLatestFlightSearchCase,
@@ -97,6 +98,10 @@ export async function handleTelegramMessage(
 
   if (!settings.agentEnabled) {
     await bot.sendMessage(chatId, 'Agent hiện đang tắt. Dùng /agent_on để bật lại.');
+    return;
+  }
+
+  if (await tryHandleTelegramHoldRecoveryMessage(bot, chatId, text)) {
     return;
   }
 

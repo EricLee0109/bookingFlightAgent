@@ -27,6 +27,7 @@ export type LocalFlightCaseStatus =
   | 'READY_TO_HOLD'
   | 'HOLD_RUNNING'
   | 'HOLD_SUCCESS'
+  | 'HOLD_NEEDS_REVIEW'
   | 'PNR_EXTRACTED'
   | 'NEEDS_INPUT'
   | 'SEARCH_FAILED'
@@ -64,6 +65,17 @@ export type LocalFlightCase = {
   selectionScreenshotPath?: string;
   selectionErrorMessage?: string;
   passengerErrorMessage?: string;
+  holdErrorScreenshotPath?: string;
+  holdSubmittedAt?: string;
+  holdSucceededAt?: string;
+  holdLoadingObservedAt?: string;
+  holdSuccessModalObservedAt?: string;
+  holdRecoveredAt?: string;
+  orderId?: string;
+  orderDetailUrl?: string;
+  pnrCode?: string;
+  pnrExtractedAt?: string;
+  pnrErrorMessage?: string;
   errorMessage?: string;
   createdAt: string;
   updatedAt: string;

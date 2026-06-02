@@ -73,7 +73,7 @@ export type CasePassenger = {
   passengerProfileId: number;
   passengerIndex: number;
   passengerInfo: PassengerInfo;
-  status: 'passenger_ready';
+  status: 'passenger_ready' | 'successful_hold';
   createdAt: string;
   updatedAt: string;
 };

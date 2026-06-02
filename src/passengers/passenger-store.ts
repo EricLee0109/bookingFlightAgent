@@ -56,7 +56,7 @@ type CasePassengerRow = {
   passenger_profile_id: number;
   passenger_index: number;
   passenger_info_json: string;
-  status: 'passenger_ready';
+  status: import('./passenger-types').CasePassenger['status'];
   created_at: string;
   updated_at: string;
 };
@@ -538,6 +538,47 @@ export class PassengerStore {
       .get(caseId, passengerIndex) as CasePassengerRow | undefined;
 
     return row ? mapCasePassengerRow(row) : null;
+  }
+
+  /**
+   * Marks one attached passenger as successfully held after browser assertion
+   * and final 1Booking confirmation.
+   */
+  markCasePassengerSuccessfulHold(caseId: string, passengerIndex = 1) {
+    this.migrate();
+    const now = new Date().toISOString();
+    const row = this.db
+      .prepare(
+        `
+        UPDATE case_passengers
+        SET
+          status = 'successful_hold',
+          updated_at = ?
+        WHERE case_id = ? AND passenger_index = ?
+        RETURNING *;
+      `,
+      )
+      .get(now, caseId, passengerIndex) as CasePassengerRow | undefined;
+
+    if (!row) {
+      throw new Error(
+        `Cannot mark successful_hold. No attached passenger found for case ${caseId}.`,
+      );
+    }
+
+    this.db
+      .prepare(
+        `
+        UPDATE passenger_profiles
+        SET
+          source = 'successful_hold',
+          updated_at = ?
+        WHERE id = ?;
+      `,
+      )
+      .run(now, row.passenger_profile_id);
+
+    return mapCasePassengerRow(row);
   }
 
   /**

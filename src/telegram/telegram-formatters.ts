@@ -258,7 +258,7 @@ export function formatNewPassengerMissingFieldsMessage(
 }
 
 /**
- * Formats successful passenger attachment without starting Playwright fill.
+ * Formats successful passenger attachment before automatic Playwright fill.
  */
 export function formatPassengerAttachedMessage(
   caseId: string,
@@ -270,7 +270,70 @@ export function formatPassengerAttachedMessage(
     ...formatPassengerSummaryLines(profile),
     '',
     'Trạng thái: passenger_ready.',
-    'Chưa chạy bước nhập form 1Booking.',
+    'Mình sẽ tự động nhập form và tiến hành giữ chỗ trên 1Booking.',
+  ].join('\n');
+}
+
+/**
+ * Formats the automatic form-fill and hold progress message.
+ */
+export function formatPassengerHoldRunningMessage(caseId: string) {
+  return `Đang nhập thông tin khách và giữ chỗ cho case ${caseId} trên 1Booking...`;
+}
+
+/**
+ * Formats the VN-only DOB follow-up before automatic browser launch.
+ */
+export function formatPassengerHoldMissingDobMessage(profile: PassengerProfile) {
+  return [
+    `Chuyến Vietnam Airlines cần ngày sinh của ${profile.normalizedFullName} trước khi giữ chỗ.`,
+    '',
+    'Vui lòng bổ sung dạng: sinh 02/01/1995',
+  ].join('\n');
+}
+
+/**
+ * Formats successful hold confirmation and its extracted PNR when available.
+ */
+export function formatPassengerHoldSuccessMessage(
+  caseId: string,
+  pnrCode: string | null,
+  pnrWarning?: string,
+) {
+  return [
+    `Đã giữ chỗ thành công cho case ${caseId}.`,
+    '',
+    'Trạng thái: successful_hold.',
+    pnrCode ? `PNR: ${pnrCode}` : 'PNR: Chưa extract được.',
+    pnrWarning ? `Lưu ý: ${pnrWarning}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/**
+ * Formats an uncertain post-submit hold state that must not be auto-retried.
+ */
+export function formatPassengerHoldNeedsReviewMessage(message: string) {
+  return [
+    'Đã gửi thao tác giữ chỗ lên 1Booking nhưng chưa thể xác nhận trạng thái cuối.',
+    '',
+    'Vui lòng kiểm tra đơn hàng hiện có trên 1Booking trước khi thử lại để tránh giữ chỗ trùng.',
+    '',
+    message,
+  ].join('\n');
+}
+
+/**
+ * Formats a failed automatic passenger fill or hold attempt.
+ */
+export function formatPassengerHoldFailedMessage(message: string) {
+  return [
+    'Không thể tự động giữ chỗ trên 1Booking.',
+    '',
+    message,
+    '',
+    'Mình sẽ gửi screenshot lỗi bên dưới nếu có.',
   ].join('\n');
 }
 

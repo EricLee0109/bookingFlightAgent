@@ -7,8 +7,13 @@ import {
 import { formatIsoDateForOneBooking } from '../src/automation/1booking/dates';
 import {
   extractFlightSelectionCandidates,
+  openMatchingFlightPassengerForm,
   selectMatchingFlight,
 } from '../src/automation/1booking/flight-selection';
+import {
+  fillAndAssertPassengerInformation,
+  openPassengerHoldReview,
+} from '../src/automation/1booking/hold-booking';
 import { searchFlights } from '../src/automation/1booking/flight-search';
 import { takeFullPageScreenshot } from '../src/automation/1booking/screenshots';
 
@@ -117,6 +122,95 @@ test('selects a matching ECO flight and opens passenger information page', async
     ).toBeVisible();
   } catch (error) {
     await takeFullPageScreenshot(page, '1booking-selection-e2e-failed.png');
+    throw error;
+  } finally {
+    await context.close();
+  }
+});
+
+/**
+ * End-to-end coverage for native quick passenger input without a real hold.
+ *
+ * The test opens the final review drawer, verifies the exact safe `Giữ chỗ`
+ * CTA, and intentionally stops before clicking it to avoid a real booking.
+ */
+test('fills and asserts split passenger information before hold confirmation', async ({
+  browser,
+}) => {
+  test.skip(
+    !existsSync(ONE_BOOKING_STORAGE_STATE_PATH),
+    `Missing saved auth state at ${ONE_BOOKING_STORAGE_STATE_PATH}. Run scripts/save-auth.ts first.`,
+  );
+
+  const searchInput = {
+    fromAirportCode: 'SGN',
+    fromAirportText: 'Sân bay Tân Sơn Nhất (SGN)',
+    toAirportCode: 'DAD',
+    toAirportText: 'Sân bay Đà Nẵng (DAD)',
+    departureDate: '2026-06-20',
+  };
+  const context = await browser.newContext({
+    storageState: ONE_BOOKING_STORAGE_STATE_PATH,
+    viewport: ONE_BOOKING_VIEWPORT,
+  });
+  const page = await context.newPage();
+
+  try {
+    await searchFlights(page, searchInput);
+
+    const candidates = await extractFlightSelectionCandidates(page);
+    const candidate = candidates.find(
+      (flightCandidate) => flightCandidate.bookingClass === 'ECO',
+    );
+
+    expect(candidate).toBeTruthy();
+
+    if (!candidate) {
+      throw new Error('Expected at least one ECO candidate for passenger fill test.');
+    }
+
+    await openMatchingFlightPassengerForm(page, searchInput, {
+      caseId: 'BK-20260620-000001',
+      airlineCode: candidate.airlineCode,
+      airlineName: candidate.airlineName,
+      departureTime: candidate.departureTime,
+      bookingClass: candidate.bookingClass,
+    });
+    await fillAndAssertPassengerInformation(page, {
+      gender: 'F',
+      lastName: 'NGUYEN',
+      firstName: 'THI LANH',
+      dob: null,
+    });
+
+    await expect(
+      page.getByRole('button', {
+        name: /^Xác nhận$|^Xac nhan$/i,
+      }),
+    ).toBeEnabled();
+
+    const reviewDrawer = await openPassengerHoldReview(page, {
+      passengerInfo: {
+        gender: 'F',
+        lastName: 'NGUYEN',
+        firstName: 'THI LANH',
+        dob: null,
+      },
+      flightNumber: candidate.flightNumber,
+    });
+
+    await expect(
+      reviewDrawer.getByRole('button', {
+        name: /^Giữ chỗ$|^Giu cho$/i,
+      }),
+    ).toBeVisible();
+    await expect(
+      reviewDrawer.getByRole('button', {
+        name: /^Xuất vé ngay$|^Xuat ve ngay$/i,
+      }),
+    ).toBeVisible();
+  } catch (error) {
+    await takeFullPageScreenshot(page, '1booking-passenger-fill-e2e-failed.png');
     throw error;
   } finally {
     await context.close();

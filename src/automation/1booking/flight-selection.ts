@@ -37,6 +37,34 @@ export async function selectMatchingFlight(
   searchInput: SearchFlightsInput,
   selectionInput: SelectMatchingFlightInput,
 ): Promise<SelectMatchingFlightResult> {
+  const selectedFlight = await openMatchingFlightPassengerForm(
+    page,
+    searchInput,
+    selectionInput,
+  );
+
+  const screenshotPath = await takeFullPageScreenshot(
+    page,
+    `${selectionInput.caseId}-selected-flight.png`,
+  );
+
+  return {
+    selectedFlight,
+    screenshotPath,
+  };
+}
+
+/**
+ * Refreshes live results, selects one exact flight, and opens passenger form.
+ *
+ * Hold-booking automation reuses this helper to avoid trusting stale browser
+ * state from the earlier Telegram selection step.
+ */
+export async function openMatchingFlightPassengerForm(
+  page: Page,
+  searchInput: SearchFlightsInput,
+  selectionInput: SelectMatchingFlightInput,
+) {
   await searchFlights(page, searchInput);
 
   const candidates = await extractFlightSelectionCandidates(page);
@@ -54,15 +82,7 @@ export async function selectMatchingFlight(
   await clickHoldBooking(page);
   await waitForPassengerInformationPage(page);
 
-  const screenshotPath = await takeFullPageScreenshot(
-    page,
-    `${selectionInput.caseId}-selected-flight.png`,
-  );
-
-  return {
-    selectedFlight: matchResult.candidate,
-    screenshotPath,
-  };
+  return matchResult.candidate;
 }
 
 /**
