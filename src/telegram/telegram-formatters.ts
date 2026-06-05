@@ -86,10 +86,12 @@ export function formatSearchSuccessMessage(flightCount: number) {
  *
  * The screenshot error should be sent after this message if available.
  */
-export function formatSearchFailedMessage() {
+export function formatSearchFailedMessage(message?: string) {
   return [
     '❌ Không thể tìm chuyến trên 1Booking.',
     '',
+    message,
+    message ? '' : null,
     'Có thể do:',
     '- Session 1Booking hết hạn.',
     '- UI 1Booking chưa load xong.',
@@ -97,7 +99,9 @@ export function formatSearchFailedMessage() {
     '- Không có chuyến phù hợp.',
     '',
     'Mình sẽ gửi screenshot lỗi bên dưới nếu có.',
-  ].join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 /**
@@ -132,7 +136,7 @@ export function formatFlightSelectionStartedMessage(
         : 'Chưa chỉ định - sẽ đối chiếu danh sách live'
     }`,
     `Giờ bay: ${input.departureTime}`,
-    `Hạng đặt chỗ: ${BOOKING_CLASS_LABELS[input.bookingClass]} (${input.bookingClass})`,
+    `Hạng đặt chỗ: ${formatSelectionBookingClass(input.bookingClass)}`,
   ].join('\n');
 }
 
@@ -151,7 +155,7 @@ export function formatLatestCaseFlightSelectionResolvedMessage(
         ? `${input.airlineName} (${input.airlineCode})`
         : 'Chưa chỉ định'
     }`,
-    `Hạng đặt chỗ: ${BOOKING_CLASS_LABELS[input.bookingClass]} (${input.bookingClass})`,
+    `Hạng đặt chỗ: ${formatSelectionBookingClass(input.bookingClass)}`,
     '',
     'Mình sẽ kiểm tra lại danh sách chuyến live trước khi chọn.',
   ].join('\n');
@@ -312,6 +316,13 @@ export function formatPassengerHoldSuccessMessage(
 }
 
 /**
+ * Formats the brief operator notice shown before automatic 1Booking re-login.
+ */
+export function formatOneBookingAuthRefreshStartedMessage() {
+  return 'Phiên 1Booking đã hết hạn, mình đang tự đăng nhập lại...';
+}
+
+/**
  * Formats an uncertain post-submit hold state that must not be auto-retried.
  */
 export function formatPassengerHoldNeedsReviewMessage(message: string) {
@@ -367,4 +378,12 @@ function formatPassengerSummaryLines(profile: PassengerProfile) {
     }`,
     `Ngày sinh: ${profile.dateOfBirth ?? 'Không bắt buộc'}`,
   ];
+}
+
+function formatSelectionBookingClass(
+  bookingClass: keyof typeof BOOKING_CLASS_LABELS | null,
+) {
+  return bookingClass
+    ? `${BOOKING_CLASS_LABELS[bookingClass]} (${bookingClass})`
+    : 'Không chỉ định - sẽ chọn chuyến duy nhất khớp giờ/hãng';
 }

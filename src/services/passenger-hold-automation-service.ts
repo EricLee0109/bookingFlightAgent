@@ -16,6 +16,7 @@ import {
 } from '../storage/local-case-store';
 import { appendLocalLog } from '../storage/local-log-store';
 import { runWithAutomationLock } from '../utils/automation-lock';
+import { OneBookingAuthRefreshRetryController } from './onebooking-auth-refresh-retry';
 
 export type PassengerHoldAutomationResult =
   | {
@@ -23,6 +24,7 @@ export type PassengerHoldAutomationResult =
       caseId: string;
       pnrCode: string | null;
       pnrWarning?: string;
+      authRefreshed?: boolean;
     }
   | {
       ok: false;
@@ -31,6 +33,7 @@ export type PassengerHoldAutomationResult =
       missingFields: ['dob'];
       message: string;
       errorScreenshotPath: null;
+      authRefreshed?: boolean;
     }
   | {
       ok: false;
@@ -38,6 +41,7 @@ export type PassengerHoldAutomationResult =
       caseId: string;
       message: string;
       errorScreenshotPath: string | null;
+      authRefreshed?: boolean;
     }
   | {
       ok: false;
@@ -45,7 +49,14 @@ export type PassengerHoldAutomationResult =
       caseId: string;
       message: string;
       errorScreenshotPath: string | null;
+      authRefreshed?: boolean;
     };
+
+export type PassengerHoldAutomationOptions = {
+  onAuthRefresh?: () => Promise<void>;
+};
+
+const MAX_ONE_BOOKING_HOLD_ATTEMPTS = 2;
 
 /**
  * Reruns the saved flight selection, fills validated passenger information,
@@ -56,10 +67,11 @@ export type PassengerHoldAutomationResult =
  */
 export async function fillPassengerAndHoldOneBookingCase(
   caseId: string,
+  options: PassengerHoldAutomationOptions = {},
 ): Promise<PassengerHoldAutomationResult> {
   try {
     return await runWithAutomationLock('Giữ chỗ', () =>
-      fillPassengerAndHoldOneBookingCaseUnlocked(caseId),
+      fillPassengerAndHoldOneBookingCaseUnlocked(caseId, options),
     );
   } catch (error) {
     return {
@@ -78,6 +90,7 @@ export async function fillPassengerAndHoldOneBookingCase(
  */
 async function fillPassengerAndHoldOneBookingCaseUnlocked(
   caseId: string,
+  options: PassengerHoldAutomationOptions,
 ): Promise<PassengerHoldAutomationResult> {
   let flightCase = await readLocalFlightCase(caseId);
 
@@ -116,214 +129,253 @@ async function fillPassengerAndHoldOneBookingCaseUnlocked(
     return createFailure(caseId, validationError);
   }
 
-  const { browser, page } = await createOneBookingBrowserSession();
-  let holdStarted = false;
-  let holdSubmitted = false;
+  const authRetry = new OneBookingAuthRefreshRetryController({
+    caseId,
+    onAuthRefresh: options.onAuthRefresh,
+  });
 
-  try {
-    flightCase = await updateLocalFlightCase(flightCase, {
-      status: 'FILL_PASSENGER_RUNNING',
-      holdErrorScreenshotPath: undefined,
-      errorMessage: undefined,
-    });
-
-    await openMatchingFlightPassengerForm(
-      page,
-      flightCase.searchInput!,
-      buildSavedFlightSelectionInput(flightCase),
-    );
-    await fillAndAssertPassengerInformation(page, flightCase.attachedPassengerInfo!);
-
-    flightCase = await updateLocalFlightCase(flightCase, {
-      status: 'FILL_PASSENGER_DONE',
-    });
-    flightCase = await updateLocalFlightCase(flightCase, {
-      status: 'READY_TO_HOLD',
-    });
-    flightCase = await updateLocalFlightCase(flightCase, {
-      status: 'HOLD_RUNNING',
-    });
-    holdStarted = true;
-
-    const heldOrder = await confirmPassengerHold(
-      page,
-      {
-        passengerInfo: flightCase.attachedPassengerInfo!,
-        flightNumber: flightCase.selectedFlight!.flightNumber,
-      },
-      {
-        async onSubmitted() {
-          holdSubmitted = true;
-          flightCase = await patchPersistedFlightCase(caseId, {
-            holdSubmittedAt: new Date().toISOString(),
-          });
-          await appendLocalLog({
-            level: 'info',
-            event: 'one_booking_hold_submitted',
-            caseId,
-            message: 'Submitted final 1Booking hold action.',
-          });
-        },
-        async onLoadingObserved(observedAt) {
-          await patchPersistedFlightCase(caseId, {
-            holdLoadingObservedAt: observedAt,
-          });
-          await appendLocalLog({
-            level: 'info',
-            event: 'one_booking_hold_loading_observed',
-            caseId,
-            message: 'Observed transient 1Booking hold loading modal.',
-          });
-        },
-        async onSuccessModalObserved(observedAt) {
-          await patchPersistedFlightCase(caseId, {
-            holdSuccessModalObservedAt: observedAt,
-          });
-          await appendLocalLog({
-            level: 'info',
-            event: 'one_booking_hold_success_modal_observed',
-            caseId,
-            message: 'Observed transient 1Booking hold success modal.',
-          });
-        },
-      },
-    );
-
-    flightCase = await patchPersistedFlightCase(caseId, {
-      status: 'HOLD_SUCCESS',
-      holdSucceededAt: new Date().toISOString(),
-      orderId: heldOrder.orderId,
-      orderDetailUrl: heldOrder.orderDetailUrl,
-      holdErrorScreenshotPath: undefined,
-      errorMessage: undefined,
-    });
-    await appendLocalLog({
-      level: 'info',
-      event: 'one_booking_hold_order_page_confirmed',
-      caseId,
-      message: 'Confirmed durable 1Booking held-order page.',
-      meta: heldOrder,
-    });
-
-    const store = new PassengerStore();
-    let pnrWarning: string | undefined;
+  for (let attempt = 1; attempt <= MAX_ONE_BOOKING_HOLD_ATTEMPTS; attempt++) {
+    const { browser, page } = await createOneBookingBrowserSession();
+    let holdStarted = false;
+    let holdSubmitted = false;
 
     try {
-      store.markCasePassengerSuccessfulHold(caseId);
-    } catch (error) {
-      pnrWarning = formatSecondaryHoldWarning(
-        'The booking was held, but the local passenger status could not be updated.',
-        error,
-      );
-    } finally {
-      store.close();
-    }
+      flightCase = await updateLocalFlightCase(flightCase, {
+        status: 'FILL_PASSENGER_RUNNING',
+        holdErrorScreenshotPath: undefined,
+        errorMessage: undefined,
+      });
 
-    try {
-      const pnrCode = await extractHeldBookingPnr(
+      await openMatchingFlightPassengerForm(
         page,
-        flightCase.selectedFlight!.flightNumber,
+        flightCase.searchInput!,
+        buildSavedFlightSelectionInput(flightCase),
+      );
+      await fillAndAssertPassengerInformation(
+        page,
+        flightCase.attachedPassengerInfo!,
+      );
+
+      flightCase = await updateLocalFlightCase(flightCase, {
+        status: 'FILL_PASSENGER_DONE',
+      });
+      flightCase = await updateLocalFlightCase(flightCase, {
+        status: 'READY_TO_HOLD',
+      });
+      flightCase = await updateLocalFlightCase(flightCase, {
+        status: 'HOLD_RUNNING',
+      });
+      holdStarted = true;
+
+      const heldOrder = await confirmPassengerHold(
+        page,
+        {
+          passengerInfo: flightCase.attachedPassengerInfo!,
+          flightNumber: flightCase.selectedFlight!.flightNumber,
+        },
+        {
+          async onSubmitted() {
+            holdSubmitted = true;
+            flightCase = await patchPersistedFlightCase(caseId, {
+              holdSubmittedAt: new Date().toISOString(),
+            });
+            await appendLocalLog({
+              level: 'info',
+              event: 'one_booking_hold_submitted',
+              caseId,
+              message: 'Submitted final 1Booking hold action.',
+            });
+          },
+          async onLoadingObserved(observedAt) {
+            await patchPersistedFlightCase(caseId, {
+              holdLoadingObservedAt: observedAt,
+            });
+            await appendLocalLog({
+              level: 'info',
+              event: 'one_booking_hold_loading_observed',
+              caseId,
+              message: 'Observed transient 1Booking hold loading modal.',
+            });
+          },
+          async onSuccessModalObserved(observedAt) {
+            await patchPersistedFlightCase(caseId, {
+              holdSuccessModalObservedAt: observedAt,
+            });
+            await appendLocalLog({
+              level: 'info',
+              event: 'one_booking_hold_success_modal_observed',
+              caseId,
+              message: 'Observed transient 1Booking hold success modal.',
+            });
+          },
+        },
       );
 
       flightCase = await patchPersistedFlightCase(caseId, {
-        status: getPnrExtractionStatus(pnrCode),
-        pnrCode,
-        pnrExtractedAt: new Date().toISOString(),
-        pnrErrorMessage: undefined,
+        status: 'HOLD_SUCCESS',
+        holdSucceededAt: new Date().toISOString(),
+        orderId: heldOrder.orderId,
+        orderDetailUrl: heldOrder.orderDetailUrl,
+        holdErrorScreenshotPath: undefined,
+        errorMessage: undefined,
       });
       await appendLocalLog({
         level: 'info',
-        event: 'one_booking_pnr_extracted',
+        event: 'one_booking_hold_order_page_confirmed',
         caseId,
-        message: 'Extracted held-booking PNR.',
-        meta: {
-          pnrCode,
-        },
+        message: 'Confirmed durable 1Booking held-order page.',
+        meta: heldOrder,
       });
 
-      return {
-        ok: true,
-        caseId,
-        pnrCode,
-        pnrWarning,
-      };
+      const store = new PassengerStore();
+      let pnrWarning: string | undefined;
+
+      try {
+        store.markCasePassengerSuccessfulHold(caseId);
+      } catch (error) {
+        pnrWarning = formatSecondaryHoldWarning(
+          'The booking was held, but the local passenger status could not be updated.',
+          error,
+        );
+      } finally {
+        store.close();
+      }
+
+      try {
+        const pnrCode = await extractHeldBookingPnr(
+          page,
+          flightCase.selectedFlight!.flightNumber,
+        );
+
+        flightCase = await patchPersistedFlightCase(caseId, {
+          status: getPnrExtractionStatus(pnrCode),
+          pnrCode,
+          pnrExtractedAt: new Date().toISOString(),
+          pnrErrorMessage: undefined,
+        });
+        await appendLocalLog({
+          level: 'info',
+          event: 'one_booking_pnr_extracted',
+          caseId,
+          message: 'Extracted held-booking PNR.',
+          meta: {
+            pnrCode,
+          },
+        });
+
+        return {
+          ok: true,
+          caseId,
+          pnrCode,
+          pnrWarning,
+          authRefreshed: authRetry.authRefreshed || undefined,
+        };
+      } catch (error) {
+        const pnrErrorMessage =
+          error instanceof Error ? error.message : 'Unknown PNR extraction error.';
+        const extractionWarning = formatSecondaryHoldWarning(
+          'The booking was held, but PNR extraction failed. Please check the existing 1Booking order manually.',
+          error,
+        );
+
+        await patchPersistedFlightCase(caseId, {
+          status: getPnrExtractionStatus(null),
+          pnrErrorMessage,
+        });
+        await appendLocalLog({
+          level: 'warn',
+          event: 'one_booking_pnr_extract_failed',
+          caseId,
+          message: pnrErrorMessage,
+        });
+
+        return {
+          ok: true,
+          caseId,
+          pnrCode: null,
+          pnrWarning: joinWarnings(pnrWarning, extractionWarning),
+          authRefreshed: authRetry.authRefreshed || undefined,
+        };
+      }
     } catch (error) {
-      const pnrErrorMessage =
-        error instanceof Error ? error.message : 'Unknown PNR extraction error.';
-      const extractionWarning = formatSecondaryHoldWarning(
-        'The booking was held, but PNR extraction failed. Please check the existing 1Booking order manually.',
+      const message =
+        error instanceof Error ? error.message : 'Unknown hold automation error.';
+      let errorScreenshotPath: string | null = null;
+
+      try {
+        errorScreenshotPath = await takeFullPageScreenshot(
+          page,
+          `${caseId}-hold-failed.png`,
+        );
+      } catch {
+        errorScreenshotPath = null;
+      }
+
+      if (
+        attempt < MAX_ONE_BOOKING_HOLD_ATTEMPTS &&
+        (await authRetry.refreshIfAuthExpired(error, {
+          irreversible: holdSubmitted,
+        }))
+      ) {
+        await browser.close();
+        continue;
+      }
+
+      const failureStatus = getHoldAutomationFailureStatus(
         error,
+        holdSubmitted,
+        holdStarted,
       );
 
       await patchPersistedFlightCase(caseId, {
-        status: getPnrExtractionStatus(null),
-        pnrErrorMessage,
-      });
-      await appendLocalLog({
-        level: 'warn',
-        event: 'one_booking_pnr_extract_failed',
-        caseId,
-        message: pnrErrorMessage,
+        status: failureStatus,
+        holdErrorScreenshotPath: errorScreenshotPath ?? undefined,
+        errorMessage: message,
       });
 
-      return {
-        ok: true,
-        caseId,
-        pnrCode: null,
-        pnrWarning: joinWarnings(pnrWarning, extractionWarning),
-      };
-    }
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Unknown hold automation error.';
-    let errorScreenshotPath: string | null = null;
+      if (failureStatus === 'HOLD_NEEDS_REVIEW') {
+        await appendLocalLog({
+          level: 'warn',
+          event: 'one_booking_hold_needs_review',
+          caseId,
+          message,
+          meta:
+            error instanceof PostSubmitHoldError
+              ? {
+                  checkpoint: error.checkpoint,
+                  originalCauseMessage: error.originalCauseMessage,
+                  currentUrl: error.currentUrl,
+                  errorScreenshotPath,
+                }
+              : {
+                  errorScreenshotPath,
+                },
+        });
+        return createNeedsReview(
+          caseId,
+          message,
+          errorScreenshotPath,
+          authRetry.authRefreshed,
+        );
+      }
 
-    try {
-      errorScreenshotPath = await takeFullPageScreenshot(
-        page,
-        `${caseId}-hold-failed.png`,
-      );
-    } catch {
-      errorScreenshotPath = null;
-    }
-
-    const failureStatus = getHoldAutomationFailureStatus(
-      error,
-      holdSubmitted,
-      holdStarted,
-    );
-
-    await patchPersistedFlightCase(caseId, {
-      status: failureStatus,
-      holdErrorScreenshotPath: errorScreenshotPath ?? undefined,
-      errorMessage: message,
-    });
-
-    if (failureStatus === 'HOLD_NEEDS_REVIEW') {
-      await appendLocalLog({
-        level: 'warn',
-        event: 'one_booking_hold_needs_review',
+      return createFailure(
         caseId,
         message,
-        meta:
-          error instanceof PostSubmitHoldError
-            ? {
-                checkpoint: error.checkpoint,
-                originalCauseMessage: error.originalCauseMessage,
-                currentUrl: error.currentUrl,
-                errorScreenshotPath,
-              }
-            : {
-                errorScreenshotPath,
-              },
-      });
-      return createNeedsReview(caseId, message, errorScreenshotPath);
+        errorScreenshotPath,
+        authRetry.authRefreshed,
+      );
+    } finally {
+      await browser.close().catch(() => null);
     }
-
-    return createFailure(caseId, message, errorScreenshotPath);
-  } finally {
-    await browser.close();
   }
+
+  return createFailure(
+    caseId,
+    'Unknown 1Booking hold automation error after auth retry.',
+    null,
+    authRetry.authRefreshed,
+  );
 }
 
 /**
@@ -471,6 +523,7 @@ function createFailure(
   caseId: string,
   message: string,
   errorScreenshotPath: string | null = null,
+  authRefreshed = false,
 ): PassengerHoldAutomationResult {
   return {
     ok: false,
@@ -478,6 +531,7 @@ function createFailure(
     caseId,
     message,
     errorScreenshotPath,
+    authRefreshed: authRefreshed || undefined,
   };
 }
 
@@ -485,6 +539,7 @@ function createNeedsReview(
   caseId: string,
   message: string,
   errorScreenshotPath: string | null = null,
+  authRefreshed = false,
 ): PassengerHoldAutomationResult {
   return {
     ok: false,
@@ -492,6 +547,7 @@ function createNeedsReview(
     caseId,
     message,
     errorScreenshotPath,
+    authRefreshed: authRefreshed || undefined,
   };
 }
 

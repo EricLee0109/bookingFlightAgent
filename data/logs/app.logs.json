@@ -2172,5 +2172,355 @@
       "pnrCode": "8Z94YW"
     },
     "timestamp": "2026-06-02T10:17:15.183Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260604-162643",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-06-04T09:26:43.374Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_search_completed",
+    "caseId": "BK-20260604-162643",
+    "message": "1Booking search completed.",
+    "meta": {
+      "flightCount": 70,
+      "screenshotPath": "screenshots/1booking-search-flights-1.png",
+      "screenshotPaths": [
+        "screenshots/1booking-search-flights-1.png",
+        "screenshots/1booking-search-flights-2.png",
+        "screenshots/1booking-search-flights-3.png",
+        "screenshots/1booking-search-flights-4.png",
+        "screenshots/1booking-search-flights-5.png",
+        "screenshots/1booking-search-flights-6.png",
+        "screenshots/1booking-search-flights-7.png"
+      ]
+    },
+    "timestamp": "2026-06-04T09:27:19.372Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260604-162806",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-06-04T09:28:06.689Z"
+  },
+  {
+    "level": "warn",
+    "event": "flight_request_missing_fields",
+    "caseId": "BK-20260604-162806",
+    "message": "Missing fields: fromAirportCode, fromAirportText, toAirportCode, toAirportText, departureDate",
+    "timestamp": "2026-06-04T09:28:11.002Z"
+  },
+  {
+    "level": "info",
+    "event": "flight_selection_requested",
+    "caseId": "BK-20260604-162643",
+    "message": "Received Telegram flight selection request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692,
+      "selectionInput": {
+        "caseId": "BK-20260604-162643",
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "departureTime": "20:40",
+        "bookingClass": "ECO"
+      }
+    },
+    "timestamp": "2026-06-04T09:28:38.614Z"
+  },
+  {
+    "level": "error",
+    "event": "one_booking_selection_failed",
+    "caseId": "BK-20260604-162643",
+    "message": "1Booking auth session expired or login is required. Run pnpm run save-auth:dev, then retry the search.",
+    "meta": {
+      "errorScreenshotPath": "screenshots/1booking-selection-failed-attempt-1.png"
+    },
+    "timestamp": "2026-06-04T09:28:45.356Z"
+  },
+  {
+    "level": "info",
+    "event": "flight_selection_requested",
+    "caseId": "BK-20260604-162643",
+    "message": "Received Telegram flight selection request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692,
+      "selectionInput": {
+        "caseId": "BK-20260604-162643",
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "departureTime": "20:40",
+        "bookingClass": "ECO"
+      }
+    },
+    "timestamp": "2026-06-05T02:57:01.938Z"
+  },
+  {
+    "level": "error",
+    "event": "one_booking_selection_failed",
+    "caseId": "BK-20260604-162643",
+    "message": "No available flight matched VJ 20:40 ECO.",
+    "meta": {
+      "errorScreenshotPath": "screenshots/1booking-selection-failed-attempt-1.png"
+    },
+    "timestamp": "2026-06-05T02:57:25.947Z"
+  },
+  {
+    "level": "info",
+    "event": "flight_selection_requested",
+    "caseId": "BK-20260604-162643",
+    "message": "Received Telegram flight selection request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692,
+      "selectionInput": {
+        "caseId": "BK-20260604-162643",
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "departureTime": "20:20",
+        "bookingClass": "ECO"
+      }
+    },
+    "timestamp": "2026-06-05T02:57:40.704Z"
+  },
+  {
+    "level": "error",
+    "event": "one_booking_selection_failed",
+    "caseId": "BK-20260604-162643",
+    "message": "No available flight matched VJ 20:20 ECO.",
+    "meta": {
+      "errorScreenshotPath": "screenshots/1booking-selection-failed-attempt-1.png"
+    },
+    "timestamp": "2026-06-05T02:57:59.050Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260605-095859",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-06-05T02:58:59.488Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_search_completed",
+    "caseId": "BK-20260605-095859",
+    "message": "1Booking search completed.",
+    "meta": {
+      "flightCount": 69,
+      "screenshotPath": "screenshots/1booking-search-flights-1.png",
+      "screenshotPaths": [
+        "screenshots/1booking-search-flights-1.png",
+        "screenshots/1booking-search-flights-2.png",
+        "screenshots/1booking-search-flights-3.png",
+        "screenshots/1booking-search-flights-4.png",
+        "screenshots/1booking-search-flights-5.png",
+        "screenshots/1booking-search-flights-6.png",
+        "screenshots/1booking-search-flights-7.png"
+      ]
+    },
+    "timestamp": "2026-06-05T02:59:23.560Z"
+  },
+  {
+    "level": "info",
+    "event": "flight_selection_requested",
+    "caseId": "BK-20260605-095859",
+    "message": "Received Telegram flight selection request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692,
+      "selectionInput": {
+        "caseId": "BK-20260605-095859",
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "departureTime": "11:20",
+        "bookingClass": "ECO"
+      }
+    },
+    "timestamp": "2026-06-05T03:00:03.186Z"
+  },
+  {
+    "level": "error",
+    "event": "one_booking_selection_failed",
+    "caseId": "BK-20260605-095859",
+    "message": "No available flight matched VJ 11:20 ECO.",
+    "meta": {
+      "errorScreenshotPath": "screenshots/1booking-selection-failed-attempt-1.png"
+    },
+    "timestamp": "2026-06-05T03:00:22.102Z"
+  },
+  {
+    "level": "info",
+    "event": "flight_selection_requested",
+    "caseId": "BK-20260605-095859",
+    "message": "Received Telegram flight selection request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692,
+      "selectionInput": {
+        "caseId": "BK-20260605-095859",
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "departureTime": "06:55",
+        "bookingClass": "ECO"
+      }
+    },
+    "timestamp": "2026-06-05T03:01:10.831Z"
+  },
+  {
+    "level": "error",
+    "event": "one_booking_selection_failed",
+    "caseId": "BK-20260605-095859",
+    "message": "No available flight matched VJ 06:55 ECO.",
+    "meta": {
+      "errorScreenshotPath": "screenshots/1booking-selection-failed-attempt-1.png"
+    },
+    "timestamp": "2026-06-05T03:01:29.215Z"
+  },
+  {
+    "level": "info",
+    "event": "flight_selection_requested",
+    "caseId": "BK-20260605-095859",
+    "message": "Received Telegram flight selection request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692,
+      "selectionInput": {
+        "caseId": "BK-20260605-095859",
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "departureTime": "05:00",
+        "bookingClass": "ECO"
+      }
+    },
+    "timestamp": "2026-06-05T03:01:46.561Z"
+  },
+  {
+    "level": "error",
+    "event": "one_booking_selection_failed",
+    "caseId": "BK-20260605-095859",
+    "message": "No available flight matched VJ 05:00 ECO.",
+    "meta": {
+      "errorScreenshotPath": "screenshots/1booking-selection-failed-attempt-1.png"
+    },
+    "timestamp": "2026-06-05T03:02:09.561Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_selection_completed",
+    "caseId": "BK-20260605-095859",
+    "message": "Recovered 1Booking flight selection after optional booking-class matcher fix.",
+    "meta": {
+      "selectedFlight": {
+        "cardIndex": 0,
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "flightNumber": "VJ120",
+        "departureTime": "05:00",
+        "arrivalTime": "07:10",
+        "bookingClass": "DLX",
+        "priceText": "VND\n1,616,520",
+        "selectedAt": "2026-06-05T03:18:10.100Z"
+      },
+      "selectionScreenshotPath": "screenshots/BK-20260605-095859-selected-flight.png"
+    },
+    "timestamp": "2026-06-05T03:18:10.103Z"
+  },
+  {
+    "level": "info",
+    "event": "flight_selection_requested",
+    "caseId": "BK-20260605-095859",
+    "message": "Received Telegram flight selection request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692,
+      "selectionInput": {
+        "caseId": "BK-20260605-095859",
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "departureTime": "05:00",
+        "bookingClass": null
+      }
+    },
+    "timestamp": "2026-06-05T03:36:42.602Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_selection_completed",
+    "caseId": "BK-20260605-095859",
+    "message": "1Booking flight selection completed.",
+    "meta": {
+      "selectedFlight": {
+        "cardIndex": 0,
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "flightNumber": "VJ120",
+        "departureTime": "05:00",
+        "arrivalTime": "07:10",
+        "bookingClass": "DLX",
+        "priceText": "VND\n1,616,520",
+        "selectedAt": "2026-06-05T03:37:13.050Z"
+      },
+      "selectionScreenshotPath": "screenshots/BK-20260605-095859-selected-flight.png"
+    },
+    "timestamp": "2026-06-05T03:37:13.052Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_hold_submitted",
+    "caseId": "BK-20260605-095859",
+    "message": "Submitted final 1Booking hold action.",
+    "timestamp": "2026-06-05T03:41:00.727Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_hold_loading_observed",
+    "caseId": "BK-20260605-095859",
+    "message": "Observed transient 1Booking hold loading modal.",
+    "timestamp": "2026-06-05T03:41:00.751Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_hold_success_modal_observed",
+    "caseId": "BK-20260605-095859",
+    "message": "Observed transient 1Booking hold success modal.",
+    "timestamp": "2026-06-05T03:41:15.382Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_hold_order_page_confirmed",
+    "caseId": "BK-20260605-095859",
+    "message": "Confirmed durable 1Booking held-order page.",
+    "meta": {
+      "orderId": "#HS2200389000094",
+      "orderDetailUrl": "https://pro.1booking.vn/order/HS2200389000094"
+    },
+    "timestamp": "2026-06-05T03:41:20.328Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_pnr_extracted",
+    "caseId": "BK-20260605-095859",
+    "message": "Extracted held-booking PNR.",
+    "meta": {
+      "pnrCode": "M6XR9P"
+    },
+    "timestamp": "2026-06-05T03:41:20.354Z"
   }
 ]

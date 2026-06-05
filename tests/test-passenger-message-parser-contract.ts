@@ -9,6 +9,7 @@ import {
   isDurableHeldOrderTerminalState,
   PostSubmitHoldError,
 } from '../src/automation/1booking/hold-booking';
+import { OneBookingAuthExpiredError } from '../src/automation/1booking/waiters';
 import {
   buildExactFlightNumberPattern,
   extractPnrCodesFromHeldOrderText,
@@ -30,6 +31,7 @@ import {
   recoverHeldBookingCase,
   validateRecoverableHoldCase,
 } from '../src/services/passenger-hold-recovery-service';
+import { OneBookingAuthRefreshRetryController } from '../src/services/onebooking-auth-refresh-retry';
 import {
   getTelegramPassengerContext,
   setActivePassengerCase,
@@ -460,6 +462,66 @@ function testSubmittedHoldFailureSafety() {
 }
 
 /**
+ * Verifies auth refresh retries only before an irreversible hold submission.
+ */
+async function testOneBookingAuthRefreshRetryPolicy() {
+  let refreshCount = 0;
+  let noticeCount = 0;
+  const controller = new OneBookingAuthRefreshRetryController({
+    async onAuthRefresh() {
+      noticeCount += 1;
+    },
+    async refreshAuthState() {
+      refreshCount += 1;
+
+      return {
+        ok: true,
+        storageStatePath: 'auth/1booking-storage-state.json',
+      };
+    },
+    async appendLog() {},
+  });
+
+  assert.equal(
+    await controller.refreshIfAuthExpired(
+      new OneBookingAuthExpiredError('expired'),
+      {
+        irreversible: false,
+      },
+    ),
+    true,
+  );
+  assert.equal(controller.authRefreshed, true);
+  assert.equal(refreshCount, 1);
+  assert.equal(noticeCount, 1);
+  assert.equal(
+    await controller.refreshIfAuthExpired(
+      new OneBookingAuthExpiredError('expired again'),
+      {
+        irreversible: false,
+      },
+    ),
+    false,
+  );
+
+  const postSubmitController = new OneBookingAuthRefreshRetryController({
+    async refreshAuthState() {
+      throw new Error('should not refresh');
+    },
+  });
+
+  assert.equal(
+    await postSubmitController.refreshIfAuthExpired(
+      new OneBookingAuthExpiredError('expired after hold click'),
+      {
+        irreversible: true,
+      },
+    ),
+    false,
+  );
+}
+
+/**
  * Verifies explicit no-browser recovery for manually reviewed held bookings.
  */
 async function testPassengerHoldRecovery() {
@@ -602,6 +664,7 @@ async function main() {
   testSafeFinalHoldCtaGuard();
   testHeldBookingPnrExtraction();
   testSubmittedHoldFailureSafety();
+  await testOneBookingAuthRefreshRetryPolicy();
   await testPassengerHoldRecovery();
   testPassengerHoldTelegramMessages();
   testTelegramPassengerContextAndRouting();

@@ -4,6 +4,7 @@ import { type SearchFlightsInput } from '../automation/1booking/search-flight-in
 import { takeFullPageScreenshot } from '../automation/1booking/screenshots';
 import { isRetryableOneBookingSearchError } from '../automation/1booking/waiters';
 import { runWithAutomationLock } from '../utils/automation-lock';
+import { OneBookingAuthRefreshRetryController } from './onebooking-auth-refresh-retry';
 
 export type FlightSearchAutomationResult =
   | {
@@ -11,14 +12,20 @@ export type FlightSearchAutomationResult =
       flightCount: number;
       screenshotPath: string;
       screenshotPaths: string[];
+      authRefreshed?: boolean;
     }
   | {
       ok: false;
       message: string;
       errorScreenshotPath: string | null;
+      authRefreshed?: boolean;
     };
 
 const MAX_ONE_BOOKING_SEARCH_ATTEMPTS = 2;
+
+export type FlightSearchAutomationOptions = {
+  onAuthRefresh?: () => Promise<void>;
+};
 
 /**
  * Runs a validated 1Booking flight search with browser lifecycle management.
@@ -31,11 +38,12 @@ const MAX_ONE_BOOKING_SEARCH_ATTEMPTS = 2;
  */
 export async function searchOneBookingFlights(
   input: SearchFlightsInput,
+  options: FlightSearchAutomationOptions = {},
 ): Promise<FlightSearchAutomationResult> {
   try {
     // use this lockName as Vietnamese for end-user understanding
     return await runWithAutomationLock('🔍 Tìm chuyến bay', () =>
-      searchOneBookingFlightsUnlocked(input),
+      searchOneBookingFlightsUnlocked(input, options),
     );
   } catch (error) {
     return {
@@ -48,9 +56,13 @@ export async function searchOneBookingFlights(
 
 async function searchOneBookingFlightsUnlocked(
   input: SearchFlightsInput,
+  options: FlightSearchAutomationOptions,
 ): Promise<FlightSearchAutomationResult> {
   let lastError: unknown = null;
   let lastErrorScreenshotPath: string | null = null;
+  const authRetry = new OneBookingAuthRefreshRetryController({
+    onAuthRefresh: options.onAuthRefresh,
+  });
 
   for (let attempt = 1; attempt <= MAX_ONE_BOOKING_SEARCH_ATTEMPTS; attempt++) {
     const { browser, page } = await createOneBookingBrowserSession();
@@ -63,6 +75,7 @@ async function searchOneBookingFlightsUnlocked(
         flightCount: result.flightCount,
         screenshotPath: result.screenshotPath,
         screenshotPaths: result.screenshotPaths,
+        authRefreshed: authRetry.authRefreshed || undefined,
       };
     } catch (error) {
       lastError = error;
@@ -77,7 +90,10 @@ async function searchOneBookingFlightsUnlocked(
       }
 
       const shouldRetry =
-        isRetryableOneBookingSearchError(error) &&
+        (isRetryableOneBookingSearchError(error) ||
+          (await authRetry.refreshIfAuthExpired(error, {
+            irreversible: false,
+          }))) &&
         attempt < MAX_ONE_BOOKING_SEARCH_ATTEMPTS;
 
       if (!shouldRetry) {
@@ -95,5 +111,6 @@ async function searchOneBookingFlightsUnlocked(
         ? lastError.message
         : 'Unknown 1Booking automation error.',
     errorScreenshotPath: lastErrorScreenshotPath,
+    authRefreshed: authRetry.authRefreshed || undefined,
   };
 }

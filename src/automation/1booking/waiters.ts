@@ -5,6 +5,16 @@ export class RetryableOneBookingSearchError extends Error {
 }
 
 /**
+ * Error raised when 1Booking shows an expired-login state.
+ *
+ * Services can safely refresh auth and retry only while no irreversible action
+ * has been submitted.
+ */
+export class OneBookingAuthExpiredError extends Error {
+  readonly authExpired = true;
+}
+
+/**
  * Checks whether an automation error is safe to retry with the same search input.
  */
 export function isRetryableOneBookingSearchError(error: unknown) {
@@ -13,6 +23,18 @@ export function isRetryableOneBookingSearchError(error: unknown) {
     (error instanceof Error &&
       'retryable' in error &&
       error.retryable === true)
+  );
+}
+
+/**
+ * Checks whether an automation/API error represents expired 1Booking auth.
+ */
+export function isOneBookingAuthExpiredError(error: unknown) {
+  return (
+    error instanceof OneBookingAuthExpiredError ||
+    (error instanceof Error &&
+      'authExpired' in error &&
+      error.authExpired === true)
   );
 }
 
@@ -29,8 +51,8 @@ export async function throwIfOneBookingLoginModalVisible(
   await page.waitForTimeout(timeoutMs).catch(() => null);
 
   if (await hasOneBookingAuthExpiredState(page)) {
-    throw new Error(
-      '1Booking auth session expired or login is required. Run pnpm run save-auth:dev, then retry the search.',
+    throw new OneBookingAuthExpiredError(
+      '1Booking auth session expired or login is required. Refreshing 1Booking auth state is required.',
     );
   }
 }

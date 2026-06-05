@@ -26,6 +26,7 @@ import {
   formatFlightSelectionStartedMessage,
   formatFlightSelectionSuccessMessage,
   formatMissingFlightFieldsMessage,
+  formatOneBookingAuthRefreshStartedMessage,
   formatParserFailedMessage,
   formatParsedRequestMessage,
   formatSearchFailedMessage,
@@ -290,7 +291,10 @@ export async function handleTelegramMessage(
 
   await bot.sendMessage(chatId, 'Đang tìm chuyến trên 1Booking...');
 
-  const result = await searchOneBookingFlights(searchInput);
+  const result = await searchOneBookingFlights(searchInput, {
+    onAuthRefresh: () =>
+      bot.sendMessage(chatId, formatOneBookingAuthRefreshStartedMessage()),
+  });
 
   if (!result.ok) {
     await updateLocalFlightCase(currentCase, {
@@ -308,7 +312,7 @@ export async function handleTelegramMessage(
       },
     });
 
-    await bot.sendMessage(chatId, formatSearchFailedMessage());
+    await bot.sendMessage(chatId, formatSearchFailedMessage(result.message));
 
     if (result.errorScreenshotPath) {
       await bot.sendPhoto(chatId, result.errorScreenshotPath, {
@@ -430,7 +434,10 @@ async function handleTelegramFlightSelection(
     formatFlightSelectionStartedMessage(selectionInput),
   );
 
-  const result = await selectMatchingOneBookingFlight(selectionInput);
+  const result = await selectMatchingOneBookingFlight(selectionInput, {
+    onAuthRefresh: () =>
+      bot.sendMessage(chatId, formatOneBookingAuthRefreshStartedMessage()),
+  });
 
   if (!result.ok) {
     await updateLocalFlightCase(currentCase, {

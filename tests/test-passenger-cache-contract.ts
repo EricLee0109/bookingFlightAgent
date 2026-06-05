@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { OneBookingAuthExpiredError } from '../src/automation/1booking/waiters';
 import { OneBookingPassengerSuggestAdapter } from '../src/passengers/onebooking-passenger-suggest-adapter';
 import { readOneBookingAccessToken } from '../src/passengers/onebooking-auth-token';
 import { generatePassengerAliases } from '../src/passengers/passenger-alias-generator';
@@ -68,8 +69,8 @@ async function testAccessTokenExtraction() {
   await assert.rejects(
     () => readOneBookingAccessToken(path.join(TEST_DIR, 'missing.json')),
     (error) =>
-      error instanceof Error &&
-      /save-auth:dev/.test(error.message) &&
+      error instanceof OneBookingAuthExpiredError &&
+      /auth state/.test(error.message) &&
       !/secret-access-token/.test(error.message),
   );
 }
@@ -113,6 +114,65 @@ async function testSuggestAdapterPayload() {
     type: 0,
   });
   assert.equal(passengers[0].lastName, 'NGUYEN');
+  assert.equal(passengers[0].firstName, 'THI LANH');
+}
+
+/**
+ * Verifies passenger suggest refreshes auth once on 1Booking auth failure.
+ */
+async function testSuggestAdapterAuthRefreshRetry() {
+  writeTestAuthState('expired-token');
+  const authorizations: string[] = [];
+  let refreshCount = 0;
+  const adapter = new OneBookingPassengerSuggestAdapter({
+    storageStatePath: TEST_AUTH_PATH,
+    async refreshAuthState() {
+      refreshCount += 1;
+      writeTestAuthState('fresh-token');
+
+      return {
+        ok: true,
+        storageStatePath: TEST_AUTH_PATH,
+      };
+    },
+    async fetchImpl(_input, init) {
+      authorizations.push(init.headers.Authorization);
+
+      if (authorizations.length === 1) {
+        return {
+          ok: false,
+          status: 498,
+          async text() {
+            return 'expired';
+          },
+        };
+      }
+
+      return {
+        ok: true,
+        status: 200,
+        async text() {
+          return JSON.stringify([
+            {
+              type: 0,
+              lastName: 'NGUYEN',
+              firstName: 'THI LANH',
+              title: 'MS',
+              gender: false,
+            },
+          ]);
+        },
+      };
+    },
+  });
+
+  const passengers = await adapter.suggestPassengers('Lanh');
+
+  assert.equal(refreshCount, 1);
+  assert.deepEqual(authorizations, [
+    'Bearer expired-token',
+    'Bearer fresh-token',
+  ]);
   assert.equal(passengers[0].firstName, 'THI LANH');
 }
 
@@ -207,6 +267,7 @@ async function main() {
   prepareTestFiles();
   await testAccessTokenExtraction();
   await testSuggestAdapterPayload();
+  await testSuggestAdapterAuthRefreshRetry();
   testAliasGenerator();
   testPassengerStoreAndResolver();
 

@@ -128,7 +128,7 @@ export function matchFlightSelectionCandidate(
     (candidate) =>
       (!input.airlineCode || candidate.airlineCode === input.airlineCode) &&
       candidate.departureTime === input.departureTime &&
-      candidate.bookingClass === input.bookingClass,
+      (!input.bookingClass || candidate.bookingClass === input.bookingClass),
   );
 
   if (matches.length === 1) {

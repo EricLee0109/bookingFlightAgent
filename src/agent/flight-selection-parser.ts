@@ -115,7 +115,11 @@ export function parseFlightSelectionMessage(
 /**
  * Formats a booking class code for operator-facing messages.
  */
-export function formatBookingClass(bookingClass: BookingClass) {
+export function formatBookingClass(bookingClass: BookingClass | null) {
+  if (!bookingClass) {
+    return 'Không chỉ định';
+  }
+
   return `${BOOKING_CLASS_LABELS[bookingClass]} (${bookingClass})`;
 }
 
@@ -162,9 +166,9 @@ function mentionsLatestCaseReference(rawMessage: string) {
 }
 
 /**
- * Reads the requested booking class, defaulting to ECO for MVP selection.
+ * Reads the requested booking class when the operator explicitly provides one.
  */
-function extractBookingClass(rawMessage: string): BookingClass {
+function extractBookingClass(rawMessage: string): BookingClass | null {
   const normalized = normalizeVietnameseText(rawMessage);
 
   if (/\b(sbb|sky\s*boss\s*business|skyboss\s*business)\b/.test(normalized)) {
@@ -183,7 +187,7 @@ function extractBookingClass(rawMessage: string): BookingClass {
     return 'ECO';
   }
 
-  return 'ECO';
+  return null;
 }
 
 /**

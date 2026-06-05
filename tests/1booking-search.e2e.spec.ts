@@ -96,14 +96,12 @@ test('selects a matching ECO flight and opens passenger information page', async
     await searchFlights(page, searchInput);
 
     const candidates = await extractFlightSelectionCandidates(page);
-    const candidate = candidates.find(
-      (flightCandidate) => flightCandidate.bookingClass === 'ECO',
-    );
+    const candidate = candidates[0];
 
     expect(candidate).toBeTruthy();
 
     if (!candidate) {
-      throw new Error('Expected at least one ECO candidate for selection test.');
+      throw new Error('Expected at least one candidate for selection test.');
     }
 
     const result = await selectMatchingFlight(page, searchInput, {
@@ -111,11 +109,11 @@ test('selects a matching ECO flight and opens passenger information page', async
       airlineCode: candidate.airlineCode,
       airlineName: candidate.airlineName,
       departureTime: candidate.departureTime,
-      bookingClass: 'ECO',
+      bookingClass: candidate.bookingClass,
     });
 
     expect(result.selectedFlight.flightNumber).toBe(candidate.flightNumber);
-    expect(result.selectedFlight.bookingClass).toBe('ECO');
+    expect(result.selectedFlight.bookingClass).toBe(candidate.bookingClass);
     expect(existsSync(result.screenshotPath)).toBe(true);
     await expect(
       page.getByText(/Thông tin khách hàng|Thong tin khach hang/i).first(),
@@ -159,14 +157,12 @@ test('fills and asserts split passenger information before hold confirmation', a
     await searchFlights(page, searchInput);
 
     const candidates = await extractFlightSelectionCandidates(page);
-    const candidate = candidates.find(
-      (flightCandidate) => flightCandidate.bookingClass === 'ECO',
-    );
+    const candidate = candidates[0];
 
     expect(candidate).toBeTruthy();
 
     if (!candidate) {
-      throw new Error('Expected at least one ECO candidate for passenger fill test.');
+      throw new Error('Expected at least one candidate for passenger fill test.');
     }
 
     await openMatchingFlightPassengerForm(page, searchInput, {

@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import { ONE_BOOKING_STORAGE_STATE_PATH } from '../automation/1booking/constants';
+import { OneBookingAuthExpiredError } from '../automation/1booking/waiters';
 
 type PlaywrightStorageState = {
   origins?: Array<{
@@ -21,8 +22,8 @@ export async function readOneBookingAccessToken(
   storageStatePath = ONE_BOOKING_STORAGE_STATE_PATH,
 ) {
   const rawStorageState = await fs.readFile(storageStatePath, 'utf8').catch(() => {
-    throw new Error(
-      `Missing 1Booking auth state. Run pnpm run save-auth:dev before calling 1Booking APIs.`,
+    throw new OneBookingAuthExpiredError(
+      `Missing 1Booking auth state. Refresh 1Booking auth before calling 1Booking APIs.`,
     );
   });
 
@@ -31,8 +32,8 @@ export async function readOneBookingAccessToken(
   try {
     storageState = JSON.parse(rawStorageState) as PlaywrightStorageState;
   } catch {
-    throw new Error(
-      `Invalid 1Booking auth state JSON. Run pnpm run save-auth:dev to refresh it.`,
+    throw new OneBookingAuthExpiredError(
+      `Invalid 1Booking auth state JSON. Refresh 1Booking auth before calling 1Booking APIs.`,
     );
   }
 
@@ -41,8 +42,8 @@ export async function readOneBookingAccessToken(
     ?.localStorage?.find((item) => item.name === 'authentication')?.value;
 
   if (!authLocalStorageValue) {
-    throw new Error(
-      `Missing 1Booking authentication state. Run pnpm run save-auth:dev to refresh it.`,
+    throw new OneBookingAuthExpiredError(
+      `Missing 1Booking authentication state. Refresh 1Booking auth before calling 1Booking APIs.`,
     );
   }
 
@@ -60,8 +61,8 @@ export async function readOneBookingAccessToken(
 
     return accessToken;
   } catch {
-    throw new Error(
-      `Missing 1Booking access token. Run pnpm run save-auth:dev to refresh it.`,
+    throw new OneBookingAuthExpiredError(
+      `Missing 1Booking access token. Refresh 1Booking auth before calling 1Booking APIs.`,
     );
   }
 }

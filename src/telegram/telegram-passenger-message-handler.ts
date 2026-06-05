@@ -28,6 +28,7 @@ import {
   formatPassengerMatchedMessage,
   formatPassengerMissingFieldsMessage,
   formatNewPassengerMissingFieldsMessage,
+  formatOneBookingAuthRefreshStartedMessage,
   formatPassengerNotFoundMessage,
   formatPassengerParserFailedMessage,
 } from './telegram-formatters';
@@ -456,7 +457,10 @@ async function runAutomaticPassengerHold(
     formatPassengerHoldRunningMessage(flightCase.caseId),
   );
 
-  const result = await fillPassengerAndHoldOneBookingCase(flightCase.caseId);
+  const result = await fillPassengerAndHoldOneBookingCase(flightCase.caseId, {
+    onAuthRefresh: () =>
+      bot.sendMessage(chatId, formatOneBookingAuthRefreshStartedMessage()),
+  });
 
   if (result.ok) {
     clearPendingPassengerProfiles(chatId);

@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import { refreshOneBookingAuthState } from '../automation/1booking/auth';
+import {
+  isOneBookingAuthExpiredError,
+  OneBookingAuthExpiredError,
+} from '../automation/1booking/waiters';
 import { readOneBookingAccessToken } from './onebooking-auth-token';
 import { type OneBookingPassengerSuggestItem } from './passenger-types';
 
@@ -40,21 +45,52 @@ export class OneBookingPassengerSuggestAdapter {
   private readonly endpoint: string;
   private readonly fetchImpl: FetchLike;
   private readonly storageStatePath?: string;
+  private readonly refreshAuthState: typeof refreshOneBookingAuthState;
 
   constructor(options: {
     endpoint?: string;
     fetchImpl?: FetchLike;
     storageStatePath?: string;
+    refreshAuthState?: typeof refreshOneBookingAuthState;
   } = {}) {
     this.endpoint = options.endpoint ?? ONE_BOOKING_PASSENGER_SUGGEST_ENDPOINT;
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.storageStatePath = options.storageStatePath;
+    this.refreshAuthState = options.refreshAuthState ?? refreshOneBookingAuthState;
   }
 
   /**
    * Fetches adult passenger suggestions from 1Booking.
    */
   async suggestPassengers(keyword: string, type = 0) {
+    let authRefreshed = false;
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        return await this.suggestPassengersWithCurrentToken(keyword, type);
+      } catch (error) {
+        if (
+          authRefreshed ||
+          !isOneBookingAuthExpiredError(error) ||
+          attempt >= 2
+        ) {
+          throw error;
+        }
+
+        authRefreshed = true;
+        await this.refreshAuthState({
+          storageStatePath: this.storageStatePath,
+        });
+      }
+    }
+
+    throw new Error('Unknown 1Booking passenger suggest retry error.');
+  }
+
+  /**
+   * Calls the 1Booking API with the currently saved access token.
+   */
+  private async suggestPassengersWithCurrentToken(keyword: string, type: number) {
     const accessToken = await readOneBookingAccessToken(this.storageStatePath);
     const response = await this.fetchImpl(this.endpoint, {
       method: 'POST',
@@ -71,8 +107,8 @@ export class OneBookingPassengerSuggestAdapter {
 
     if (!response.ok) {
       if (response.status === 401 || response.status === 498) {
-        throw new Error(
-          '1Booking passenger suggest auth failed. Run pnpm run save-auth:dev, then retry bootstrap.',
+        throw new OneBookingAuthExpiredError(
+          '1Booking passenger suggest auth failed. Refresh 1Booking auth state before retrying bootstrap.',
         );
       }
 

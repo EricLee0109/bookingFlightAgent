@@ -17,8 +17,15 @@ import {
   buildFlightParserSystemPrompt,
   createOpenAIFlightRequestParser,
 } from '../src/agent/openai-flight-request-parser';
+import {
+  OneBookingAuthRefreshError,
+  readOneBookingCredentialsFromEnv,
+} from '../src/automation/1booking/auth';
 import { matchFlightSelectionCandidate } from '../src/automation/1booking/flight-selection';
-import { throwIfOneBookingLoginModalVisible } from '../src/automation/1booking/waiters';
+import {
+  OneBookingAuthExpiredError,
+  throwIfOneBookingLoginModalVisible,
+} from '../src/automation/1booking/waiters';
 import { ParsedFlightRequestSchema } from '../src/contracts/flight';
 import {
   getLatestFlightSearchCase,
@@ -163,9 +170,9 @@ function testAirportCatalogCodeLookup() {
 }
 
 /**
- * Verifies that selection parsing extracts case id, airline, time, and ECO by default.
+ * Verifies that selection parsing does not invent a booking class.
  */
-function testFlightSelectionParserDefaultsEco() {
+function testFlightSelectionParserLeavesBookingClassUnspecified() {
   const result = parseFlightSelectionMessage(
     'BK-20260520-155949 chọn Vietjet lúc 5h00',
   );
@@ -179,7 +186,7 @@ function testFlightSelectionParserDefaultsEco() {
   assert.equal(result.input.caseId, 'BK-20260520-155949');
   assert.equal(result.input.airlineCode, 'VJ');
   assert.equal(result.input.departureTime, '05:00');
-  assert.equal(result.input.bookingClass, 'ECO');
+  assert.equal(result.input.bookingClass, null);
 }
 
 /**
@@ -246,7 +253,7 @@ function testFlightSelectionParserUsesLatestCaseContext() {
   assert.equal(result.input.caseId, 'BK-20260601-092749');
   assert.equal(result.input.departureTime, '08:40');
   assert.equal(result.input.airlineCode, null);
-  assert.equal(result.input.bookingClass, 'ECO');
+  assert.equal(result.input.bookingClass, null);
 }
 
 /**
@@ -276,7 +283,7 @@ function testLatestFlightSearchCaseContext() {
 }
 
 /**
- * Verifies that matcher selects only exact airline, time, and booking class.
+ * Verifies that matcher uses booking class only when explicitly requested.
  */
 function testFlightSelectionMatcher() {
   const candidates = [
@@ -287,7 +294,7 @@ function testFlightSelectionMatcher() {
       flightNumber: 'VJ120',
       departureTime: '05:00',
       arrivalTime: '07:10',
-      bookingClass: 'ECO',
+      bookingClass: 'DLX',
       priceText: 'VND 2,322,200',
     },
     {
@@ -307,7 +314,7 @@ function testFlightSelectionMatcher() {
     airlineCode: 'VJ',
     airlineName: 'Vietjet Air',
     departureTime: '05:00',
-    bookingClass: 'ECO',
+    bookingClass: null,
   });
 
   assert.equal(match.ok, true);
@@ -321,7 +328,7 @@ function testFlightSelectionMatcher() {
     airlineCode: 'VJ',
     airlineName: 'Vietjet Air',
     departureTime: '05:00',
-    bookingClass: 'DLX',
+    bookingClass: 'ECO',
   });
 
   assert.equal(noMatch.ok, false);
@@ -331,7 +338,7 @@ function testFlightSelectionMatcher() {
     airlineCode: null,
     airlineName: null,
     departureTime: '06:05',
-    bookingClass: 'ECO',
+    bookingClass: null,
   });
 
   assert.equal(timeOnlyMatch.ok, true);
@@ -346,7 +353,7 @@ function testFlightSelectionMatcher() {
         flightNumber: 'VN124',
         departureTime: '06:05',
         arrivalTime: '08:15',
-        bookingClass: 'ECO',
+        bookingClass: 'DLX',
         priceText: 'VND 2,422,200',
       },
     ],
@@ -355,7 +362,7 @@ function testFlightSelectionMatcher() {
       airlineCode: null,
       airlineName: null,
       departureTime: '06:05',
-      bookingClass: 'ECO',
+      bookingClass: null,
     },
   );
 
@@ -397,7 +404,9 @@ async function testOneBookingAuthExpiredToastDetection() {
 
   await assert.rejects(
     () => throwIfOneBookingLoginModalVisible(fakePage as never, 0),
-    /auth session expired/,
+    (error) =>
+      error instanceof OneBookingAuthExpiredError &&
+      /auth session expired/.test(error.message),
   );
 }
 
@@ -432,7 +441,39 @@ async function testOneBookingAuthExpiredPasswordModalDetection() {
 
   await assert.rejects(
     () => throwIfOneBookingLoginModalVisible(fakePage as never, 0),
-    /auth session expired/,
+    (error) =>
+      error instanceof OneBookingAuthExpiredError &&
+      /auth session expired/.test(error.message),
+  );
+}
+
+/**
+ * Verifies automatic 1Booking login credential validation before browser launch.
+ */
+function testOneBookingCredentialValidation() {
+  assert.deepEqual(
+    readOneBookingCredentialsFromEnv({
+      ONE_BOOKING_AGENT_ID: 'HS0001',
+      ONE_BOOKING_USERNAME: 'operator',
+      ONE_BOOKING_PASSWORD: 'secret',
+    }),
+    {
+      agentId: 'HS0001',
+      username: 'operator',
+      password: 'secret',
+    },
+  );
+  assert.throws(
+    () =>
+      readOneBookingCredentialsFromEnv({
+        ONE_BOOKING_AGENT_ID: 'HS0001',
+        ONE_BOOKING_USERNAME: '',
+        ONE_BOOKING_PASSWORD: 'secret',
+      }),
+    (error) =>
+      error instanceof OneBookingAuthRefreshError &&
+      /ONE_BOOKING_USERNAME/.test(error.message) &&
+      !/secret/.test(error.message),
   );
 }
 
@@ -532,7 +573,7 @@ async function main() {
   testAirportCatalogAliases();
   testOpenAIParserPromptIncludesAirportCatalog();
   testAirportCatalogCodeLookup();
-  testFlightSelectionParserDefaultsEco();
+  testFlightSelectionParserLeavesBookingClassUnspecified();
   testFlightSelectionParserBookingClassAliases();
   testFlightSelectionParserRejectsMissingFields();
   testFlightSelectionParserUsesLatestCaseContext();
@@ -541,6 +582,7 @@ async function main() {
   testFlightSelectionMatcher();
   await testOneBookingAuthExpiredToastDetection();
   await testOneBookingAuthExpiredPasswordModalDetection();
+  testOneBookingCredentialValidation();
   testParserFactoryProviderSelection();
   testOpenAIParserRequiresApiKey();
   await testOpenAIParserRejectsInvalidOutput();

@@ -17,7 +17,7 @@ export const SelectMatchingFlightInputSchema = z.object({
   airlineCode: z.string().min(2).nullable(),
   airlineName: z.string().min(1).nullable(),
   departureTime: z.string().regex(/^\d{2}:\d{2}$/),
-  bookingClass: BookingClassSchema.default('ECO'),
+  bookingClass: BookingClassSchema.nullable().default(null),
 });
 
 export type SelectMatchingFlightInput = z.infer<

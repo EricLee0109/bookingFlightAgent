@@ -8,21 +8,28 @@ import { isRetryableOneBookingSearchError } from '../automation/1booking/waiters
 import { type SelectMatchingFlightInput } from '../contracts/flight';
 import { readLocalFlightCase } from '../storage/local-case-store';
 import { runWithAutomationLock } from '../utils/automation-lock';
+import { OneBookingAuthRefreshRetryController } from './onebooking-auth-refresh-retry';
 
 export type FlightSelectionAutomationResult =
   | {
       ok: true;
       caseId: string;
       result: SelectMatchingFlightResult;
+      authRefreshed?: boolean;
     }
   | {
       ok: false;
       caseId: string;
       message: string;
       errorScreenshotPath: string | null;
+      authRefreshed?: boolean;
     };
 
 const MAX_ONE_BOOKING_SELECTION_ATTEMPTS = 2;
+
+export type FlightSelectionAutomationOptions = {
+  onAuthRefresh?: () => Promise<void>;
+};
 
 /**
  * Runs validated 1Booking flight selection with browser lifecycle management.
@@ -32,11 +39,12 @@ const MAX_ONE_BOOKING_SELECTION_ATTEMPTS = 2;
  */
 export async function selectMatchingOneBookingFlight(
   input: SelectMatchingFlightInput,
+  options: FlightSelectionAutomationOptions = {},
 ): Promise<FlightSelectionAutomationResult> {
   try {
     // use this lockName as Vietnamese for end-user understanding
     return await runWithAutomationLock('✈️ Chọn chuyến bay', () =>
-      selectMatchingOneBookingFlightUnlocked(input),
+      selectMatchingOneBookingFlightUnlocked(input, options),
     );
   } catch (error) {
     return {
@@ -53,6 +61,7 @@ export async function selectMatchingOneBookingFlight(
  */
 async function selectMatchingOneBookingFlightUnlocked(
   input: SelectMatchingFlightInput,
+  options: FlightSelectionAutomationOptions,
 ): Promise<FlightSelectionAutomationResult> {
   const flightCase = await readLocalFlightCase(input.caseId);
 
@@ -76,6 +85,10 @@ async function selectMatchingOneBookingFlightUnlocked(
 
   let lastError: unknown = null;
   let lastErrorScreenshotPath: string | null = null;
+  const authRetry = new OneBookingAuthRefreshRetryController({
+    caseId: input.caseId,
+    onAuthRefresh: options.onAuthRefresh,
+  });
 
   for (let attempt = 1; attempt <= MAX_ONE_BOOKING_SELECTION_ATTEMPTS; attempt++) {
     const { browser, page } = await createOneBookingBrowserSession();
@@ -87,6 +100,7 @@ async function selectMatchingOneBookingFlightUnlocked(
         ok: true,
         caseId: input.caseId,
         result,
+        authRefreshed: authRetry.authRefreshed || undefined,
       };
     } catch (error) {
       lastError = error;
@@ -101,7 +115,10 @@ async function selectMatchingOneBookingFlightUnlocked(
       }
 
       const shouldRetry =
-        isRetryableOneBookingSearchError(error) &&
+        (isRetryableOneBookingSearchError(error) ||
+          (await authRetry.refreshIfAuthExpired(error, {
+            irreversible: false,
+          }))) &&
         attempt < MAX_ONE_BOOKING_SELECTION_ATTEMPTS;
 
       if (!shouldRetry) {
@@ -120,5 +137,6 @@ async function selectMatchingOneBookingFlightUnlocked(
         ? lastError.message
         : 'Unknown 1Booking selection automation error.',
     errorScreenshotPath: lastErrorScreenshotPath,
+    authRefreshed: authRetry.authRefreshed || undefined,
   };
 }
