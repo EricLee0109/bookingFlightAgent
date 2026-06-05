@@ -4,6 +4,7 @@ import {
   type ParsedFlightRequest,
   type SelectMatchingFlightInput,
 } from '../contracts/flight';
+import { type PassengerMention } from '../contracts/passenger';
 import { type PassengerProfile } from '../passengers/passenger-types';
 
 /**
@@ -241,10 +242,25 @@ export function formatPassengerMissingFieldsMessage(
   profile: PassengerProfile,
   missingFields: string[],
 ) {
+  const labels = formatPassengerMissingFieldLabels(missingFields);
+  const sampleLines = buildPassengerQuickInputExamples({
+    fullName: profile.normalizedFullName,
+    gender:
+      profile.gender === true
+        ? 'male'
+        : profile.gender === false
+          ? 'female'
+          : null,
+    dob: profile.dateOfBirth,
+  });
+
   return [
     `Mình đã tìm thấy ${profile.normalizedFullName}, nhưng còn thiếu thông tin.`,
     '',
-    `Vui lòng bổ sung: ${missingFields.join(', ')}`,
+    `Còn thiếu: ${labels.join(', ')}.`,
+    '',
+    'Bạn có thể gửi nhanh theo mẫu:',
+    ...sampleLines,
   ].join('\n');
 }
 
@@ -253,12 +269,26 @@ export function formatPassengerMissingFieldsMessage(
  */
 export function formatNewPassengerMissingFieldsMessage(
   missingFields: string[],
+  mention?: PassengerMention,
 ) {
+  const labels = formatPassengerMissingFieldLabels(missingFields);
+  const knownLines = formatKnownPassengerDraftLines(mention);
+  const sampleLines = buildPassengerQuickInputExamples(mention);
+
   return [
     'Mình chưa đủ thông tin để lưu khách mới.',
     '',
-    `Vui lòng bổ sung: ${missingFields.join(', ')}`,
-  ].join('\n');
+    ...knownLines,
+    knownLines.length > 0 ? '' : null,
+    `Còn thiếu: ${labels.join(', ')}.`,
+    '',
+    'Vui lòng gửi theo một trong các mẫu:',
+    ...sampleLines,
+    '',
+    'Ngày sinh không bắt buộc, chỉ thêm khi cần.',
+  ]
+    .filter((line): line is string => line !== null)
+    .join('\n');
 }
 
 /**
@@ -378,6 +408,74 @@ function formatPassengerSummaryLines(profile: PassengerProfile) {
     }`,
     `Ngày sinh: ${profile.dateOfBirth ?? 'Không bắt buộc'}`,
   ];
+}
+
+/**
+ * Converts internal passenger field names into operator-facing Vietnamese.
+ */
+function formatPassengerMissingFieldLabels(missingFields: string[]) {
+  return missingFields.map((field) => {
+    if (field === 'fullName') return 'họ tên đầy đủ';
+    if (field === 'gender') return 'giới tính';
+    if (field === 'dob') return 'ngày sinh';
+
+    return field;
+  });
+}
+
+/**
+ * Shows the passenger draft already understood before requesting more data.
+ */
+function formatKnownPassengerDraftLines(mention?: PassengerMention) {
+  if (!mention) {
+    return [];
+  }
+
+  return [
+    mention.fullName ? `Mình đã nhận tên: ${mention.fullName}` : null,
+    mention.gender
+      ? `Mình đã nhận giới tính: ${formatMentionGender(mention.gender)}`
+      : null,
+    mention.dob ? `Mình đã nhận ngày sinh: ${mention.dob}` : null,
+  ].filter((line): line is string => line !== null);
+}
+
+/**
+ * Builds copy-ready passenger input examples for Telegram operators.
+ */
+function buildPassengerQuickInputExamples(mention?: PassengerMention) {
+  const fullName = mention?.fullName;
+  const genderLabel = mention?.gender
+    ? formatMentionGender(mention.gender)
+    : null;
+
+  if (fullName && !genderLabel) {
+    return [`Nữ, ${fullName}`, `Nam, ${fullName}`];
+  }
+
+  if (!fullName && genderLabel) {
+    return [`${genderLabel}, <họ tên khách>`];
+  }
+
+  if (fullName && genderLabel) {
+    return [
+      `${genderLabel}, ${fullName}`,
+      `${genderLabel}, ${fullName}, sinh 02/01/1995`,
+    ];
+  }
+
+  return [
+    'Nữ, Nguyễn Thị Oanh',
+    'Nam, Nguyễn Văn A',
+    'Nữ, Nguyễn Thị Oanh, sinh 02/01/1995',
+  ];
+}
+
+/**
+ * Formats parser gender values as the exact words operators can reuse.
+ */
+function formatMentionGender(gender: PassengerMention['gender']) {
+  return gender === 'male' ? 'Nam' : 'Nữ';
 }
 
 function formatSelectionBookingClass(

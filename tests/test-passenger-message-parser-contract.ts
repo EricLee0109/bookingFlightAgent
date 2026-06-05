@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createOpenAIPassengerMessageParser } from '../src/agent/openai-passenger-message-parser';
+import {
+  buildPassengerParserSystemPrompt,
+  createOpenAIPassengerMessageParser,
+} from '../src/agent/openai-passenger-message-parser';
 import { parseFlightSelectionMessage } from '../src/agent/flight-selection-parser';
 import {
   assertSafeFinalHoldCtaText,
@@ -42,10 +45,13 @@ import {
   parsePassengerCallbackData,
 } from '../src/telegram/telegram-passenger-keyboards';
 import {
+  formatNewPassengerMissingFieldsMessage,
   formatPassengerHoldNeedsReviewMessage,
   formatPassengerHoldSuccessMessage,
+  formatPassengerMissingFieldsMessage,
 } from '../src/telegram/telegram-formatters';
 import { parseHoldRecoveryMessage } from '../src/telegram/telegram-hold-recovery';
+import { mergePassengerMentions } from '../src/telegram/telegram-passenger-message-handler';
 import { type LocalFlightCase } from '../src/storage/local-case-store';
 
 const TEST_DIR = path.resolve(
@@ -125,6 +131,60 @@ async function testOpenAIPassengerMessageParser() {
     await parser.parse('case BK-20260525-162456 lấy chị Lanh'),
     parsedPassengerMessage,
   );
+}
+
+/**
+ * Verifies the passenger parser contract supports short follow-up and quick
+ * input messages without adding non-MVP contact/document fields.
+ */
+function testPassengerQuickInputParserContract() {
+  const genderOnly = ParsedPassengerMessageSchema.parse({
+    intent: 'update_passenger_fields',
+    caseCode: null,
+    passengerMentions: [
+      {
+        fullName: null,
+        gender: 'female',
+        dob: null,
+      },
+    ],
+    missingFields: [],
+    confidence: 0.9,
+  });
+  const quickInput = ParsedPassengerMessageSchema.parse({
+    intent: 'provide_new_passenger',
+    caseCode: null,
+    passengerMentions: [
+      {
+        fullName: 'Nguyễn Thị Oanh',
+        gender: 'female',
+        dob: null,
+      },
+    ],
+    missingFields: [],
+    confidence: 0.94,
+  });
+  const dobInput = ParsedPassengerMessageSchema.parse({
+    intent: 'update_passenger_fields',
+    caseCode: null,
+    passengerMentions: [
+      {
+        fullName: 'Nguyễn Thị Oanh',
+        gender: null,
+        dob: '1995-01-02',
+      },
+    ],
+    missingFields: [],
+    confidence: 0.92,
+  });
+  const prompt = buildPassengerParserSystemPrompt();
+
+  assert.equal(genderOnly.passengerMentions[0].gender, 'female');
+  assert.equal(quickInput.passengerMentions[0].fullName, 'Nguyễn Thị Oanh');
+  assert.equal(dobInput.passengerMentions[0].dob, '1995-01-02');
+  assert.match(prompt, /standalone "Nam"/);
+  assert.match(prompt, /Nữ, Nguyễn Thị Oanh/);
+  assert.doesNotMatch(prompt, /phone|email|passport|cccd|document/i);
 }
 
 /**
@@ -309,6 +369,132 @@ function testIncompleteNewPassengerIsNotInserted() {
   } finally {
     store.close();
   }
+}
+
+/**
+ * Verifies Telegram follow-up replies enrich the previous passenger draft.
+ */
+function testPassengerDraftMergeForSplitInputs() {
+  assert.deepEqual(
+    mergePassengerMentions(
+      {
+        fullName: 'Nguyễn Thị Oanh',
+        gender: null,
+        dob: null,
+      },
+      {
+        fullName: null,
+        gender: 'female',
+        dob: null,
+      },
+    ),
+    {
+      fullName: 'Nguyễn Thị Oanh',
+      gender: 'female',
+      dob: null,
+    },
+  );
+  assert.deepEqual(
+    mergePassengerMentions(
+      {
+        fullName: null,
+        gender: 'female',
+        dob: null,
+      },
+      {
+        fullName: 'Nguyễn Thị Oanh',
+        gender: null,
+        dob: null,
+      },
+    ),
+    {
+      fullName: 'Nguyễn Thị Oanh',
+      gender: 'female',
+      dob: null,
+    },
+  );
+  assert.deepEqual(
+    mergePassengerMentions(
+      {
+        fullName: 'Nguyễn Thị Oanh',
+        gender: null,
+        dob: null,
+      },
+      {
+        fullName: 'Oanh',
+        gender: 'female',
+        dob: null,
+      },
+    ),
+    {
+      fullName: 'Nguyễn Thị Oanh',
+      gender: 'female',
+      dob: null,
+    },
+  );
+}
+
+/**
+ * Verifies missing-field Telegram messages use natural copy-ready examples
+ * instead of leaking internal schema field names.
+ */
+function testPassengerMissingFieldTelegramMessages() {
+  const genericMessage = formatNewPassengerMissingFieldsMessage([
+    'fullName',
+    'gender',
+  ]);
+  const nameKnownMessage = formatNewPassengerMissingFieldsMessage(
+    ['gender'],
+    {
+      fullName: 'Nguyễn Thị Oanh',
+      gender: null,
+      dob: null,
+    },
+  );
+  const genderKnownMessage = formatNewPassengerMissingFieldsMessage(
+    ['fullName'],
+    {
+      fullName: null,
+      gender: 'female',
+      dob: null,
+    },
+  );
+  const storedProfileMessage = formatPassengerMissingFieldsMessage(
+    {
+      id: 1,
+      passengerType: 0,
+      lastName: 'NGUYEN',
+      firstName: 'THI OANH',
+      title: 'MS',
+      gender: false,
+      dateOfBirth: null,
+      source: 'operator_input',
+      normalizedLastName: 'NGUYEN',
+      normalizedFirstName: 'THI OANH',
+      normalizedFullName: 'NGUYEN THI OANH',
+      seenCount: 1,
+      createdAt: '2026-06-05T00:00:00.000Z',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    },
+    ['gender'],
+  );
+  const combinedText = [
+    genericMessage,
+    nameKnownMessage,
+    genderKnownMessage,
+    storedProfileMessage,
+  ].join('\n');
+
+  assert.match(genericMessage, /họ tên đầy đủ/);
+  assert.match(genericMessage, /giới tính/);
+  assert.match(genericMessage, /Nữ, Nguyễn Thị Oanh/);
+  assert.match(genericMessage, /Nam, Nguyễn Văn A/);
+  assert.match(nameKnownMessage, /Nữ, Nguyễn Thị Oanh/);
+  assert.match(genderKnownMessage, /Nữ, <họ tên khách>/);
+  assert.doesNotMatch(
+    combinedText,
+    /\bfullName\b|\bgender\b|\bemail\b|\bphone\b|điện thoại|hộ chiếu|căn cước/i,
+  );
 }
 
 /**
@@ -656,10 +842,13 @@ async function main() {
   prepareTestFiles();
   testPassengerMessageSchema();
   await testOpenAIPassengerMessageParser();
+  testPassengerQuickInputParserContract();
   testPassengerResolverStates();
   testPassengerProfileEnrichment();
   testNewPassengerUpsertAndCaseAttachment();
   testIncompleteNewPassengerIsNotInserted();
+  testPassengerDraftMergeForSplitInputs();
+  testPassengerMissingFieldTelegramMessages();
   testPassengerQuickInputAndAirlineDobRules();
   testSafeFinalHoldCtaGuard();
   testHeldBookingPnrExtraction();

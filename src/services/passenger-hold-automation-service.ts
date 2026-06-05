@@ -116,7 +116,7 @@ async function fillPassengerAndHoldOneBookingCaseUnlocked(
       ok: false,
       reason: 'needs_input',
       caseId,
-      missingFields,
+      missingFields: missingFields as ['dob'],
       message:
         'Vietnam Airlines requires passenger DOB before automatic hold booking.',
       errorScreenshotPath: null,

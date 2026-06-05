@@ -170,6 +170,10 @@ export async function tryHandleTelegramPassengerMessage(
     return true;
   }
 
+  const previousPassengerMention =
+    existingCase.parsedPassengerMessage?.passengerMentions[0];
+  const pendingProfileIds = context?.pendingPassengerProfileIds ?? [];
+
   let currentCase = await updateLocalFlightCase(existingCase, {
     status: 'PASSENGER_INFO_RECEIVED',
     parsedPassengerMessage,
@@ -177,8 +181,6 @@ export async function tryHandleTelegramPassengerMessage(
   currentCase = await updateLocalFlightCase(currentCase, {
     status: 'PASSENGER_INFO_PARSED',
   });
-
-  const pendingProfileIds = context?.pendingPassengerProfileIds ?? [];
 
   if (parsedPassengerMessage.intent === 'confirm_passenger') {
     if (pendingProfileIds.length !== 1) {
@@ -211,13 +213,27 @@ export async function tryHandleTelegramPassengerMessage(
     return true;
   }
 
-  const effectiveMention =
-    parsedPassengerMessage.intent === 'update_passenger_fields'
-      ? mergePassengerMentions(
-          existingCase.parsedPassengerMessage?.passengerMentions[0],
-          mention,
-        )
-      : mention;
+  const shouldMergeMention = shouldMergePassengerFollowUp(
+    existingCase.status,
+    parsedPassengerMessage.intent,
+    previousPassengerMention,
+  );
+  const effectiveMention = shouldMergeMention
+    ? mergePassengerMentions(previousPassengerMention, mention)
+    : mention;
+
+  if (effectiveMention !== mention) {
+    parsedPassengerMessage = {
+      ...parsedPassengerMessage,
+      passengerMentions: [
+        effectiveMention,
+        ...parsedPassengerMessage.passengerMentions.slice(1),
+      ],
+    };
+    currentCase = await updateLocalFlightCase(currentCase, {
+      parsedPassengerMessage,
+    });
+  }
 
   await withPassengerResolutionService(async (service) => {
     const result = service.resolveMention(effectiveMention, {
@@ -227,7 +243,7 @@ export async function tryHandleTelegramPassengerMessage(
           ? pendingProfileIds
           : undefined,
       pendingPassengerProfileId:
-        parsedPassengerMessage.intent === 'update_passenger_fields' &&
+        shouldMergeMention &&
         pendingProfileIds.length === 1
           ? pendingProfileIds[0]
           : undefined,
@@ -260,7 +276,7 @@ export async function tryHandleTelegramPassengerMessage(
  * Example: after the bot asks for gender, the operator can answer without
  * repeating a previously supplied full name.
  */
-function mergePassengerMentions(
+export function mergePassengerMentions(
   previousMention: PassengerMention | undefined,
   nextMention: PassengerMention,
 ) {
@@ -269,10 +285,57 @@ function mergePassengerMentions(
   }
 
   return {
-    fullName: nextMention.fullName ?? previousMention.fullName,
+    fullName: chooseMergedPassengerFullName(previousMention, nextMention),
     gender: nextMention.gender ?? previousMention.gender,
     dob: nextMention.dob ?? previousMention.dob,
   };
+}
+
+/**
+ * Decides whether a short passenger reply should enrich the previous draft.
+ */
+function shouldMergePassengerFollowUp(
+  caseStatus: string,
+  intent: string,
+  previousMention: PassengerMention | undefined,
+) {
+  if (!previousMention) {
+    return false;
+  }
+
+  if (intent === 'update_passenger_fields') {
+    return true;
+  }
+
+  return (
+    caseStatus === 'PASSENGER_INFO_NEEDS_REVIEW' &&
+    (intent === 'attach_passenger' || intent === 'provide_new_passenger')
+  );
+}
+
+/**
+ * Keeps a complete full name from being overwritten by a later nickname reply.
+ */
+function chooseMergedPassengerFullName(
+  previousMention: PassengerMention,
+  nextMention: PassengerMention,
+) {
+  if (!nextMention.fullName) {
+    return previousMention.fullName;
+  }
+
+  if (
+    isCompletePassengerName(previousMention.fullName) &&
+    !isCompletePassengerName(nextMention.fullName)
+  ) {
+    return previousMention.fullName;
+  }
+
+  return nextMention.fullName;
+}
+
+function isCompletePassengerName(fullName: string | null) {
+  return fullName?.trim().split(/\s+/).filter(Boolean).length ?? 0 >= 2;
 }
 
 /**
@@ -293,7 +356,10 @@ async function renderPassengerResolution(
     });
     await bot.sendMessage(
       chatId,
-      formatNewPassengerMissingFieldsMessage(result.missingFields),
+      formatNewPassengerMissingFieldsMessage(
+        result.missingFields,
+        result.mention,
+      ),
     );
     return;
   }
@@ -459,7 +525,7 @@ async function runAutomaticPassengerHold(
 
   const result = await fillPassengerAndHoldOneBookingCase(flightCase.caseId, {
     onAuthRefresh: () =>
-      bot.sendMessage(chatId, formatOneBookingAuthRefreshStartedMessage()),
+      Promise.resolve(void bot.sendMessage(chatId, formatOneBookingAuthRefreshStartedMessage())),
   });
 
   if (result.ok) {
