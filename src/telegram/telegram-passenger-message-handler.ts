@@ -20,6 +20,7 @@ import {
   formatPassengerAmbiguousMessage,
   formatPassengerAttachedMessage,
   formatPassengerCaseRequiredMessage,
+  formatPassengerCaseNotReadyMessage,
   formatPassengerHoldFailedMessage,
   formatPassengerHoldMissingDobMessage,
   formatPassengerHoldNeedsReviewMessage,
@@ -29,8 +30,10 @@ import {
   formatPassengerMissingFieldsMessage,
   formatNewPassengerMissingFieldsMessage,
   formatOneBookingAuthRefreshStartedMessage,
+  formatPassengerMentionMissingMessage,
   formatPassengerNotFoundMessage,
   formatPassengerParserFailedMessage,
+  formatPassengerProfileMissingMessage,
 } from './telegram-formatters';
 import {
   clearPendingPassengerProfiles,
@@ -125,7 +128,7 @@ export async function handleTelegramCallbackQuery(
     const profile = service.getProfile(payload.passengerProfileId);
 
     if (!profile) {
-      await bot.sendMessage(chatId, 'Không tìm thấy passenger profile local.');
+      await bot.sendMessage(chatId, formatPassengerProfileMissingMessage());
       return;
     }
 
@@ -176,7 +179,7 @@ export async function tryHandleTelegramPassengerMessage(
     if (explicitCaseId && messageLooksLikePassengerInfo(rawMessage)) {
       await bot.sendMessage(
         chatId,
-        `Case ${caseId} chưa sẵn sàng để nhận thông tin khách.`,
+        formatPassengerCaseNotReadyMessage(caseId),
       );
       return true;
     }
@@ -430,9 +433,7 @@ export async function renderPassengerResolutionOutcome(
   if (outcome.status === 'no_mention') {
     await bot.sendMessage(
       chatId,
-      outcome.intent === 'reject_passenger'
-        ? 'Vui lòng cho mình tên khách khác cần tìm.'
-        : 'Mình chưa nhận ra tên khách. Vui lòng nhập lại họ tên khách.',
+      formatPassengerMentionMissingMessage(outcome.intent === 'reject_passenger'),
     );
     return;
   }

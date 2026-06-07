@@ -226,3 +226,5 @@ Call log:
 2026-06-07T15:46:14.416Z INFO one_booking_hold_success_modal_observed case=BK-20260607-224410 Observed transient 1Booking hold success modal.
 2026-06-07T15:46:18.835Z INFO one_booking_hold_order_page_confirmed case=BK-20260607-224410 Confirmed durable 1Booking held-order page. meta={"orderId":"#HS2200389000123","orderDetailUrl":"https://pro.1booking.vn/order/HS2200389000123"}
 2026-06-07T15:46:18.874Z INFO one_booking_pnr_extracted case=BK-20260607-224410 Extracted held-booking PNR. meta={"pnrCode":"9JR93F"}
+2026-06-07T17:09:26.093Z INFO telegram_request_received case=BK-20260608-000926 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-06-07T17:09:29.148Z WARN flight_request_missing_fields case=BK-20260608-000926 Missing fields: toAirportCode, toAirportText

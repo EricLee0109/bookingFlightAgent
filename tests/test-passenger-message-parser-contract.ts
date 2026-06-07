@@ -47,10 +47,16 @@ import {
 import {
   formatCombinedFlightSelectionProgressMessage,
   formatCombinedSelectionPassengerReadyMessage,
+  formatHoldRecoveryFailedMessage,
+  formatHoldRecoveryParseFailedMessage,
   formatNewPassengerMissingFieldsMessage,
+  formatPassengerCaseRequiredMessage,
+  formatPassengerHoldFailedMessage,
   formatPassengerHoldNeedsReviewMessage,
   formatPassengerHoldSuccessMessage,
+  formatPassengerMentionMissingMessage,
   formatPassengerMissingFieldsMessage,
+  formatPassengerNotFoundMessage,
 } from '../src/telegram/telegram-formatters';
 import { parseHoldRecoveryMessage } from '../src/telegram/telegram-hold-recovery';
 import {
@@ -500,6 +506,42 @@ function testPassengerMissingFieldTelegramMessages() {
   assert.doesNotMatch(
     combinedText,
     /\bfullName\b|\bgender\b|\bemail\b|\bphone\b|điện thoại|hộ chiếu|căn cước/i,
+  );
+}
+
+/**
+ * Verifies passenger/recovery failures show copy-ready patterns and hide raw
+ * technical details.
+ */
+function testOperatorFriendlyPassengerFailureMessages() {
+  const notFoundMessage = formatPassengerNotFoundMessage();
+  const caseRequiredMessage = formatPassengerCaseRequiredMessage();
+  const noMentionMessage = formatPassengerMentionMissingMessage(false);
+  const holdFailedMessage = formatPassengerHoldFailedMessage(
+    'locator.waitFor: Timeout 10000ms exceeded while waiting for gender.',
+  );
+  const recoveryParseMessage = formatHoldRecoveryParseFailedMessage();
+  const recoveryFailedMessage = formatHoldRecoveryFailedMessage(
+    'PNR "BAD" không hợp lệ. PNR phải gồm đúng 6 ký tự chữ hoặc số.',
+  );
+  const combinedText = [
+    notFoundMessage,
+    caseRequiredMessage,
+    noMentionMessage,
+    holdFailedMessage,
+    recoveryParseMessage,
+    recoveryFailedMessage,
+  ].join('\n');
+
+  assert.match(notFoundMessage, /Nữ, Nguyễn Thị Oanh/);
+  assert.match(caseRequiredMessage, /BK-YYYYMMDD-HHMMSS lấy khách/);
+  assert.match(noMentionMessage, /Nữ, Nguyễn Thị Oanh/);
+  assert.match(holdFailedMessage, /Vui lòng kiểm tra lại thông tin khách\/chuyến/);
+  assert.match(recoveryParseMessage, /recover BK-YYYYMMDD-HHMMSS PNR ABC123/);
+  assert.match(recoveryFailedMessage, /PNR cần gồm 6 ký tự/);
+  assert.doesNotMatch(
+    combinedText,
+    /\bfullName\b|\bgender\b|locator\.waitFor|Timeout 10000ms|OPENAI_API_KEY|passenger profile local|Missing fields/i,
   );
 }
 
@@ -955,6 +997,7 @@ async function main() {
   testIncompleteNewPassengerIsNotInserted();
   testPassengerDraftMergeForSplitInputs();
   testPassengerMissingFieldTelegramMessages();
+  testOperatorFriendlyPassengerFailureMessages();
   testPassengerQuickInputAndAirlineDobRules();
   testSafeFinalHoldCtaGuard();
   testHeldBookingPnrExtraction();

@@ -34,6 +34,7 @@ import {
   formatParserFailedMessage,
   formatParsedRequestMessage,
   formatSearchFailedMessage,
+  formatSearchInputMappingFailedMessage,
   formatSearchSuccessMessage,
 } from './telegram-formatters';
 import { handleTelegramSettingsCommand } from './telegram-settings-commands';
@@ -291,7 +292,7 @@ export async function handleTelegramMessage(
       caseId: currentCase.caseId,
       message: errorMessage,
     });
-    await bot.sendMessage(chatId, errorMessage);
+    await bot.sendMessage(chatId, formatSearchInputMappingFailedMessage());
     return;
   }
 
@@ -418,6 +419,7 @@ async function handleTelegramFlightSelection(
       chatId,
       formatFlightSelectionFailedMessage(
         `Không tìm thấy case ${selectionInput.caseId}. Vui lòng kiểm tra lại caseId.`,
+        selectionInput,
       ),
     );
     return;
@@ -428,6 +430,7 @@ async function handleTelegramFlightSelection(
       chatId,
       formatFlightSelectionFailedMessage(
         `Case ${selectionInput.caseId} chưa có searchInput. Vui lòng search chuyến trước rồi mới chọn.`,
+        selectionInput,
       ),
     );
     return;
@@ -490,7 +493,10 @@ async function handleTelegramFlightSelection(
       },
     });
 
-    await bot.sendMessage(chatId, formatFlightSelectionFailedMessage(result.message));
+    await bot.sendMessage(
+      chatId,
+      formatFlightSelectionFailedMessage(result.message, selectionInput),
+    );
 
     if (passengerOutcome?.status === 'ready') {
       await bot.sendMessage(

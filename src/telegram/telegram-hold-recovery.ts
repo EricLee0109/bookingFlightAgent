@@ -1,7 +1,11 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { BOOKING_CASE_REGEX } from '../automation/1booking/constants';
 import { recoverHeldBookingCase } from '../services/passenger-hold-recovery-service';
-import { formatPassengerHoldSuccessMessage } from './telegram-formatters';
+import {
+  formatHoldRecoveryFailedMessage,
+  formatHoldRecoveryParseFailedMessage,
+  formatPassengerHoldSuccessMessage,
+} from './telegram-formatters';
 
 const HOLD_RECOVERY_PATTERN = new RegExp(
   `^recover\\s+(${BOOKING_CASE_REGEX.source})\\s+pnr\\s+([a-z0-9]+)$`,
@@ -44,7 +48,7 @@ export function parseHoldRecoveryMessage(
     return {
       isRecoveryMessage: true,
       ok: false,
-      message: 'Cú pháp recover: recover BK-YYYYMMDD-HHMMSS PNR ABC123',
+      message: 'invalid_recovery_syntax',
     };
   }
 
@@ -74,14 +78,14 @@ export async function tryHandleTelegramHoldRecoveryMessage(
   }
 
   if (!parsed.ok) {
-    await bot.sendMessage(chatId, parsed.message);
+    await bot.sendMessage(chatId, formatHoldRecoveryParseFailedMessage());
     return true;
   }
 
   const result = await recoverHeldBookingCase(parsed);
 
   if (!result.ok) {
-    await bot.sendMessage(chatId, `Không thể recover hold. ${result.message}`);
+    await bot.sendMessage(chatId, formatHoldRecoveryFailedMessage(result.message));
     return true;
   }
 

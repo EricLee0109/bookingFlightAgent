@@ -31,6 +31,13 @@ import {
   getLatestFlightSearchCase,
   setLatestFlightSearchCase,
 } from '../src/telegram/telegram-flight-selection-context';
+import {
+  formatFlightSelectionFailedMessage,
+  formatFlightSelectionParseFailedMessage,
+  formatMissingFlightFieldsMessage,
+  formatSearchFailedMessage,
+  formatSearchInputMappingFailedMessage,
+} from '../src/telegram/telegram-formatters';
 
 const validOneWayRequest = {
   fromAirportCode: 'HAN',
@@ -303,6 +310,53 @@ function testLatestFlightSearchCaseContext() {
   assert.deepEqual(getLatestFlightSearchCase(456), {
     latestSearchCaseId: 'BK-20260601-092749',
   });
+}
+
+/**
+ * Verifies Telegram flight failures use retry patterns instead of raw internals.
+ */
+function testOperatorFriendlyFlightFailureMessages() {
+  const missingSearchMessage = formatMissingFlightFieldsMessage([
+    'fromAirportCode',
+    'toAirportCode',
+    'departureDate',
+  ]);
+  const selectionParseMessage = formatFlightSelectionParseFailedMessage([
+    'departureTime',
+  ]);
+  const selectionNoMatchMessage = formatFlightSelectionFailedMessage(
+    'No available flight matched VJ 05:00 ECO.',
+    {
+      caseId: 'BK-20260605-095859',
+      airlineCode: 'VJ',
+      airlineName: 'Vietjet Air',
+      departureTime: '05:00',
+      bookingClass: 'ECO',
+    },
+  );
+  const searchFailedMessage = formatSearchFailedMessage(
+    'page.waitForFunction: Timeout 10000ms exceeded.',
+  );
+  const mappingFailedMessage = formatSearchInputMappingFailedMessage();
+  const combinedText = [
+    missingSearchMessage,
+    selectionParseMessage,
+    selectionNoMatchMessage,
+    searchFailedMessage,
+    mappingFailedMessage,
+  ].join('\n');
+
+  assert.match(missingSearchMessage, /bay từ SGN ra HAN ngày 30\/07/);
+  assert.match(selectionParseMessage, /case này chọn chuyến Vietjet 13:30/);
+  assert.match(selectionParseMessage, /BK-YYYYMMDD-HHMMSS chọn VJ 13:30 hạng Eco/);
+  assert.match(selectionNoMatchMessage, /Hãng: Vietjet Air \(VJ\)/);
+  assert.match(selectionNoMatchMessage, /Giờ bay: 05:00/);
+  assert.match(selectionNoMatchMessage, /Hạng: Eco \(ECO\)/);
+  assert.match(selectionNoMatchMessage, /case này chọn chuyến Vietjet Air 05:00 hạng Deluxe/);
+  assert.doesNotMatch(
+    combinedText,
+    /No available flight matched|Missing fields:|fromAirportCode|toAirportCode|departureDate\b|departureTime|page\.waitForFunction|OPENAI_API_KEY/i,
+  );
 }
 
 /**
@@ -603,6 +657,7 @@ async function main() {
   testFlightSelectionParserAcceptsCombinedPassengerMessage();
   testFlightSelectionParserRequiresLatestCaseContext();
   testLatestFlightSearchCaseContext();
+  testOperatorFriendlyFlightFailureMessages();
   testFlightSelectionMatcher();
   await testOneBookingAuthExpiredToastDetection();
   await testOneBookingAuthExpiredPasswordModalDetection();

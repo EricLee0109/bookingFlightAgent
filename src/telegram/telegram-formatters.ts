@@ -50,10 +50,16 @@ export function formatParsedRequestMessage(parsed: ParsedFlightRequest) {
  * with incomplete input.
  */
 export function formatMissingFlightFieldsMessage(missingFields: string[]) {
+  const labels = Array.from(new Set(formatOperatorFieldLabels(missingFields)));
+
   return [
     'Mình còn thiếu thông tin để tìm chuyến.',
     '',
-    `Vui lòng bổ sung: ${missingFields.join(', ')}`,
+    `Cần thêm: ${labels.join(', ')}.`,
+    '',
+    'Bạn có thể gửi:',
+    'bay từ SGN ra HAN ngày 30/07',
+    'bay từ Hà Nội vào Sài Gòn ngày mai buổi sáng',
   ].join('\n');
 }
 
@@ -62,9 +68,10 @@ export function formatMissingFlightFieldsMessage(missingFields: string[]) {
  */
 export function formatParserFailedMessage() {
   return [
-    'Không thể phân tích yêu cầu bằng AI parser.',
+    'Mình chưa phân tích được yêu cầu bay.',
     '',
-    'Vui lòng kiểm tra OPENAI_API_KEY, OPENAI_MODEL hoặc đổi FLIGHT_PARSER_PROVIDER=mock để test local.',
+    'Vui lòng gửi lại ngắn gọn theo mẫu:',
+    'bay từ SGN ra HAN ngày 30/07',
   ].join('\n');
 }
 
@@ -89,20 +96,29 @@ export function formatSearchSuccessMessage(flightCount: number) {
  */
 export function formatSearchFailedMessage(message?: string) {
   return [
-    '❌ Không thể tìm chuyến trên 1Booking.',
+    'Chưa tìm được chuyến trên 1Booking.',
     '',
-    message,
-    message ? '' : null,
-    'Có thể do:',
-    '- Session 1Booking hết hạn.',
-    '- UI 1Booking chưa load xong.',
-    '- Selector thay đổi.',
-    '- Không có chuyến phù hợp.',
+    formatSearchFailureReason(message),
     '',
-    'Mình sẽ gửi screenshot lỗi bên dưới nếu có.',
+    'Bạn có thể thử lại theo mẫu:',
+    'bay từ SGN ra HAN ngày 30/07',
+    '',
+    'Mình gửi screenshot bên dưới để bạn đối chiếu nếu có.',
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+/**
+ * Formats a parser-to-search mapping failure without exposing mapper internals.
+ */
+export function formatSearchInputMappingFailedMessage() {
+  return [
+    'Mình chưa đủ thông tin để tạo yêu cầu tìm chuyến.',
+    '',
+    'Vui lòng gửi lại theo mẫu:',
+    'bay từ SGN ra HAN ngày 30/07',
+  ].join('\n');
 }
 
 /**
@@ -112,13 +128,16 @@ export function formatSearchFailedMessage(message?: string) {
  * bot can safely rerun 1Booking and select a refreshed flight card.
  */
 export function formatFlightSelectionParseFailedMessage(missingFields: string[]) {
+  const labels = Array.from(new Set(formatOperatorFieldLabels(missingFields)));
+
   return [
     'Mình chưa đủ thông tin để chọn chuyến.',
     '',
-    `Còn thiếu: ${missingFields.join(', ')}`,
+    `Cần thêm: ${labels.join(', ')}.`,
     '',
-    'Vui lòng gửi dạng:',
-    'BK-YYYYMMDD-HHMMSS chọn Vietjet lúc 05:00 hạng Eco',
+    'Bạn có thể gửi:',
+    'case này chọn chuyến Vietjet 13:30',
+    'BK-YYYYMMDD-HHMMSS chọn VJ 13:30 hạng Eco',
   ].join('\n');
 }
 
@@ -204,13 +223,19 @@ export function formatFlightSelectionSuccessMessage(
 /**
  * Formats a selection failure for Telegram.
  */
-export function formatFlightSelectionFailedMessage(message: string) {
+export function formatFlightSelectionFailedMessage(
+  message: string,
+  input?: SelectMatchingFlightInput,
+) {
   return [
-    'Không thể chọn chuyến trên 1Booking.',
+    'Chưa chọn được chuyến.',
     '',
-    message,
+    formatFlightSelectionFailureReason(message, input),
     '',
-    'Mình sẽ gửi screenshot lỗi bên dưới nếu có.',
+    'Vui lòng đối chiếu screenshot và gửi lại, ví dụ:',
+    buildFlightSelectionRetryExample(input),
+    '',
+    'Mình gửi screenshot bên dưới để bạn đối chiếu nếu có.',
   ].join('\n');
 }
 
@@ -240,7 +265,9 @@ export function formatPassengerReadySelectionStillNeededMessage(
     '',
     ...formatPassengerSummaryLines(profile),
     '',
-    'Chưa chọn được chuyến. Vui lòng chọn lại chuyến bay cho case này.',
+    'Chưa chọn được chuyến.',
+    'Vui lòng chọn lại chuyến theo mẫu:',
+    `case ${caseId} chọn chuyến Vietjet 13:30`,
   ].join('\n');
 }
 
@@ -262,8 +289,7 @@ export function formatPassengerMatchedMessage(profile: PassengerProfile) {
  */
 export function formatPassengerAmbiguousMessage(candidateCount: number) {
   return [
-    `Mình tìm thấy ${candidateCount} khách có tên gần giống.`,
-    '',
+    `Có ${candidateCount} khách gần giống.`,
     'Vui lòng chọn đúng khách bên dưới.',
   ].join('\n');
 }
@@ -275,7 +301,12 @@ export function formatPassengerNotFoundMessage() {
   return [
     'Mình chưa tìm thấy khách phù hợp trong dữ liệu local.',
     '',
-    'Vui lòng nhập họ tên đầy đủ và giới tính để mình lưu lại. Ngày sinh có thể bổ sung nếu cần.',
+    'Cần: Giới tính + Họ tên.',
+    '',
+    'Gửi theo mẫu:',
+    'Nữ, Nguyễn Thị Oanh',
+    'Nam, Nguyễn Văn A',
+    'Nữ, Nguyễn Thị Oanh, sinh 02/01/1995',
   ].join('\n');
 }
 
@@ -315,7 +346,9 @@ export function formatNewPassengerMissingFieldsMessage(
   missingFields: string[],
   mention?: PassengerMention,
 ) {
-  const labels = formatPassengerMissingFieldLabels(missingFields);
+  const labels = Array.from(
+    new Set(formatPassengerMissingFieldLabels(missingFields)),
+  );
   const knownLines = formatKnownPassengerDraftLines(mention);
   const sampleLines = buildPassengerQuickInputExamples(mention);
 
@@ -324,9 +357,9 @@ export function formatNewPassengerMissingFieldsMessage(
     '',
     ...knownLines,
     knownLines.length > 0 ? '' : null,
-    `Còn thiếu: ${labels.join(', ')}.`,
+    `Cần: ${labels.join(', ')}.`,
     '',
-    'Vui lòng gửi theo một trong các mẫu:',
+    'Gửi theo mẫu:',
     ...sampleLines,
     '',
     'Ngày sinh không bắt buộc, chỉ thêm khi cần.',
@@ -417,11 +450,13 @@ export function formatPassengerHoldNeedsReviewMessage(message: string) {
  */
 export function formatPassengerHoldFailedMessage(message: string) {
   return [
-    'Không thể tự động giữ chỗ trên 1Booking.',
+    'Chưa giữ chỗ được trên 1Booking.',
     '',
-    message,
+    formatPassengerHoldFailureReason(message),
     '',
-    'Mình sẽ gửi screenshot lỗi bên dưới nếu có.',
+    'Vui lòng kiểm tra lại thông tin khách/chuyến rồi thử lại.',
+    '',
+    'Mình gửi screenshot bên dưới để bạn đối chiếu nếu có.',
   ].join('\n');
 }
 
@@ -430,9 +465,11 @@ export function formatPassengerHoldFailedMessage(message: string) {
  */
 export function formatPassengerParserFailedMessage() {
   return [
-    'Không thể phân tích thông tin khách bằng AI parser.',
+    'Mình chưa phân tích được thông tin khách.',
     '',
-    'Vui lòng kiểm tra OPENAI_API_KEY và thử lại.',
+    'Vui lòng gửi theo mẫu:',
+    'Nữ, Nguyễn Thị Oanh',
+    'Nam, Nguyễn Văn A',
   ].join('\n');
 }
 
@@ -440,7 +477,123 @@ export function formatPassengerParserFailedMessage() {
  * Formats the missing active-case instruction for passenger messages.
  */
 export function formatPassengerCaseRequiredMessage() {
-  return 'Vui lòng gửi kèm case BK-YYYYMMDD-HHMMSS hoặc chọn chuyến trước.';
+  return [
+    'Mình chưa biết đang thao tác case nào.',
+    '',
+    'Vui lòng gửi theo mẫu:',
+    'BK-YYYYMMDD-HHMMSS lấy khách Nữ, Nguyễn Thị Oanh',
+    'hoặc chọn chuyến trước rồi gửi: Nữ, Nguyễn Thị Oanh',
+  ].join('\n');
+}
+
+/**
+ * Formats an explicit case that cannot receive passenger info yet.
+ */
+export function formatPassengerCaseNotReadyMessage(caseId: string) {
+  return [
+    `Case ${caseId} chưa sẵn sàng để nhận thông tin khách.`,
+    '',
+    'Vui lòng chọn chuyến trước, rồi gửi khách theo mẫu:',
+    'Nữ, Nguyễn Thị Oanh',
+  ].join('\n');
+}
+
+/**
+ * Formats a missing local passenger profile selected from stale buttons.
+ */
+export function formatPassengerProfileMissingMessage() {
+  return [
+    'Mình không tìm thấy khách này trong dữ liệu local.',
+    '',
+    'Vui lòng gửi lại tên khách theo mẫu:',
+    'Nữ, Nguyễn Thị Oanh',
+  ].join('\n');
+}
+
+/**
+ * Formats a passenger message that the parser could not turn into a mention.
+ */
+export function formatPassengerMentionMissingMessage(isRejectIntent: boolean) {
+  return isRejectIntent
+    ? [
+        'Mình chưa biết cần tìm khách nào khác.',
+        '',
+        'Vui lòng gửi lại theo mẫu:',
+        'tìm khách Nguyễn Thị Oanh khác',
+      ].join('\n')
+    : [
+        'Mình chưa nhận ra tên khách.',
+        '',
+        'Vui lòng gửi lại theo mẫu:',
+        'Nữ, Nguyễn Thị Oanh',
+      ].join('\n');
+}
+
+/**
+ * Formats an explicit local hold recovery syntax error.
+ */
+export function formatHoldRecoveryParseFailedMessage() {
+  return [
+    'Mình chưa hiểu lệnh recover hold.',
+    '',
+    'Vui lòng gửi đúng mẫu:',
+    'recover BK-YYYYMMDD-HHMMSS PNR ABC123',
+  ].join('\n');
+}
+
+/**
+ * Formats a local hold recovery failure without leaking raw service wording.
+ */
+export function formatHoldRecoveryFailedMessage(message: string) {
+  if (/PNR .*không hợp lệ|PNR phải/i.test(message)) {
+    return [
+      'PNR chưa đúng định dạng.',
+      '',
+      'PNR cần gồm 6 ký tự chữ/số, ví dụ:',
+      'recover BK-YYYYMMDD-HHMMSS PNR ABC123',
+    ].join('\n');
+  }
+
+  if (/không tìm thấy case/i.test(message)) {
+    return [
+      'Mình không tìm thấy case cần recover.',
+      '',
+      'Vui lòng kiểm tra lại mã case và gửi:',
+      'recover BK-YYYYMMDD-HHMMSS PNR ABC123',
+    ].join('\n');
+  }
+
+  return [
+    'Chưa thể recover hold cho case này.',
+    '',
+    'Chỉ recover khi case đang cần kiểm tra hold hoặc đã hold nhưng thiếu PNR.',
+  ].join('\n');
+}
+
+/**
+ * Converts internal field names into short operator-facing Vietnamese labels.
+ */
+export function formatOperatorFieldLabels(fields: string[]) {
+  return fields.map((field) => {
+    if (field === 'departureTime') return 'giờ bay';
+    if (field === 'caseId') return 'mã case';
+    if (field === 'bookingClass') return 'hạng đặt chỗ';
+    if (field === 'fromAirportCode' || field === 'fromAirportText') {
+      return 'sân bay đi';
+    }
+    if (field === 'toAirportCode' || field === 'toAirportText') {
+      return 'sân bay đến';
+    }
+    if (field === 'departureDate' || field === 'departureDate:YYYY-MM-DD') {
+      return 'ngày bay';
+    }
+    if (field === 'returnDate') return 'ngày về';
+    if (field === 'fullName') return 'họ tên';
+    if (field === 'gender') return 'giới tính';
+    if (field === 'dob') return 'ngày sinh';
+
+    return field;
+  });
 }
 
 function formatPassengerSummaryLines(profile: PassengerProfile) {
@@ -461,13 +614,9 @@ function formatPassengerSummaryLines(profile: PassengerProfile) {
  * Converts internal passenger field names into operator-facing Vietnamese.
  */
 function formatPassengerMissingFieldLabels(missingFields: string[]) {
-  return missingFields.map((field) => {
-    if (field === 'fullName') return 'họ tên đầy đủ';
-    if (field === 'gender') return 'giới tính';
-    if (field === 'dob') return 'ngày sinh';
-
-    return field;
-  });
+  return formatOperatorFieldLabels(missingFields).map((label) =>
+    label === 'họ tên' ? 'họ tên đầy đủ' : label,
+  );
 }
 
 /**
@@ -531,4 +680,91 @@ function formatSelectionBookingClass(
   return bookingClass
     ? `${BOOKING_CLASS_LABELS[bookingClass]} (${bookingClass})`
     : 'Không chỉ định - sẽ chọn chuyến duy nhất khớp giờ/hãng';
+}
+
+function formatSearchFailureReason(message?: string) {
+  if (message && /auth session expired|login is required|đăng nhập/i.test(message)) {
+    return 'Phiên 1Booking có thể vừa hết hạn. Bot sẽ tự đăng nhập lại khi flow cho phép.';
+  }
+
+  if (message && /loading|timeout|load|still/i.test(message)) {
+    return '1Booking tải kết quả quá lâu hoặc chưa trả danh sách chuyến ổn định.';
+  }
+
+  return 'Có thể 1Booking chưa trả kết quả ổn định hoặc không có chuyến phù hợp.';
+}
+
+function formatFlightSelectionFailureReason(
+  message: string,
+  input?: SelectMatchingFlightInput,
+) {
+  if (/case .*not found|không tìm thấy case/i.test(message)) {
+    return 'Mình không tìm thấy mã case này trong dữ liệu local.';
+  }
+
+  if (/no saved search input|chưa có searchInput/i.test(message)) {
+    return 'Case này chưa có kết quả tìm chuyến đã lưu. Vui lòng search chuyến trước.';
+  }
+
+  if (/multiple matching|Found \d+ matching/i.test(message)) {
+    return [
+      'Có nhiều chuyến cùng khớp thông tin đã gửi.',
+      '',
+      'Vui lòng thêm hạng đặt chỗ hoặc hãng rõ hơn.',
+    ].join('\n');
+  }
+
+  if (input && /No available flight matched/i.test(message)) {
+    return [
+      'Mình không thấy chuyến khớp:',
+      `Hãng: ${formatSelectionAirline(input)}`,
+      `Giờ bay: ${input.departureTime}`,
+      `Hạng: ${formatSelectionBookingClassShort(input.bookingClass)}`,
+    ].join('\n');
+  }
+
+  return 'Danh sách chuyến live trên 1Booking không khớp với thông tin vừa gửi.';
+}
+
+function formatPassengerHoldFailureReason(message: string) {
+  if (/auth session expired|login is required|đăng nhập/i.test(message)) {
+    return 'Phiên 1Booking có thể vừa hết hạn trước khi giữ chỗ.';
+  }
+
+  if (/passenger|gender|full name|quick input|Nhập nhanh/i.test(message)) {
+    return '1Booking chưa nhận đúng thông tin khách trong form.';
+  }
+
+  if (/timeout|locator|waitFor/i.test(message)) {
+    return '1Booking chưa xác nhận kịp trạng thái trên màn hình.';
+  }
+
+  return 'Automation chưa hoàn tất được bước nhập khách hoặc giữ chỗ.';
+}
+
+function buildFlightSelectionRetryExample(input?: SelectMatchingFlightInput) {
+  const airline = input?.airlineName ?? input?.airlineCode ?? 'Vietjet';
+  const time = input?.departureTime ?? '13:30';
+
+  if (input?.bookingClass) {
+    return `case này chọn chuyến ${airline} ${time} hạng Deluxe`;
+  }
+
+  return `case này chọn chuyến ${airline} ${time}`;
+}
+
+function formatSelectionAirline(input: SelectMatchingFlightInput) {
+  if (input.airlineName && input.airlineCode) {
+    return `${input.airlineName} (${input.airlineCode})`;
+  }
+
+  return 'Chưa chỉ định';
+}
+
+function formatSelectionBookingClassShort(
+  bookingClass: keyof typeof BOOKING_CLASS_LABELS | null,
+) {
+  return bookingClass
+    ? `${BOOKING_CLASS_LABELS[bookingClass]} (${bookingClass})`
+    : 'Chưa chỉ định';
 }
