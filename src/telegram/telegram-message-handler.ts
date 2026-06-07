@@ -53,6 +53,7 @@ import {
   type TelegramPassengerResolutionOutcome,
 } from './telegram-passenger-message-handler';
 import { createTelegramScreenshotArchive } from './telegram-screenshot-archive';
+import { PassengerProfile } from '../passengers/passenger-types';
 
 /**
  * Handles one incoming Telegram message from an operator.
@@ -313,7 +314,7 @@ export async function handleTelegramMessage(
 
   const result = await searchOneBookingFlights(searchInput, {
     onAuthRefresh: () =>
-      bot.sendMessage(chatId, formatOneBookingAuthRefreshStartedMessage()),
+      Promise.resolve(void bot.sendMessage(chatId, formatOneBookingAuthRefreshStartedMessage())),
   });
 
   if (!result.ok) {
@@ -474,7 +475,7 @@ async function handleTelegramFlightSelection(
 
   const result = await selectMatchingOneBookingFlight(selectionInput, {
     onAuthRefresh: () =>
-      bot.sendMessage(chatId, formatOneBookingAuthRefreshStartedMessage()),
+      Promise.resolve(void bot.sendMessage(chatId, formatOneBookingAuthRefreshStartedMessage())),
   });
 
   if (!result.ok) {
@@ -559,7 +560,7 @@ async function handleTelegramFlightSelection(
       formatCombinedSelectionPassengerReadyMessage(
         currentCase.caseId,
         result.result.selectedFlight,
-        currentCase.attachedPassenger,
+        currentCase.attachedPassenger as PassengerProfile,
       ),
     );
     await runAutomaticPassengerHold(bot, chatId, currentCase, {
