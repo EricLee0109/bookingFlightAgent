@@ -201,6 +201,43 @@ export function formatFlightSelectionFailedMessage(message: string) {
 }
 
 /**
+ * Formats the combined flow checkpoint before automatic fill and hold starts.
+ */
+export function formatCombinedSelectionPassengerReadyMessage(
+  caseId: string,
+  selectedFlight: FlightSelectionCandidate,
+  profile: PassengerProfile,
+) {
+  return [
+    `Đã chọn chuyến và gắn khách vào case ${caseId}.`,
+    '',
+    `Chuyến: ${selectedFlight.airlineName} ${selectedFlight.flightNumber}`,
+    `Giờ bay: ${selectedFlight.departureTime}${
+      selectedFlight.arrivalTime ? ` - ${selectedFlight.arrivalTime}` : ''
+    }`,
+    `Khách: ${profile.normalizedFullName}`,
+    '',
+    'Mình sẽ tự động nhập thông tin và giữ chỗ trên 1Booking.',
+  ].join('\n');
+}
+
+/**
+ * Formats the case where passenger data is saved but flight selection failed.
+ */
+export function formatPassengerReadySelectionStillNeededMessage(
+  caseId: string,
+  profile: PassengerProfile,
+) {
+  return [
+    `Đã lưu khách vào case ${caseId}.`,
+    '',
+    ...formatPassengerSummaryLines(profile),
+    '',
+    'Chưa chọn được chuyến. Vui lòng chọn lại chuyến bay cho case này.',
+  ].join('\n');
+}
+
+/**
  * Formats a ready local passenger candidate before final operator confirmation.
  */
 export function formatPassengerMatchedMessage(profile: PassengerProfile) {

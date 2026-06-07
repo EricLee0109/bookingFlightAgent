@@ -48,6 +48,37 @@ type LocalPassengerReadyCase = NonNullable<
   Awaited<ReturnType<typeof readLocalFlightCase>>
 >;
 
+export type TelegramPassengerResolutionOutcome =
+  | {
+      status: 'not_attempted';
+      flightCase: LocalPassengerReadyCase;
+    }
+  | {
+      status: 'parser_failed';
+      flightCase: LocalPassengerReadyCase;
+      message: string;
+    }
+  | {
+      status: 'no_mention';
+      flightCase: LocalPassengerReadyCase;
+      intent: string;
+    }
+  | {
+      status: 'ready';
+      flightCase: LocalPassengerReadyCase;
+      profile: PassengerProfile;
+    }
+  | {
+      status: 'resolved';
+      flightCase: LocalPassengerReadyCase;
+      result: PassengerMentionResolutionResult;
+    };
+
+export type ResolvePassengerMessageForCaseOptions = {
+  autoConfirmReadyPassenger?: boolean;
+  pendingPassengerProfileIds?: number[];
+};
+
 /**
  * Telegram passenger conversation component.
  *
@@ -131,7 +162,7 @@ export async function tryHandleTelegramPassengerMessage(
   const caseId = explicitCaseId ?? context?.activeCaseId;
 
   if (!caseId) {
-    if (looksLikePassengerMessage(rawMessage)) {
+    if (messageLooksLikePassengerInfo(rawMessage)) {
       await bot.sendMessage(chatId, formatPassengerCaseRequiredMessage());
       return true;
     }
@@ -142,7 +173,7 @@ export async function tryHandleTelegramPassengerMessage(
   const existingCase = await readLocalFlightCase(caseId);
 
   if (!existingCase || !isPassengerReadyCaseStatus(existingCase.status)) {
-    if (explicitCaseId && looksLikePassengerMessage(rawMessage)) {
+    if (explicitCaseId && messageLooksLikePassengerInfo(rawMessage)) {
       await bot.sendMessage(
         chatId,
         `Case ${caseId} chưa sẵn sàng để nhận thông tin khách.`,
@@ -155,24 +186,63 @@ export async function tryHandleTelegramPassengerMessage(
 
   setActivePassengerCase(chatId, caseId);
 
+  const outcome = await resolvePassengerMessageForCase(
+    rawMessage,
+    existingCase,
+    {
+      pendingPassengerProfileIds: context?.pendingPassengerProfileIds,
+    },
+  );
+
+  await renderPassengerResolutionOutcome(bot, chatId, outcome, {
+    holdWhenReady: true,
+  });
+
+  return true;
+}
+
+/**
+ * Parses and resolves one passenger message against a known local case.
+ *
+ * This helper is shared by passenger-only Telegram messages and by the combined
+ * select-flight + passenger flow. It updates local case memory but does not send
+ * Telegram messages or run Playwright by itself.
+ */
+export async function resolvePassengerMessageForCase(
+  rawMessage: string,
+  existingCase: LocalPassengerReadyCase,
+  options: ResolvePassengerMessageForCaseOptions = {},
+): Promise<TelegramPassengerResolutionOutcome> {
+  if (!messageLooksLikePassengerInfo(rawMessage)) {
+    return {
+      status: 'not_attempted',
+      flightCase: existingCase,
+    };
+  }
+
   let parsedPassengerMessage;
 
   try {
     const parser = createOpenAIPassengerMessageParser();
     parsedPassengerMessage = await parser.parse(rawMessage);
   } catch (error) {
-    await updateLocalFlightCase(existingCase, {
+    const currentCase = await updateLocalFlightCase(existingCase, {
       status: 'PASSENGER_INFO_FAILED',
       passengerErrorMessage:
         error instanceof Error ? error.message : 'Passenger parser failed.',
     });
-    await bot.sendMessage(chatId, formatPassengerParserFailedMessage());
-    return true;
+
+    return {
+      status: 'parser_failed',
+      flightCase: currentCase,
+      message:
+        error instanceof Error ? error.message : 'Passenger parser failed.',
+    };
   }
 
   const previousPassengerMention =
     existingCase.parsedPassengerMessage?.passengerMentions[0];
-  const pendingProfileIds = context?.pendingPassengerProfileIds ?? [];
+  const pendingProfileIds = options.pendingPassengerProfileIds ?? [];
 
   let currentCase = await updateLocalFlightCase(existingCase, {
     status: 'PASSENGER_INFO_RECEIVED',
@@ -183,34 +253,42 @@ export async function tryHandleTelegramPassengerMessage(
   });
 
   if (parsedPassengerMessage.intent === 'confirm_passenger') {
-    if (pendingProfileIds.length !== 1) {
-      await bot.sendMessage(chatId, 'Vui lòng chọn đúng khách trước khi xác nhận.');
-      return true;
-    }
-
-    await withPassengerResolutionService(async (service) => {
-      const profile = service.getProfile(pendingProfileIds[0]);
+    return await withPassengerResolutionService(async (service) => {
+      const profile =
+        pendingProfileIds.length === 1
+          ? service.getProfile(pendingProfileIds[0])
+          : null;
 
       if (!profile) {
-        await bot.sendMessage(chatId, 'Không tìm thấy passenger profile local.');
-        return;
+        return {
+          status: 'no_mention',
+          flightCase: currentCase,
+          intent: parsedPassengerMessage.intent,
+        } satisfies TelegramPassengerResolutionOutcome;
       }
 
-      await attachConfirmedPassenger(bot, chatId, currentCase, service, profile);
+      const updatedCase = await attachPassengerToCaseMemory(
+        currentCase,
+        service,
+        profile,
+      );
+
+      return {
+        status: 'ready',
+        flightCase: updatedCase,
+        profile,
+      } satisfies TelegramPassengerResolutionOutcome;
     });
-    return true;
   }
 
   const mention = parsedPassengerMessage.passengerMentions[0];
 
   if (!mention) {
-    await bot.sendMessage(
-      chatId,
-      parsedPassengerMessage.intent === 'reject_passenger'
-        ? 'Vui lòng cho mình tên khách khác cần tìm.'
-        : 'Mình chưa nhận ra tên khách. Vui lòng nhập lại họ tên khách.',
-    );
-    return true;
+    return {
+      status: 'no_mention',
+      flightCase: currentCase,
+      intent: parsedPassengerMessage.intent,
+    };
   }
 
   const shouldMergeMention = shouldMergePassengerFollowUp(
@@ -235,7 +313,7 @@ export async function tryHandleTelegramPassengerMessage(
     });
   }
 
-  await withPassengerResolutionService(async (service) => {
+  return await withPassengerResolutionService(async (service) => {
     const result = service.resolveMention(effectiveMention, {
       caseId: currentCase.caseId,
       excludeProfileIds:
@@ -250,24 +328,62 @@ export async function tryHandleTelegramPassengerMessage(
     });
 
     if (
-      parsedPassengerMessage.intent === 'update_passenger_fields' &&
+      options.autoConfirmReadyPassenger &&
       result.status === 'matched' &&
-      currentCase.attachedPassenger?.id === result.profile.id
+      result.missingFields.length === 0
     ) {
-      await attachConfirmedPassenger(
-        bot,
-        chatId,
+      const updatedCase = await attachPassengerToCaseMemory(
         currentCase,
         service,
         result.profile,
       );
-      return;
+
+      return {
+        status: 'ready',
+        flightCase: updatedCase,
+        profile: result.profile,
+      } satisfies TelegramPassengerResolutionOutcome;
     }
 
-    await renderPassengerResolution(bot, chatId, currentCase, service, result);
-  });
+    if (result.status === 'passenger_ready') {
+      const updatedCase = await updateLocalFlightCase(currentCase, {
+        status: 'PASSENGER_INFO_CONFIRMED',
+        attachedPassenger: result.profile,
+        attachedPassengerInfo: result.passengerInfo,
+        passengerErrorMessage: undefined,
+      });
 
-  return true;
+      return {
+        status: 'ready',
+        flightCase: updatedCase,
+        profile: result.profile,
+      } satisfies TelegramPassengerResolutionOutcome;
+    }
+
+    if (
+      parsedPassengerMessage.intent === 'update_passenger_fields' &&
+      result.status === 'matched' &&
+      currentCase.attachedPassenger?.id === result.profile.id
+    ) {
+      const updatedCase = await attachPassengerToCaseMemory(
+        currentCase,
+        service,
+        result.profile,
+      );
+
+      return {
+        status: 'ready',
+        flightCase: updatedCase,
+        profile: result.profile,
+      } satisfies TelegramPassengerResolutionOutcome;
+    }
+
+    return {
+      status: 'resolved',
+      flightCase: currentCase,
+      result,
+    } satisfies TelegramPassengerResolutionOutcome;
+  });
 }
 
 /**
@@ -289,6 +405,64 @@ export function mergePassengerMentions(
     gender: nextMention.gender ?? previousMention.gender,
     dob: nextMention.dob ?? previousMention.dob,
   };
+}
+
+/**
+ * Renders a passenger resolution outcome and optionally starts hold automation.
+ */
+export async function renderPassengerResolutionOutcome(
+  bot: TelegramBot,
+  chatId: number,
+  outcome: TelegramPassengerResolutionOutcome,
+  options: {
+    holdWhenReady: boolean;
+  },
+) {
+  if (outcome.status === 'not_attempted') {
+    return;
+  }
+
+  if (outcome.status === 'parser_failed') {
+    await bot.sendMessage(chatId, formatPassengerParserFailedMessage());
+    return;
+  }
+
+  if (outcome.status === 'no_mention') {
+    await bot.sendMessage(
+      chatId,
+      outcome.intent === 'reject_passenger'
+        ? 'Vui lòng cho mình tên khách khác cần tìm.'
+        : 'Mình chưa nhận ra tên khách. Vui lòng nhập lại họ tên khách.',
+    );
+    return;
+  }
+
+  if (outcome.status === 'ready') {
+    setPendingPassengerProfiles(chatId, outcome.flightCase.caseId, [
+      outcome.profile.id,
+    ]);
+    await bot.sendMessage(
+      chatId,
+      formatPassengerAttachedMessage(outcome.flightCase.caseId, outcome.profile),
+    );
+
+    if (options.holdWhenReady) {
+      await runAutomaticPassengerHold(bot, chatId, outcome.flightCase);
+    }
+
+    return;
+  }
+
+  await withPassengerResolutionService(async (service) => {
+    await renderPassengerResolution(
+      bot,
+      chatId,
+      outcome.flightCase,
+      service,
+      outcome.result,
+      options,
+    );
+  });
 }
 
 /**
@@ -335,7 +509,7 @@ function chooseMergedPassengerFullName(
 }
 
 function isCompletePassengerName(fullName: string | null) {
-  return fullName?.trim().split(/\s+/).filter(Boolean).length ?? 0 >= 2;
+  return (fullName?.trim().split(/\s+/).filter(Boolean).length ?? 0) >= 2;
 }
 
 /**
@@ -347,6 +521,11 @@ async function renderPassengerResolution(
   flightCase: LocalPassengerReadyCase,
   service: PassengerResolutionService,
   result: PassengerMentionResolutionResult,
+  options: {
+    holdWhenReady: boolean;
+  } = {
+    holdWhenReady: true,
+  },
 ) {
   if (result.status === 'new_passenger_missing_fields') {
     clearPendingPassengerProfiles(chatId);
@@ -376,7 +555,9 @@ async function renderPassengerResolution(
       chatId,
       formatPassengerAttachedMessage(flightCase.caseId, result.profile),
     );
-    await runAutomaticPassengerHold(bot, chatId, updatedCase);
+    if (options.holdWhenReady) {
+      await runAutomaticPassengerHold(bot, chatId, updatedCase);
+    }
     return;
   }
 
@@ -491,15 +672,11 @@ async function attachConfirmedPassenger(
     return;
   }
 
-  const updatedCase = await updateLocalFlightCase(flightCase, {
-    status: 'PASSENGER_INFO_CONFIRMED',
-    attachedPassenger: profile,
-    attachedPassengerInfo: service.attachPassengerToCase(
-      flightCase.caseId,
-      profile,
-    ).passengerInfo,
-    passengerErrorMessage: undefined,
-  });
+  const updatedCase = await attachPassengerToCaseMemory(
+    flightCase,
+    service,
+    profile,
+  );
   setPendingPassengerProfiles(chatId, flightCase.caseId, [profile.id]);
   await bot.sendMessage(
     chatId,
@@ -509,11 +686,33 @@ async function attachConfirmedPassenger(
 }
 
 /**
- * Runs automatic passenger fill and hold after passenger_ready confirmation.
+ * Persists a ready passenger on local case memory and SQLite case_passengers.
+ *
+ * This helper intentionally does not send Telegram messages or start browser
+ * automation, so combined selection/passenger flows can decide when to hold.
+ */
+async function attachPassengerToCaseMemory(
+  flightCase: LocalPassengerReadyCase,
+  service: PassengerResolutionService,
+  profile: PassengerProfile,
+) {
+  return await updateLocalFlightCase(flightCase, {
+    status: 'PASSENGER_INFO_CONFIRMED',
+    attachedPassenger: profile,
+    attachedPassengerInfo: service.attachPassengerToCase(
+      flightCase.caseId,
+      profile,
+    ).passengerInfo,
+    passengerErrorMessage: undefined,
+  });
+}
+
+/**
+ * Runs automatic passenger fill and hold after both flight and passenger exist.
  *
  * Success sends text only. Error screenshots remain enabled for local support.
  */
-async function runAutomaticPassengerHold(
+export async function runAutomaticPassengerHold(
   bot: TelegramBot,
   chatId: number,
   flightCase: LocalPassengerReadyCase,
@@ -575,13 +774,13 @@ async function runAutomaticPassengerHold(
   }
 }
 
-async function withPassengerResolutionService(
-  callback: (service: PassengerResolutionService) => Promise<void>,
+async function withPassengerResolutionService<T>(
+  callback: (service: PassengerResolutionService) => Promise<T>,
 ) {
   const store = new PassengerStore();
 
   try {
-    await callback(new PassengerResolutionService(store));
+    return await callback(new PassengerResolutionService(store));
   } finally {
     store.close();
   }
@@ -599,8 +798,27 @@ function isPassengerReadyCaseStatus(status: string) {
   ]).has(status);
 }
 
-function looksLikePassengerMessage(rawMessage: string) {
-  return /(dùng|dung|lấy|lay)\s+(chị|chi|anh|cô|co|chú|chu|bác|bac|em|bé|be|khách|khach)|khách\s+là|khach\s+la|sinh\s+\d|không\s+phải\s+khách|khong\s+phai\s+khach|đúng\s+rồi\s+dùng\s+khách|dung\s+khach/i.test(
+/**
+ * Detects whether a Telegram message contains passenger information.
+ */
+export function messageLooksLikePassengerInfo(rawMessage: string) {
+  const honorific =
+    '(?:chị|chi|anh|cô|co|chú|chu|bác|bac|em|bé|be|khách|khach)(?=\\s|$)';
+
+  return new RegExp(
+    [
+      `(?:dùng|dung|lấy|lay)\\s+${honorific}`,
+      `(?:cho|khách|khach)\\s+${honorific}`,
+      'khách\\s+là',
+      'khach\\s+la',
+      'sinh\\s+\\d',
+      'không\\s+phải\\s+khách',
+      'khong\\s+phai\\s+khach',
+      'đúng\\s+rồi\\s+dùng\\s+khách',
+      'dung\\s+khach',
+    ].join('|'),
+    'i',
+  ).test(
     rawMessage,
   );
 }

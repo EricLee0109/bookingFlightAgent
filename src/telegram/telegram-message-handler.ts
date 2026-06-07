@@ -15,11 +15,13 @@ import {
   createLocalFlightCase,
   readLocalFlightCase,
   updateLocalFlightCase,
+  type LocalFlightCase,
 } from '../storage/local-case-store';
 import { appendLocalLog } from '../storage/local-log-store';
 import { readLocalAgentSettings } from '../storage/local-settings-store';
 import { isAllowedTelegramOperator } from './telegram-access';
 import {
+  formatCombinedSelectionPassengerReadyMessage,
   formatFlightSelectionFailedMessage,
   formatFlightSelectionParseFailedMessage,
   formatLatestCaseFlightSelectionResolvedMessage,
@@ -27,6 +29,7 @@ import {
   formatFlightSelectionSuccessMessage,
   formatMissingFlightFieldsMessage,
   formatOneBookingAuthRefreshStartedMessage,
+  formatPassengerReadySelectionStillNeededMessage,
   formatParserFailedMessage,
   formatParsedRequestMessage,
   formatSearchFailedMessage,
@@ -39,7 +42,14 @@ import {
   setLatestFlightSearchCase,
 } from './telegram-flight-selection-context';
 import { setActivePassengerCase } from './telegram-passenger-context';
-import { tryHandleTelegramPassengerMessage } from './telegram-passenger-message-handler';
+import {
+  messageLooksLikePassengerInfo,
+  renderPassengerResolutionOutcome,
+  resolvePassengerMessageForCase,
+  runAutomaticPassengerHold,
+  tryHandleTelegramPassengerMessage,
+  type TelegramPassengerResolutionOutcome,
+} from './telegram-passenger-message-handler';
 import { createTelegramScreenshotArchive } from './telegram-screenshot-archive';
 
 /**
@@ -136,6 +146,7 @@ export async function handleTelegramMessage(
       chatId,
       telegramUserId,
       selectionParseResult.input,
+      text,
     );
     return;
   }
@@ -389,6 +400,7 @@ async function handleTelegramFlightSelection(
   chatId: number,
   telegramUserId: number,
   selectionInput: Parameters<typeof selectMatchingOneBookingFlight>[0],
+  rawMessage: string,
 ) {
   const existingCase = await readLocalFlightCase(selectionInput.caseId);
 
@@ -416,6 +428,18 @@ async function handleTelegramFlightSelection(
     status: 'CUSTOMER_SELECTED_OPTION',
     selectionErrorMessage: undefined,
   });
+  let passengerOutcome: TelegramPassengerResolutionOutcome | null = null;
+
+  if (messageLooksLikePassengerInfo(rawMessage)) {
+    passengerOutcome = await resolvePassengerMessageForCase(
+      rawMessage,
+      currentCase,
+      {
+        autoConfirmReadyPassenger: true,
+      },
+    );
+    currentCase = passengerOutcome.flightCase;
+  }
 
   await appendLocalLog({
     level: 'info',
@@ -457,6 +481,30 @@ async function handleTelegramFlightSelection(
 
     await bot.sendMessage(chatId, formatFlightSelectionFailedMessage(result.message));
 
+    if (passengerOutcome?.status === 'ready') {
+      await bot.sendMessage(
+        chatId,
+        formatPassengerReadySelectionStillNeededMessage(
+          passengerOutcome.flightCase.caseId,
+          passengerOutcome.profile,
+        ),
+      );
+    } else if (passengerOutcome && passengerOutcome.status !== 'not_attempted') {
+      await renderPassengerResolutionOutcome(
+        bot,
+        chatId,
+        rebasePassengerOutcomeCase(passengerOutcome, {
+          ...currentCase,
+          status: 'OPTION_MATCH_FAILED',
+          selectionErrorMessage: result.message,
+          selectionScreenshotPath: result.errorScreenshotPath ?? undefined,
+        }),
+        {
+          holdWhenReady: false,
+        },
+      );
+    }
+
     if (result.errorScreenshotPath) {
       await bot.sendPhoto(chatId, result.errorScreenshotPath, {
         caption: 'Screenshot lỗi khi chọn chuyến trên 1Booking.',
@@ -476,9 +524,6 @@ async function handleTelegramFlightSelection(
     selectedFlight,
     selectionScreenshotPath: result.result.screenshotPath,
   });
-  currentCase = await updateLocalFlightCase(currentCase, {
-    status: 'AWAITING_PASSENGER_INFO',
-  });
   setActivePassengerCase(chatId, currentCase.caseId);
   await appendLocalLog({
     level: 'info',
@@ -491,6 +536,23 @@ async function handleTelegramFlightSelection(
     },
   });
 
+  if (hasReadyPassengerForCombinedHold(currentCase)) {
+    await bot.sendMessage(
+      chatId,
+      formatCombinedSelectionPassengerReadyMessage(
+        currentCase.caseId,
+        result.result.selectedFlight,
+        currentCase.attachedPassenger,
+      ),
+    );
+    await runAutomaticPassengerHold(bot, chatId, currentCase);
+    return;
+  }
+
+  currentCase = await updateLocalFlightCase(currentCase, {
+    status: 'AWAITING_PASSENGER_INFO',
+  });
+
   await bot.sendMessage(
     chatId,
     formatFlightSelectionSuccessMessage(result.result.selectedFlight),
@@ -499,4 +561,44 @@ async function handleTelegramFlightSelection(
     caption:
       'Screenshot sau khi bấm Giữ chỗ và vào màn hình thông tin khách hàng.',
   });
+
+  if (passengerOutcome && passengerOutcome.status !== 'not_attempted') {
+    await renderPassengerResolutionOutcome(
+      bot,
+      chatId,
+      rebasePassengerOutcomeCase(passengerOutcome, currentCase),
+      {
+        holdWhenReady: false,
+      },
+    );
+  }
+}
+
+/**
+ * Repoints a passenger outcome at the latest case snapshot before rendering.
+ */
+function rebasePassengerOutcomeCase(
+  outcome: TelegramPassengerResolutionOutcome,
+  flightCase: LocalFlightCase | null,
+) {
+  if (!flightCase) {
+    return outcome;
+  }
+
+  return {
+    ...outcome,
+    flightCase,
+  } as TelegramPassengerResolutionOutcome;
+}
+
+/**
+ * Decides whether a selected-flight case can immediately continue to hold.
+ */
+export function hasReadyPassengerForCombinedHold(
+  flightCase: Pick<
+    LocalFlightCase,
+    'attachedPassenger' | 'attachedPassengerInfo'
+  >,
+) {
+  return Boolean(flightCase.attachedPassenger && flightCase.attachedPassengerInfo);
 }

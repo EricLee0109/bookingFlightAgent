@@ -51,7 +51,11 @@ import {
   formatPassengerMissingFieldsMessage,
 } from '../src/telegram/telegram-formatters';
 import { parseHoldRecoveryMessage } from '../src/telegram/telegram-hold-recovery';
-import { mergePassengerMentions } from '../src/telegram/telegram-passenger-message-handler';
+import {
+  mergePassengerMentions,
+  messageLooksLikePassengerInfo,
+} from '../src/telegram/telegram-passenger-message-handler';
+import { hasReadyPassengerForCombinedHold } from '../src/telegram/telegram-message-handler';
 import { type LocalFlightCase } from '../src/storage/local-case-store';
 
 const TEST_DIR = path.resolve(
@@ -836,6 +840,54 @@ function testTelegramPassengerContextAndRouting() {
       isSelectionMessage: false,
     },
   );
+  assert.equal(
+    messageLooksLikePassengerInfo('case này lấy chuyến 13h30 Vietjet cho chị Oanh'),
+    true,
+  );
+  assert.equal(
+    messageLooksLikePassengerInfo('case này lấy chuyến 13h30 Vietjet'),
+    false,
+  );
+}
+
+/**
+ * Verifies combined flow only auto-holds after passenger data is attached.
+ */
+function testCombinedSelectionPassengerHoldReadiness() {
+  assert.equal(
+    hasReadyPassengerForCombinedHold({
+      attachedPassenger: undefined,
+      attachedPassengerInfo: undefined,
+    }),
+    false,
+  );
+  assert.equal(
+    hasReadyPassengerForCombinedHold({
+      attachedPassenger: {
+        id: 1,
+        passengerType: 0,
+        lastName: 'NGUYEN',
+        firstName: 'THI OANH',
+        title: 'MS',
+        gender: false,
+        dateOfBirth: null,
+        source: 'operator_input',
+        normalizedLastName: 'NGUYEN',
+        normalizedFirstName: 'THI OANH',
+        normalizedFullName: 'NGUYEN THI OANH',
+        seenCount: 1,
+        createdAt: '2026-06-07T00:00:00.000Z',
+        updatedAt: '2026-06-07T00:00:00.000Z',
+      },
+      attachedPassengerInfo: {
+        gender: 'F',
+        lastName: 'NGUYEN',
+        firstName: 'THI OANH',
+        dob: null,
+      },
+    }),
+    true,
+  );
 }
 
 async function main() {
@@ -857,6 +909,7 @@ async function main() {
   await testPassengerHoldRecovery();
   testPassengerHoldTelegramMessages();
   testTelegramPassengerContextAndRouting();
+  testCombinedSelectionPassengerHoldReadiness();
 
   console.log('Passenger message parser contract tests passed.');
 }

@@ -151,7 +151,9 @@ function extractDepartureTime(rawMessage: string) {
 function mentionsFlightSelection(rawMessage: string) {
   const normalized = normalizeVietnameseText(rawMessage);
 
-  return /\b(chon\s+chuyen|chon\s+flight|flight)\b/.test(normalized);
+  return /\b(chon\s+chuyen|lay\s+chuyen|lay\s+flight|chon\s+flight|flight)\b/.test(
+    normalized,
+  );
 }
 
 /**

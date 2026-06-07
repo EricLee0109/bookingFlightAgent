@@ -257,6 +257,29 @@ function testFlightSelectionParserUsesLatestCaseContext() {
 }
 
 /**
+ * Verifies combined passenger wording still parses the selected flight only.
+ */
+function testFlightSelectionParserAcceptsCombinedPassengerMessage() {
+  const result = parseFlightSelectionMessage(
+    'case này lấy chuyến 13h30 Vietjet cho chị Oanh',
+    {
+      latestCaseId: 'BK-20260607-141109',
+    },
+  );
+
+  assert.equal(result.isSelectionMessage, true);
+
+  if (!result.isSelectionMessage || !result.ok) {
+    throw new Error('Expected valid combined selection parse result.');
+  }
+
+  assert.equal(result.input.caseId, 'BK-20260607-141109');
+  assert.equal(result.input.airlineCode, 'VJ');
+  assert.equal(result.input.departureTime, '13:30');
+  assert.equal(result.input.bookingClass, null);
+}
+
+/**
  * Verifies `case nay` asks for a case id when no latest search context exists.
  */
 function testFlightSelectionParserRequiresLatestCaseContext() {
@@ -577,6 +600,7 @@ async function main() {
   testFlightSelectionParserBookingClassAliases();
   testFlightSelectionParserRejectsMissingFields();
   testFlightSelectionParserUsesLatestCaseContext();
+  testFlightSelectionParserAcceptsCombinedPassengerMessage();
   testFlightSelectionParserRequiresLatestCaseContext();
   testLatestFlightSearchCaseContext();
   testFlightSelectionMatcher();
