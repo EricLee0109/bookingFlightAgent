@@ -163,6 +163,20 @@ export function formatLatestCaseFlightSelectionResolvedMessage(
 }
 
 /**
+ * Formats one compact progress message for combined select-flight/passenger.
+ */
+export function formatCombinedFlightSelectionProgressMessage(
+  input: SelectMatchingFlightInput,
+) {
+  const airline =
+    input.airlineName && input.airlineCode
+      ? `${input.airlineName} ${input.airlineCode}`
+      : 'chuyến phù hợp';
+
+  return `Đang xử lý case ${input.caseId}: chọn ${airline} ${input.departureTime} và kiểm tra khách...`;
+}
+
+/**
  * Formats a successful selected-flight confirmation.
  *
  * Flight number is shown only after automation reads it from the matched card.
@@ -205,19 +219,12 @@ export function formatFlightSelectionFailedMessage(message: string) {
  */
 export function formatCombinedSelectionPassengerReadyMessage(
   caseId: string,
-  selectedFlight: FlightSelectionCandidate,
-  profile: PassengerProfile,
+  _selectedFlight: FlightSelectionCandidate,
+  _profile: PassengerProfile,
 ) {
   return [
-    `Đã chọn chuyến và gắn khách vào case ${caseId}.`,
-    '',
-    `Chuyến: ${selectedFlight.airlineName} ${selectedFlight.flightNumber}`,
-    `Giờ bay: ${selectedFlight.departureTime}${
-      selectedFlight.arrivalTime ? ` - ${selectedFlight.arrivalTime}` : ''
-    }`,
-    `Khách: ${profile.normalizedFullName}`,
-    '',
-    'Mình sẽ tự động nhập thông tin và giữ chỗ trên 1Booking.',
+    `Đã chọn chuyến và nhận khách cho case ${caseId}.`,
+    'Mình đang giữ chỗ trên 1Booking...',
   ].join('\n');
 }
 
@@ -372,10 +379,13 @@ export function formatPassengerHoldSuccessMessage(
   pnrWarning?: string,
 ) {
   return [
-    `Đã giữ chỗ thành công cho case ${caseId}.`,
+    'GIỮ CHỖ THÀNH CÔNG',
     '',
-    'Trạng thái: successful_hold.',
-    pnrCode ? `PNR: ${pnrCode}` : 'PNR: Chưa extract được.',
+    'PNR',
+    pnrCode ?? 'Chưa extract được',
+    '',
+    `Case: ${caseId}`,
+    'Trạng thái: successful_hold',
     pnrWarning ? `Lưu ý: ${pnrWarning}` : null,
   ]
     .filter(Boolean)

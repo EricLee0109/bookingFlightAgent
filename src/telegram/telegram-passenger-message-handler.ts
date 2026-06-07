@@ -716,11 +716,16 @@ export async function runAutomaticPassengerHold(
   bot: TelegramBot,
   chatId: number,
   flightCase: LocalPassengerReadyCase,
+  options: {
+    skipProgressMessage?: boolean;
+  } = {},
 ) {
-  await bot.sendMessage(
-    chatId,
-    formatPassengerHoldRunningMessage(flightCase.caseId),
-  );
+  if (!options.skipProgressMessage) {
+    await bot.sendMessage(
+      chatId,
+      formatPassengerHoldRunningMessage(flightCase.caseId),
+    );
+  }
 
   const result = await fillPassengerAndHoldOneBookingCase(flightCase.caseId, {
     onAuthRefresh: () =>

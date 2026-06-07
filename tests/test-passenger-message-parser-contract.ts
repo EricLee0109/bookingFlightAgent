@@ -45,6 +45,8 @@ import {
   parsePassengerCallbackData,
 } from '../src/telegram/telegram-passenger-keyboards';
 import {
+  formatCombinedFlightSelectionProgressMessage,
+  formatCombinedSelectionPassengerReadyMessage,
   formatNewPassengerMissingFieldsMessage,
   formatPassengerHoldNeedsReviewMessage,
   formatPassengerHoldSuccessMessage,
@@ -804,22 +806,74 @@ async function testPassengerHoldRecovery() {
  * Verifies Telegram success includes PNR or a non-retry manual-check warning.
  */
 function testPassengerHoldTelegramMessages() {
-  assert.match(
-    formatPassengerHoldSuccessMessage('BK-20260602-133338', 'VNT56E'),
-    /PNR: VNT56E/,
+  const successMessage = formatPassengerHoldSuccessMessage(
+    'BK-20260602-133338',
+    'VNT56E',
   );
-  assert.match(
-    formatPassengerHoldSuccessMessage(
+  const missingPnrMessage = formatPassengerHoldSuccessMessage(
       'BK-20260602-133338',
       null,
       'Please check the existing order manually.',
-    ),
-    /PNR: Chưa extract được/,
   );
+
+  assert.match(successMessage, /^GIỮ CHỖ THÀNH CÔNG/);
+  assert.match(successMessage, /\nPNR\nVNT56E\n/);
+  assert.ok(successMessage.indexOf('PNR') < successMessage.indexOf('Case:'));
+  assert.match(missingPnrMessage, /\nPNR\nChưa extract được\n/);
   assert.match(
     formatPassengerHoldNeedsReviewMessage('Order page timed out.'),
     /tránh giữ chỗ trùng/,
   );
+}
+
+/**
+ * Verifies compact combined-flow messages avoid dense intermediate details.
+ */
+function testCompactCombinedTelegramMessages() {
+  const progressMessage = formatCombinedFlightSelectionProgressMessage({
+    caseId: 'BK-20260607-224410',
+    airlineCode: 'VJ',
+    airlineName: 'Vietjet Air',
+    departureTime: '13:30',
+    bookingClass: null,
+  });
+  const readyMessage = formatCombinedSelectionPassengerReadyMessage(
+    'BK-20260607-224410',
+    {
+      cardIndex: 1,
+      airlineCode: 'VJ',
+      airlineName: 'Vietjet Air',
+      flightNumber: 'VJ638',
+      departureTime: '13:30',
+      arrivalTime: '14:50',
+      bookingClass: 'DLX',
+      priceText: 'VND 1,504,200',
+    },
+    {
+      id: 1,
+      passengerType: 0,
+      lastName: 'NGUYEN',
+      firstName: 'THI LANH',
+      title: 'MS',
+      gender: false,
+      dateOfBirth: null,
+      source: 'operator_input',
+      normalizedLastName: 'NGUYEN',
+      normalizedFirstName: 'THI LANH',
+      normalizedFullName: 'NGUYEN THI LANH',
+      seenCount: 1,
+      createdAt: '2026-06-07T00:00:00.000Z',
+      updatedAt: '2026-06-07T00:00:00.000Z',
+    },
+  );
+
+  assert.match(progressMessage, /BK-20260607-224410/);
+  assert.match(progressMessage, /13:30/);
+  assert.match(progressMessage, /Vietjet Air VJ/);
+  assert.doesNotMatch(progressMessage, /Hạng đặt chỗ|Mình hiểu/);
+  assert.equal(progressMessage.split('\n').length, 1);
+  assert.match(readyMessage, /Đã chọn chuyến và nhận khách/);
+  assert.doesNotMatch(readyMessage, /Mã chuyến|Giá hiển thị|NGUYEN THI LANH/);
 }
 
 /**
@@ -908,6 +962,7 @@ async function main() {
   await testOneBookingAuthRefreshRetryPolicy();
   await testPassengerHoldRecovery();
   testPassengerHoldTelegramMessages();
+  testCompactCombinedTelegramMessages();
   testTelegramPassengerContextAndRouting();
   testCombinedSelectionPassengerHoldReadiness();
 

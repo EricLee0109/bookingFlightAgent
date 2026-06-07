@@ -21,6 +21,7 @@ import { appendLocalLog } from '../storage/local-log-store';
 import { readLocalAgentSettings } from '../storage/local-settings-store';
 import { isAllowedTelegramOperator } from './telegram-access';
 import {
+  formatCombinedFlightSelectionProgressMessage,
   formatCombinedSelectionPassengerReadyMessage,
   formatFlightSelectionFailedMessage,
   formatFlightSelectionParseFailedMessage,
@@ -132,7 +133,13 @@ export async function handleTelegramMessage(
       return;
     }
 
-    if (selectionParseResult.resolvedCaseFromContext) {
+    const isCombinedSelectionPassengerMessage =
+      messageLooksLikePassengerInfo(text);
+
+    if (
+      selectionParseResult.resolvedCaseFromContext &&
+      !isCombinedSelectionPassengerMessage
+    ) {
       await bot.sendMessage(
         chatId,
         formatLatestCaseFlightSelectionResolvedMessage(
@@ -147,6 +154,7 @@ export async function handleTelegramMessage(
       telegramUserId,
       selectionParseResult.input,
       text,
+      isCombinedSelectionPassengerMessage,
     );
     return;
   }
@@ -401,6 +409,7 @@ async function handleTelegramFlightSelection(
   telegramUserId: number,
   selectionInput: Parameters<typeof selectMatchingOneBookingFlight>[0],
   rawMessage: string,
+  isCombinedSelectionPassengerMessage: boolean,
 ) {
   const existingCase = await readLocalFlightCase(selectionInput.caseId);
 
@@ -455,7 +464,9 @@ async function handleTelegramFlightSelection(
 
   await bot.sendMessage(
     chatId,
-    formatFlightSelectionStartedMessage(selectionInput),
+    isCombinedSelectionPassengerMessage
+      ? formatCombinedFlightSelectionProgressMessage(selectionInput)
+      : formatFlightSelectionStartedMessage(selectionInput),
   );
 
   const result = await selectMatchingOneBookingFlight(selectionInput, {
@@ -545,7 +556,9 @@ async function handleTelegramFlightSelection(
         currentCase.attachedPassenger,
       ),
     );
-    await runAutomaticPassengerHold(bot, chatId, currentCase);
+    await runAutomaticPassengerHold(bot, chatId, currentCase, {
+      skipProgressMessage: true,
+    });
     return;
   }
 
