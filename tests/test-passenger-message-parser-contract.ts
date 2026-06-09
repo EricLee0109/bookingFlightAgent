@@ -176,6 +176,19 @@ function testPassengerQuickInputParserContract() {
     missingFields: [],
     confidence: 0.94,
   });
+  const maleQuickInput = ParsedPassengerMessageSchema.parse({
+    intent: 'provide_new_passenger',
+    caseCode: null,
+    passengerMentions: [
+      {
+        fullName: 'Trần Đăng Khoa',
+        gender: 'male',
+        dob: null,
+      },
+    ],
+    missingFields: [],
+    confidence: 0.94,
+  });
   const dobInput = ParsedPassengerMessageSchema.parse({
     intent: 'update_passenger_fields',
     caseCode: null,
@@ -193,6 +206,8 @@ function testPassengerQuickInputParserContract() {
 
   assert.equal(genderOnly.passengerMentions[0].gender, 'female');
   assert.equal(quickInput.passengerMentions[0].fullName, 'Nguyễn Thị Oanh');
+  assert.equal(maleQuickInput.passengerMentions[0].fullName, 'Trần Đăng Khoa');
+  assert.equal(maleQuickInput.passengerMentions[0].gender, 'male');
   assert.equal(dobInput.passengerMentions[0].dob, '1995-01-02');
   assert.match(prompt, /standalone "Nam"/);
   assert.match(prompt, /Nữ, Nguyễn Thị Oanh/);
@@ -942,6 +957,26 @@ function testTelegramPassengerContextAndRouting() {
   );
   assert.equal(
     messageLooksLikePassengerInfo('case này lấy chuyến 13h30 Vietjet'),
+    false,
+  );
+  assert.equal(messageLooksLikePassengerInfo('Nam, Trần Đăng Khoa'), true);
+  assert.equal(messageLooksLikePassengerInfo('Trần Đăng Khoa'), false);
+  assert.equal(
+    messageLooksLikePassengerInfo('Trần Đăng Khoa', {
+      allowStandaloneFollowUp: true,
+    }),
+    true,
+  );
+  assert.equal(
+    messageLooksLikePassengerInfo('Nam', {
+      allowStandaloneFollowUp: true,
+    }),
+    true,
+  );
+  assert.equal(
+    messageLooksLikePassengerInfo('mình muốn bay từ SGN ra HAN ngày 30/07', {
+      allowStandaloneFollowUp: true,
+    }),
     false,
   );
 }

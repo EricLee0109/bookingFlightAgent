@@ -3064,5 +3064,23 @@
       "selectionScreenshotPath": "screenshots/BK-20260609-140422-selected-flight.png"
     },
     "timestamp": "2026-06-09T07:08:49.356Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260609-141652",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-06-09T07:16:52.343Z"
+  },
+  {
+    "level": "warn",
+    "event": "flight_request_missing_fields",
+    "caseId": "BK-20260609-141652",
+    "message": "Missing fields: fromAirportCode, fromAirportText, toAirportCode, toAirportText, departureDate",
+    "timestamp": "2026-06-09T07:16:55.779Z"
   }
 ]

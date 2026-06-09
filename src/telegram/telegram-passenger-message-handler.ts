@@ -176,7 +176,12 @@ export async function tryHandleTelegramPassengerMessage(
   const existingCase = await readLocalFlightCase(caseId);
 
   if (!existingCase || !isPassengerReadyCaseStatus(existingCase.status)) {
-    if (explicitCaseId && messageLooksLikePassengerInfo(rawMessage)) {
+    if (
+      explicitCaseId &&
+      messageLooksLikePassengerInfo(rawMessage, {
+        allowStandaloneFollowUp: true,
+      })
+    ) {
       await bot.sendMessage(
         chatId,
         formatPassengerCaseNotReadyMessage(caseId),
@@ -216,7 +221,11 @@ export async function resolvePassengerMessageForCase(
   existingCase: LocalPassengerReadyCase,
   options: ResolvePassengerMessageForCaseOptions = {},
 ): Promise<TelegramPassengerResolutionOutcome> {
-  if (!messageLooksLikePassengerInfo(rawMessage)) {
+  if (
+    !messageLooksLikePassengerInfo(rawMessage, {
+      allowStandaloneFollowUp: true,
+    })
+  ) {
     return {
       status: 'not_attempted',
       flightCase: existingCase,
@@ -807,24 +816,100 @@ function isPassengerReadyCaseStatus(status: string) {
 /**
  * Detects whether a Telegram message contains passenger information.
  */
-export function messageLooksLikePassengerInfo(rawMessage: string) {
+export function messageLooksLikePassengerInfo(
+  rawMessage: string,
+  options: {
+    allowStandaloneFollowUp?: boolean;
+  } = {},
+) {
   const honorific =
     '(?:chị|chi|anh|cô|co|chú|chu|bác|bac|em|bé|be|khách|khach)(?=\\s|$)';
 
-  return new RegExp(
-    [
-      `(?:dùng|dung|lấy|lay)\\s+${honorific}`,
-      `(?:cho|khách|khach)\\s+${honorific}`,
-      'khách\\s+là',
-      'khach\\s+la',
-      'sinh\\s+\\d',
-      'không\\s+phải\\s+khách',
-      'khong\\s+phai\\s+khach',
-      'đúng\\s+rồi\\s+dùng\\s+khách',
-      'dung\\s+khach',
-    ].join('|'),
-    'i',
-  ).test(
-    rawMessage,
+  if (
+    new RegExp(
+      [
+        `(?:dùng|dung|lấy|lay)\\s+${honorific}`,
+        `(?:cho|khách|khach)\\s+${honorific}`,
+        'khách\\s+là',
+        'khach\\s+la',
+        'sinh\\s+\\d',
+        'không\\s+phải\\s+khách',
+        'khong\\s+phai\\s+khach',
+        'đúng\\s+rồi\\s+dùng\\s+khách',
+        'dung\\s+khach',
+      ].join('|'),
+      'i',
+    ).test(rawMessage)
+  ) {
+    return true;
+  }
+
+  if (looksLikePassengerQuickInput(rawMessage)) {
+    return true;
+  }
+
+  if (!options.allowStandaloneFollowUp) {
+    return false;
+  }
+
+  return (
+    looksLikeStandalonePassengerGender(rawMessage) ||
+    looksLikeStandalonePassengerName(rawMessage)
   );
+}
+
+/**
+ * Detects copy-ready passenger quick input such as `Nam, Trần Đăng Khoa`.
+ */
+function looksLikePassengerQuickInput(rawMessage: string) {
+  const normalized = normalizePassengerRoutingText(rawMessage);
+
+  return /^\s*(nam|nu)\s*,\s+\S+(?:\s+\S+)+\s*$/.test(normalized);
+}
+
+/**
+ * Detects short gender-only replies while a passenger draft is active.
+ */
+function looksLikeStandalonePassengerGender(rawMessage: string) {
+  const normalized = normalizePassengerRoutingText(rawMessage);
+
+  return /^(nam|nu)$/.test(normalized.trim());
+}
+
+/**
+ * Detects full-name-only replies while avoiding normal flight search text.
+ */
+function looksLikeStandalonePassengerName(rawMessage: string) {
+  const trimmed = rawMessage.trim();
+
+  if (
+    /[0-9]/.test(trimmed) ||
+    /\b(bay|chuyen|chuyến|ve|vé|san bay|sân bay|sgn|han|dad|cxr|pqc|hph|vca|vdo|vii|hue|hcm)\b/i.test(
+      normalizePassengerRoutingText(trimmed),
+    )
+  ) {
+    return false;
+  }
+
+  const tokens = trimmed.split(/\s+/).filter(Boolean);
+
+  if (tokens.length < 2 || tokens.length > 5) {
+    return false;
+  }
+
+  return tokens.every(
+    (token) => /^[\p{L}'-]+$/u.test(token) && /^\p{Lu}/u.test(token),
+  );
+}
+
+/**
+ * Normalizes Vietnamese operator text before lightweight routing checks.
+ */
+function normalizePassengerRoutingText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'd')
+    .toLowerCase();
 }
