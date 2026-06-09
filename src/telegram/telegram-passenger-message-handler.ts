@@ -47,6 +47,7 @@ import {
   buildPassengerConfirmationKeyboard,
   parsePassengerCallbackData,
 } from './telegram-passenger-keyboards';
+import { tryHandleTelegramPnrDetailCallback } from './telegram-pnr-detail';
 
 type LocalPassengerReadyCase = NonNullable<
   Awaited<ReturnType<typeof readLocalFlightCase>>
@@ -103,11 +104,8 @@ export async function handleTelegramCallbackQuery(
 ) {
   const telegramUserId = callbackQuery.from.id;
   const chatId = callbackQuery.message?.chat.id;
-  const payload = callbackQuery.data
-    ? parsePassengerCallbackData(callbackQuery.data)
-    : null;
 
-  if (!chatId || !payload) {
+  if (!chatId) {
     return;
   }
 
@@ -115,6 +113,24 @@ export async function handleTelegramCallbackQuery(
 
   if (!isAllowedTelegramOperator(telegramUserId)) {
     await bot.sendMessage(chatId, 'Bạn chưa có quyền sử dụng Agent này nhé.');
+    return;
+  }
+
+  if (
+    await tryHandleTelegramPnrDetailCallback(
+      bot,
+      chatId,
+      callbackQuery.data,
+    )
+  ) {
+    return;
+  }
+
+  const payload = callbackQuery.data
+    ? parsePassengerCallbackData(callbackQuery.data)
+    : null;
+
+  if (!payload) {
     return;
   }
 
@@ -745,16 +761,19 @@ export async function runAutomaticPassengerHold(
 
   if (result.ok) {
     clearPendingPassengerProfiles(chatId);
-    const text = formatPassengerHoldSuccessMessage(flightCase.caseId, result.pnrCode, result.pnrWarning)
+    const text = formatPassengerHoldSuccessMessage(
+      flightCase.caseId,
+      result.pnrCode,
+      result.pnrWarning,
+    );
 
-  await bot.sendMessage(
-    chatId,
-    text,
-    {
+    await bot.sendMessage(chatId, text, {
       parse_mode: 'HTML',
-      reply_markup: buildPassengerHoldSuccessReplyMarkup(result.pnrCode),
-    }
-  );
+      reply_markup: buildPassengerHoldSuccessReplyMarkup({
+        caseId: flightCase.caseId,
+        pnrCode: result.pnrCode,
+      }),
+    });
     return;
   }
 

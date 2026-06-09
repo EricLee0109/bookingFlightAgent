@@ -47,6 +47,7 @@ import {
 import {
   formatCombinedFlightSelectionProgressMessage,
   formatCombinedSelectionPassengerReadyMessage,
+  buildPassengerHoldSuccessReplyMarkup,
   formatHoldRecoveryFailedMessage,
   formatHoldRecoveryParseFailedMessage,
   formatNewPassengerMissingFieldsMessage,
@@ -54,11 +55,13 @@ import {
   formatPassengerHoldFailedMessage,
   formatPassengerHoldNeedsReviewMessage,
   formatPassengerHoldSuccessMessage,
+  formatPnrDetailMessage,
   formatPassengerMentionMissingMessage,
   formatPassengerMissingFieldsMessage,
   formatPassengerNotFoundMessage,
 } from '../src/telegram/telegram-formatters';
 import { parseHoldRecoveryMessage } from '../src/telegram/telegram-hold-recovery';
+import { parsePnrDetailCallbackData } from '../src/telegram/telegram-pnr-detail';
 import {
   mergePassengerMentions,
   messageLooksLikePassengerInfo,
@@ -872,11 +875,68 @@ function testPassengerHoldTelegramMessages() {
       null,
       'Please check the existing order manually.',
   );
+  const replyMarkup = buildPassengerHoldSuccessReplyMarkup({
+    caseId: 'BK-20260602-133338',
+    pnrCode: 'VNT56E',
+  });
+  const detailMessage = formatPnrDetailMessage({
+    caseId: 'BK-20260602-133338',
+    status: 'PNR_EXTRACTED',
+    rawMessage: 'test',
+    createdAt: '2026-06-02T00:00:00.000Z',
+    updatedAt: '2026-06-02T00:01:00.000Z',
+    pnrCode: 'VNT56E',
+    selectedFlight: {
+      cardIndex: 1,
+      airlineCode: 'VJ',
+      airlineName: 'Vietjet <Air>',
+      flightNumber: 'VJ120',
+      departureTime: '05:00',
+      arrivalTime: '07:10',
+      bookingClass: 'ECO',
+      priceText: 'VND 1,000',
+      selectedAt: '2026-06-02T00:00:30.000Z',
+    },
+    attachedPassenger: {
+      id: 1,
+      passengerType: 0,
+      lastName: 'NGUYEN',
+      firstName: 'THI LANH',
+      title: 'MS',
+      gender: false,
+      dateOfBirth: null,
+      source: 'operator_input',
+      normalizedLastName: 'NGUYEN',
+      normalizedFirstName: 'THI LANH',
+      normalizedFullName: 'NGUYEN <THI> & LANH',
+      seenCount: 1,
+      createdAt: '2026-06-02T00:00:00.000Z',
+      updatedAt: '2026-06-02T00:00:00.000Z',
+    },
+  });
 
-  assert.match(successMessage, /^✅ GIỮ CHỖ THÀNH CÔNG/);
-  assert.match(successMessage, /\nPNR\nVNT56E\n/);
+  assert.match(successMessage, /<b>✅ GIỮ CHỖ THÀNH CÔNG<\/b>/);
+  assert.match(successMessage, /<b>✈️ PNR ✈️<\/b>/);
+  assert.match(successMessage, /VNT56E/);
   assert.ok(successMessage.indexOf('PNR') < successMessage.indexOf('Case:'));
-  assert.match(missingPnrMessage, /\nPNR\nChưa lấy được\n/);
+  assert.match(missingPnrMessage, /<i>Chưa lấy được<\/i>/);
+  assert.equal(replyMarkup?.inline_keyboard[0][0].text, '📋 Copy PNR');
+  assert.equal(replyMarkup?.inline_keyboard[0][1].text, '🔎 Xem chi tiết');
+  assert.equal(
+    replyMarkup?.inline_keyboard[0][1].callback_data,
+    'pnr:detail:BK-20260602-133338',
+  );
+  assert.deepEqual(parsePnrDetailCallbackData('pnr:detail:BK-20260609-152205'), {
+    caseId: 'BK-20260609-152205',
+  });
+  assert.equal(parsePnrDetailCallbackData('p:confirm:BK-20260609-152205:1'), null);
+  assert.equal(parsePnrDetailCallbackData('pnr:detail:not-a-case'), null);
+  assert.match(detailMessage, /VNT56E/);
+  assert.match(detailMessage, /Vietjet &lt;Air&gt; \(VJ\)/);
+  assert.match(detailMessage, /05:00 - 07:10/);
+  assert.match(detailMessage, /NGUYEN &lt;THI&gt; &amp; LANH/);
+  assert.match(detailMessage, /BK-20260602-133338/);
+  assert.match(detailMessage, /PNR_EXTRACTED/);
   assert.match(
     formatPassengerHoldNeedsReviewMessage('Order page timed out.'),
     /tránh giữ chỗ trùng/,

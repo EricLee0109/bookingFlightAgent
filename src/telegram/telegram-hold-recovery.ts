@@ -90,16 +90,15 @@ export async function tryHandleTelegramHoldRecoveryMessage(
     return true;
   }
 
-  const text = formatPassengerHoldSuccessMessage(result.caseId, result.pnrCode)
+  const text = formatPassengerHoldSuccessMessage(result.caseId, result.pnrCode);
 
-  await bot.sendMessage(
-    chatId,
-    text,
-    {
-      parse_mode: 'HTML',
-      reply_markup: buildPassengerHoldSuccessReplyMarkup(result.pnrCode),
-    }
-  );
+  await bot.sendMessage(chatId, text, {
+    parse_mode: 'HTML',
+    reply_markup: buildPassengerHoldSuccessReplyMarkup({
+      caseId: result.caseId,
+      pnrCode: result.pnrCode,
+    }),
+  });
 
   return true;
 }

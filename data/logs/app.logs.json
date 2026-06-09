@@ -3303,5 +3303,117 @@
       "pnrCode": "EP47K4"
     },
     "timestamp": "2026-06-09T08:24:36.921Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260609-164103",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-06-09T09:41:03.219Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_search_completed",
+    "caseId": "BK-20260609-164103",
+    "message": "1Booking search completed.",
+    "meta": {
+      "flightCount": 70,
+      "screenshotPath": "screenshots/1booking-search-flights-1.png",
+      "screenshotPaths": [
+        "screenshots/1booking-search-flights-1.png",
+        "screenshots/1booking-search-flights-2.png",
+        "screenshots/1booking-search-flights-3.png",
+        "screenshots/1booking-search-flights-4.png",
+        "screenshots/1booking-search-flights-5.png",
+        "screenshots/1booking-search-flights-6.png",
+        "screenshots/1booking-search-flights-7.png"
+      ]
+    },
+    "timestamp": "2026-06-09T09:41:32.474Z"
+  },
+  {
+    "level": "info",
+    "event": "flight_selection_requested",
+    "caseId": "BK-20260609-164103",
+    "message": "Received Telegram flight selection request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692,
+      "selectionInput": {
+        "caseId": "BK-20260609-164103",
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "departureTime": "23:00",
+        "bookingClass": null
+      }
+    },
+    "timestamp": "2026-06-09T09:42:02.640Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_selection_completed",
+    "caseId": "BK-20260609-164103",
+    "message": "1Booking flight selection completed.",
+    "meta": {
+      "selectedFlight": {
+        "cardIndex": 16,
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "flightNumber": "VJ168",
+        "departureTime": "23:00",
+        "arrivalTime": "01:10",
+        "bookingClass": "ECO",
+        "priceText": "VND\n1,104,600",
+        "selectedAt": "2026-06-09T09:42:33.170Z"
+      },
+      "selectionScreenshotPath": "screenshots/BK-20260609-164103-selected-flight.png"
+    },
+    "timestamp": "2026-06-09T09:42:33.171Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_hold_submitted",
+    "caseId": "BK-20260609-164103",
+    "message": "Submitted final 1Booking hold action.",
+    "timestamp": "2026-06-09T09:43:07.881Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_hold_loading_observed",
+    "caseId": "BK-20260609-164103",
+    "message": "Observed transient 1Booking hold loading modal.",
+    "timestamp": "2026-06-09T09:43:07.899Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_hold_success_modal_observed",
+    "caseId": "BK-20260609-164103",
+    "message": "Observed transient 1Booking hold success modal.",
+    "timestamp": "2026-06-09T09:43:21.007Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_hold_order_page_confirmed",
+    "caseId": "BK-20260609-164103",
+    "message": "Confirmed durable 1Booking held-order page.",
+    "meta": {
+      "orderId": "#HS2200389000141",
+      "orderDetailUrl": "https://pro.1booking.vn/order/HS2200389000141"
+    },
+    "timestamp": "2026-06-09T09:43:25.522Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_pnr_extracted",
+    "caseId": "BK-20260609-164103",
+    "message": "Extracted held-booking PNR.",
+    "meta": {
+      "pnrCode": "6QJ7A4"
+    },
+    "timestamp": "2026-06-09T09:43:25.567Z"
   }
 ]

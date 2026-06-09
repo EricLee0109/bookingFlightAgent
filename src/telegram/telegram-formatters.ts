@@ -7,6 +7,7 @@ import {
 } from '../contracts/flight';
 import { type PassengerMention } from '../contracts/passenger';
 import { type PassengerProfile } from '../passengers/passenger-types';
+import { type LocalFlightCase } from '../storage/local-case-store';
 import type TelegramBot from 'node-telegram-bot-api';
 
 /**
@@ -470,12 +471,19 @@ export function formatPassengerHoldSuccessMessage(
     .join('\n');
 }
 
+export type PassengerHoldSuccessReplyMarkupInput = {
+  caseId: string;
+  pnrCode: string | null;
+};
+
 /**
- * Inline keyboard: adds a Copy PNR button under the message.
+ * Inline keyboard: adds Copy PNR and detail-view buttons under the message.
  */
 export function buildPassengerHoldSuccessReplyMarkup(
-  pnrCode: string | null,
+  input: PassengerHoldSuccessReplyMarkupInput,
 ): InlineKeyboardMarkup | undefined {
+  const { caseId, pnrCode } = input;
+
   if (!pnrCode) return undefined;
 
   return {
@@ -487,9 +495,48 @@ export function buildPassengerHoldSuccessReplyMarkup(
             text: pnrCode.trim().toUpperCase(),
           },
         },
+        {
+          text: '🔎 Xem chi tiết',
+          callback_data: `pnr:detail:${caseId.toUpperCase()}`,
+        },
       ],
     ],
   };
+}
+
+/**
+ * Formats the operator-facing held booking details shown after `Xem chi tiết`.
+ */
+export function formatPnrDetailMessage(flightCase: LocalFlightCase) {
+  const selectedFlight = flightCase.selectedFlight;
+  const passenger = flightCase.attachedPassenger;
+
+  return [
+    '<b>🔎 Chi tiết giữ chỗ</b>',
+    '',
+    `✈️ <b>PNR:</b> <code>${escapeTelegramHtml(flightCase.pnrCode ?? 'Chưa có')}</code>`,
+    `🏷️ <b>Hãng:</b> ${escapeTelegramHtml(formatPnrDetailFlightBrand(flightCase))}`,
+    `🕒 <b>Giờ bay:</b> ${escapeTelegramHtml(formatPnrDetailFlightTime(flightCase))}`,
+    `👤 <b>Khách:</b> ${escapeTelegramHtml(passenger?.normalizedFullName ?? 'Chưa có')}`,
+    `📋 <b>Case:</b> <code>${escapeTelegramHtml(flightCase.caseId)}</code>`,
+    `✅ <b>Trạng thái:</b> <code>${escapeTelegramHtml(flightCase.status)}</code>`,
+    selectedFlight?.flightNumber
+      ? `🛫 <b>Mã chuyến:</b> <code>${escapeTelegramHtml(selectedFlight.flightNumber)}</code>`
+      : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/**
+ * Formats a soft failure when local case details are unavailable.
+ */
+export function formatPnrDetailUnavailableMessage() {
+  return [
+    '📝 Mình chưa lấy được chi tiết giữ chỗ từ case local.',
+    '',
+    'Bạn kiểm tra lại mã case hoặc mở case trên 1Booking giúp mình nhé.',
+  ].join('\n');
 }
 
 /**
@@ -834,4 +881,26 @@ function formatSelectionBookingClassShort(
   return bookingClass
     ? `${BOOKING_CLASS_LABELS[bookingClass]} (${bookingClass})`
     : 'Chưa chỉ định';
+}
+
+function formatPnrDetailFlightBrand(flightCase: LocalFlightCase) {
+  const selectedFlight = flightCase.selectedFlight;
+
+  if (selectedFlight?.airlineName && selectedFlight.airlineCode) {
+    return `${selectedFlight.airlineName} (${selectedFlight.airlineCode})`;
+  }
+
+  return selectedFlight?.airlineName ?? selectedFlight?.airlineCode ?? 'Chưa có';
+}
+
+function formatPnrDetailFlightTime(flightCase: LocalFlightCase) {
+  const selectedFlight = flightCase.selectedFlight;
+
+  if (!selectedFlight?.departureTime) {
+    return 'Chưa có';
+  }
+
+  return selectedFlight.arrivalTime
+    ? `${selectedFlight.departureTime} - ${selectedFlight.arrivalTime}`
+    : selectedFlight.departureTime;
 }
