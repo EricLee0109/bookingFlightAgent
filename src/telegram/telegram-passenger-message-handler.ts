@@ -34,6 +34,7 @@ import {
   formatPassengerNotFoundMessage,
   formatPassengerParserFailedMessage,
   formatPassengerProfileMissingMessage,
+  buildPassengerHoldSuccessReplyMarkup,
 } from './telegram-formatters';
 import {
   clearPendingPassengerProfiles,
@@ -744,14 +745,16 @@ export async function runAutomaticPassengerHold(
 
   if (result.ok) {
     clearPendingPassengerProfiles(chatId);
-    await bot.sendMessage(
-      chatId,
-      formatPassengerHoldSuccessMessage(
-        flightCase.caseId,
-        result.pnrCode,
-        result.pnrWarning,
-      ),
-    );
+    const text = formatPassengerHoldSuccessMessage(flightCase.caseId, result.pnrCode, result.pnrWarning)
+
+  await bot.sendMessage(
+    chatId,
+    text,
+    {
+      parse_mode: 'HTML',
+      reply_markup: buildPassengerHoldSuccessReplyMarkup(result.pnrCode),
+    }
+  );
     return;
   }
 

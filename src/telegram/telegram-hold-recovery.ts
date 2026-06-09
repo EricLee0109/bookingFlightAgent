@@ -2,6 +2,7 @@ import TelegramBot from 'node-telegram-bot-api';
 import { BOOKING_CASE_REGEX } from '../automation/1booking/constants';
 import { recoverHeldBookingCase } from '../services/passenger-hold-recovery-service';
 import {
+  buildPassengerHoldSuccessReplyMarkup,
   formatHoldRecoveryFailedMessage,
   formatHoldRecoveryParseFailedMessage,
   formatPassengerHoldSuccessMessage,
@@ -14,19 +15,19 @@ const HOLD_RECOVERY_PATTERN = new RegExp(
 
 export type ParsedHoldRecoveryMessage =
   | {
-      isRecoveryMessage: false;
-    }
+    isRecoveryMessage: false;
+  }
   | {
-      isRecoveryMessage: true;
-      ok: false;
-      message: string;
-    }
+    isRecoveryMessage: true;
+    ok: false;
+    message: string;
+  }
   | {
-      isRecoveryMessage: true;
-      ok: true;
-      caseId: string;
-      pnrCode: string;
-    };
+    isRecoveryMessage: true;
+    ok: true;
+    caseId: string;
+    pnrCode: string;
+  };
 
 /**
  * Parses the explicit operator-only hold recovery message.
@@ -89,9 +90,15 @@ export async function tryHandleTelegramHoldRecoveryMessage(
     return true;
   }
 
+  const text = formatPassengerHoldSuccessMessage(result.caseId, result.pnrCode)
+
   await bot.sendMessage(
     chatId,
-    formatPassengerHoldSuccessMessage(result.caseId, result.pnrCode),
+    text,
+    {
+      parse_mode: 'HTML',
+      reply_markup: buildPassengerHoldSuccessReplyMarkup(result.pnrCode),
+    }
   );
 
   return true;

@@ -1,3 +1,4 @@
+import { InlineKeyboardMarkup } from 'node-telegram-bot-api';
 import {
   BOOKING_CLASS_LABELS,
   type FlightSelectionCandidate,
@@ -6,6 +7,7 @@ import {
 } from '../contracts/flight';
 import { type PassengerMention } from '../contracts/passenger';
 import { type PassengerProfile } from '../passengers/passenger-types';
+import type TelegramBot from 'node-telegram-bot-api';
 
 /**
  * Telegram presentation component.
@@ -254,8 +256,8 @@ export function formatCombinedSelectionPassengerReadyMessage(
   _profile: PassengerProfile,
 ) {
   return [
-    `✅ Đã chọn chuyến và nhận khách cho case ${caseId}.`,
-    'Mình đang giữ chỗ trên 1Booking nhé...',
+    `✈️✅ Đã chọn chuyến và nhận khách cho case ${caseId}.`,
+    'Mình đang tiến hành giữ chỗ trên 1Booking, đợi 1 xíu nhé...',
   ].join('\n');
 }
 
@@ -409,26 +411,85 @@ export function formatPassengerHoldMissingDobMessage(profile: PassengerProfile) 
   ].join('\n');
 }
 
+export function escapeTelegramHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function centerText(value: string, width: number): string {
+  const length = Array.from(value).length;
+  const totalPadding = Math.max(width - length, 0);
+  const left = Math.floor(totalPadding / 2);
+  const right = totalPadding - left;
+
+  return `${' '.repeat(left)}${value}${' '.repeat(right)}`;
+}
+
+function createPnrTicketBlock(pnrCode: string): string {
+  const pnr = pnrCode.trim().toUpperCase();
+  const width = Math.max(18, Array.from(pnr).length + 10);
+
+  return [
+    `╭${'─'.repeat(width)}╮`,
+    `│${centerText(pnr, width)}│`,
+    `╰${'─'.repeat(width)}╯`,
+  ].join('\n');
+}
+
 /**
- * Formats successful hold confirmation and its extracted PNR when available.
+ * Formats successful hold confirmation with a more prominent PNR for Telegram HTML mode.
  */
 export function formatPassengerHoldSuccessMessage(
   caseId: string,
   pnrCode: string | null,
   pnrWarning?: string,
-) {
+): string {
+  const safeCaseId = escapeTelegramHtml(caseId);
+  const safeWarning = pnrWarning ? escapeTelegramHtml(pnrWarning) : null;
+
+  const pnrSection = pnrCode
+    ? [
+        '<b>✈️ PNR ✈️</b>',
+        `<pre>${escapeTelegramHtml(createPnrTicketBlock(pnrCode))}</pre>`,
+      ].join('\n')
+    : ['<b>✈️ PNR ✈️</b>', '<i>Chưa lấy được</i>'].join('\n');
+
   return [
-    '✅ GIỮ CHỖ THÀNH CÔNG',
+    '<b>✅ GIỮ CHỖ THÀNH CÔNG</b>',
     '',
-    'PNR',
-    pnrCode ?? 'Chưa lấy được',
+    pnrSection,
     '',
-    `Case: ${caseId}`,
-    'Trạng thái: successful_hold',
-    pnrWarning ? `Lưu ý: ${pnrWarning}` : null,
+    `📋 <b>Case:</b> <code>${safeCaseId}</code>`,
+    '✅ <b>Trạng thái:</b> <code>successful_hold</code>',
+    safeWarning ? `⚠️ <i>Lưu ý: ${safeWarning}</i>` : null,
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+/**
+ * Inline keyboard: adds a Copy PNR button under the message.
+ */
+export function buildPassengerHoldSuccessReplyMarkup(
+  pnrCode: string | null,
+): InlineKeyboardMarkup | undefined {
+  if (!pnrCode) return undefined;
+
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: '📋 Copy PNR',
+          copy_text: {
+            text: pnrCode.trim().toUpperCase(),
+          },
+        },
+      ],
+    ],
+  };
 }
 
 /**

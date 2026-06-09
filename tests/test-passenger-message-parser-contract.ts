@@ -797,7 +797,7 @@ async function testPassengerHoldRecovery() {
     },
   );
   assert.equal(
-    parseHoldRecoveryMessage('recover BK-20260602-145601 PNR BAD').ok,
+    parseHoldRecoveryMessage('recover BK-20260602-145601 PNR BAD').isRecoveryMessage,
     true,
   );
   assert.match(

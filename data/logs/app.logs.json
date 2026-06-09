@@ -3082,5 +3082,226 @@
     "caseId": "BK-20260609-141652",
     "message": "Missing fields: fromAirportCode, fromAirportText, toAirportCode, toAirportText, departureDate",
     "timestamp": "2026-06-09T07:16:55.779Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260609-143927",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-06-09T07:39:27.263Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_search_completed",
+    "caseId": "BK-20260609-143927",
+    "message": "1Booking search completed.",
+    "meta": {
+      "flightCount": 38,
+      "screenshotPath": "screenshots/1booking-search-flights-1.png",
+      "screenshotPaths": [
+        "screenshots/1booking-search-flights-1.png",
+        "screenshots/1booking-search-flights-2.png",
+        "screenshots/1booking-search-flights-3.png",
+        "screenshots/1booking-search-flights-4.png"
+      ]
+    },
+    "timestamp": "2026-06-09T07:39:50.297Z"
+  },
+  {
+    "level": "info",
+    "event": "flight_selection_requested",
+    "caseId": "BK-20260609-143927",
+    "message": "Received Telegram flight selection request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692,
+      "selectionInput": {
+        "caseId": "BK-20260609-143927",
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "departureTime": "13:00",
+        "bookingClass": null
+      }
+    },
+    "timestamp": "2026-06-09T07:40:50.334Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_selection_completed",
+    "caseId": "BK-20260609-143927",
+    "message": "1Booking flight selection completed.",
+    "meta": {
+      "selectedFlight": {
+        "cardIndex": 28,
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "flightNumber": "VJ636",
+        "departureTime": "13:00",
+        "arrivalTime": "14:20",
+        "bookingClass": "ECO",
+        "priceText": "VND\n2,033,400",
+        "selectedAt": "2026-06-09T07:41:17.701Z"
+      },
+      "selectionScreenshotPath": "screenshots/BK-20260609-143927-selected-flight.png"
+    },
+    "timestamp": "2026-06-09T07:41:17.703Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_hold_submitted",
+    "caseId": "BK-20260609-143927",
+    "message": "Submitted final 1Booking hold action.",
+    "timestamp": "2026-06-09T07:41:48.799Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_hold_loading_observed",
+    "caseId": "BK-20260609-143927",
+    "message": "Observed transient 1Booking hold loading modal.",
+    "timestamp": "2026-06-09T07:41:48.818Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_hold_success_modal_observed",
+    "caseId": "BK-20260609-143927",
+    "message": "Observed transient 1Booking hold success modal.",
+    "timestamp": "2026-06-09T07:42:03.445Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_hold_order_page_confirmed",
+    "caseId": "BK-20260609-143927",
+    "message": "Confirmed durable 1Booking held-order page.",
+    "meta": {
+      "orderId": "#HS2200389000139",
+      "orderDetailUrl": "https://pro.1booking.vn/order/HS2200389000139"
+    },
+    "timestamp": "2026-06-09T07:42:08.456Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_pnr_extracted",
+    "caseId": "BK-20260609-143927",
+    "message": "Extracted held-booking PNR.",
+    "meta": {
+      "pnrCode": "6CED5S"
+    },
+    "timestamp": "2026-06-09T07:42:08.497Z"
+  },
+  {
+    "level": "info",
+    "event": "telegram_request_received",
+    "caseId": "BK-20260609-152205",
+    "message": "Received Telegram flight request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692
+    },
+    "timestamp": "2026-06-09T08:22:05.493Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_search_completed",
+    "caseId": "BK-20260609-152205",
+    "message": "1Booking search completed.",
+    "meta": {
+      "flightCount": 70,
+      "screenshotPath": "screenshots/1booking-search-flights-1.png",
+      "screenshotPaths": [
+        "screenshots/1booking-search-flights-1.png",
+        "screenshots/1booking-search-flights-2.png",
+        "screenshots/1booking-search-flights-3.png",
+        "screenshots/1booking-search-flights-4.png",
+        "screenshots/1booking-search-flights-5.png",
+        "screenshots/1booking-search-flights-6.png",
+        "screenshots/1booking-search-flights-7.png"
+      ]
+    },
+    "timestamp": "2026-06-09T08:22:36.545Z"
+  },
+  {
+    "level": "info",
+    "event": "flight_selection_requested",
+    "caseId": "BK-20260609-152205",
+    "message": "Received Telegram flight selection request.",
+    "meta": {
+      "telegramUserId": 2053205692,
+      "chatId": 2053205692,
+      "selectionInput": {
+        "caseId": "BK-20260609-152205",
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "departureTime": "14:10",
+        "bookingClass": null
+      }
+    },
+    "timestamp": "2026-06-09T08:23:10.247Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_selection_completed",
+    "caseId": "BK-20260609-152205",
+    "message": "1Booking flight selection completed.",
+    "meta": {
+      "selectedFlight": {
+        "cardIndex": 27,
+        "airlineCode": "VJ",
+        "airlineName": "Vietjet Air",
+        "flightNumber": "VJ140",
+        "departureTime": "14:10",
+        "arrivalTime": "16:20",
+        "bookingClass": "ECO",
+        "priceText": "VND\n2,238,600",
+        "selectedAt": "2026-06-09T08:23:43.909Z"
+      },
+      "selectionScreenshotPath": "screenshots/BK-20260609-152205-selected-flight.png"
+    },
+    "timestamp": "2026-06-09T08:23:43.911Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_hold_submitted",
+    "caseId": "BK-20260609-152205",
+    "message": "Submitted final 1Booking hold action.",
+    "timestamp": "2026-06-09T08:24:18.785Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_hold_loading_observed",
+    "caseId": "BK-20260609-152205",
+    "message": "Observed transient 1Booking hold loading modal.",
+    "timestamp": "2026-06-09T08:24:18.801Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_hold_success_modal_observed",
+    "caseId": "BK-20260609-152205",
+    "message": "Observed transient 1Booking hold success modal.",
+    "timestamp": "2026-06-09T08:24:31.871Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_hold_order_page_confirmed",
+    "caseId": "BK-20260609-152205",
+    "message": "Confirmed durable 1Booking held-order page.",
+    "meta": {
+      "orderId": "#HS2200389000140",
+      "orderDetailUrl": "https://pro.1booking.vn/order/HS2200389000140"
+    },
+    "timestamp": "2026-06-09T08:24:36.900Z"
+  },
+  {
+    "level": "info",
+    "event": "one_booking_pnr_extracted",
+    "caseId": "BK-20260609-152205",
+    "message": "Extracted held-booking PNR.",
+    "meta": {
+      "pnrCode": "EP47K4"
+    },
+    "timestamp": "2026-06-09T08:24:36.921Z"
   }
 ]
