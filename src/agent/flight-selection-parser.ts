@@ -50,12 +50,21 @@ export function parseFlightSelectionMessage(
 ): FlightSelectionParseResult {
   const explicitCaseId = rawMessage.match(BOOKING_CASE_REGEX)?.[0]?.toUpperCase();
   const usesLatestCaseContext = mentionsLatestCaseReference(rawMessage);
+  const usesImplicitLatestCaseSelection =
+    !explicitCaseId &&
+    !usesLatestCaseContext &&
+    mentionsImplicitLatestCaseSelection(rawMessage);
   const caseId =
     explicitCaseId ??
-    (usesLatestCaseContext ? options.latestCaseId?.toUpperCase() : null);
+    (usesLatestCaseContext || usesImplicitLatestCaseSelection
+      ? options.latestCaseId?.toUpperCase()
+      : null);
 
   if (!caseId) {
-    if (usesLatestCaseContext && mentionsFlightSelection(rawMessage)) {
+    if (
+      (usesLatestCaseContext || usesImplicitLatestCaseSelection) &&
+      mentionsFlightSelection(rawMessage)
+    ) {
       return {
         isSelectionMessage: true,
         ok: false,
@@ -108,7 +117,9 @@ export function parseFlightSelectionMessage(
     isSelectionMessage: true,
     ok: true,
     input,
-    resolvedCaseFromContext: !explicitCaseId && usesLatestCaseContext,
+    resolvedCaseFromContext:
+      !explicitCaseId &&
+      (usesLatestCaseContext || usesImplicitLatestCaseSelection),
   };
 }
 
@@ -151,8 +162,10 @@ function extractDepartureTime(rawMessage: string) {
 function mentionsFlightSelection(rawMessage: string) {
   const normalized = normalizeVietnameseText(rawMessage);
 
-  return /\b(chon\s+chuyen|lay\s+chuyen|lay\s+flight|chon\s+flight|flight)\b/.test(
-    normalized,
+  return (
+    /\b(chon|dat|lay|book|giu)\s+(chuyen|chuyen\s+bay|ve|flight)\b/.test(
+      normalized,
+    ) || /\bflight\b/.test(normalized)
   );
 }
 
@@ -165,6 +178,32 @@ function mentionsLatestCaseReference(rawMessage: string) {
   return /\b(case|booking)\s+(nay|vua roi|gan nhat|moi nhat|truoc do)\b/.test(
     normalized,
   );
+}
+
+/**
+ * Detects selection messages that should use the latest sent flight-list case.
+ *
+ * This keeps operator-friendly messages like `đặt chuyến Vietjet 22h15` on the
+ * selection path while avoiding normal search requests such as `muốn bay SGN
+ * ra HAN ngày 30/07`.
+ */
+function mentionsImplicitLatestCaseSelection(rawMessage: string) {
+  if (!extractDepartureTime(rawMessage)) {
+    return false;
+  }
+
+  const normalized = normalizeVietnameseText(rawMessage);
+  const hasSelectionVerb = /\b(chon|dat|lay|book|giu)\b/.test(normalized);
+
+  if (!hasSelectionVerb) {
+    return false;
+  }
+
+  const hasFlightContext =
+    /\b(chuyen|chuyen\s+bay|ve|flight)\b/.test(normalized) ||
+    Boolean(resolveAirlineFromText(rawMessage));
+
+  return hasFlightContext;
 }
 
 /**

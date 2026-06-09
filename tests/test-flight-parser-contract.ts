@@ -264,6 +264,87 @@ function testFlightSelectionParserUsesLatestCaseContext() {
 }
 
 /**
+ * Verifies natural selection wording can use the latest flight-list case
+ * without requiring the operator to type `case này`.
+ */
+function testFlightSelectionParserUsesImplicitLatestCaseContext() {
+  const result = parseFlightSelectionMessage(
+    'mình muốn đặt chuyến Vietjet 22h15',
+    {
+      latestCaseId: 'BK-20260609-113604',
+    },
+  );
+
+  assert.equal(result.isSelectionMessage, true);
+
+  if (!result.isSelectionMessage || !result.ok) {
+    throw new Error('Expected valid implicit latest-case selection parse result.');
+  }
+
+  assert.equal(result.resolvedCaseFromContext, true);
+  assert.equal(result.input.caseId, 'BK-20260609-113604');
+  assert.equal(result.input.airlineCode, 'VJ');
+  assert.equal(result.input.departureTime, '22:15');
+  assert.equal(result.input.bookingClass, null);
+}
+
+/**
+ * Verifies polite operator wording with `chọn chuyến bay` is also selection.
+ */
+function testFlightSelectionParserAcceptsNaturalChooseAlias() {
+  const result = parseFlightSelectionMessage(
+    'chị chọn chuyến bay Vietjet 22h15',
+    {
+      latestCaseId: 'BK-20260609-113604',
+    },
+  );
+
+  assert.equal(result.isSelectionMessage, true);
+
+  if (!result.isSelectionMessage || !result.ok) {
+    throw new Error('Expected valid natural choose selection parse result.');
+  }
+
+  assert.equal(result.input.caseId, 'BK-20260609-113604');
+  assert.equal(result.input.airlineCode, 'VJ');
+  assert.equal(result.input.departureTime, '22:15');
+}
+
+/**
+ * Verifies natural latest-case selection asks for a case when no flight list is
+ * available in the chat context.
+ */
+function testFlightSelectionParserRequiresContextForImplicitLatestCase() {
+  const result = parseFlightSelectionMessage(
+    'mình muốn đặt chuyến Vietjet 22h15',
+  );
+
+  assert.equal(result.isSelectionMessage, true);
+
+  if (!result.isSelectionMessage || result.ok) {
+    throw new Error('Expected missing implicit latest-case parse result.');
+  }
+
+  assert.deepEqual(result.missingFields, ['caseId']);
+}
+
+/**
+ * Verifies normal search wording is not claimed by the selection parser.
+ */
+function testFlightSelectionParserDoesNotClaimSearchRequest() {
+  const result = parseFlightSelectionMessage(
+    'mình muốn bay từ SGN ra HAN ngày 30/07',
+    {
+      latestCaseId: 'BK-20260609-113604',
+    },
+  );
+
+  assert.deepEqual(result, {
+    isSelectionMessage: false,
+  });
+}
+
+/**
  * Verifies combined passenger wording still parses the selected flight only.
  */
 function testFlightSelectionParserAcceptsCombinedPassengerMessage() {
@@ -347,12 +428,13 @@ function testOperatorFriendlyFlightFailureMessages() {
   ].join('\n');
 
   assert.match(missingSearchMessage, /bay từ SGN ra HAN ngày 30\/07/);
-  assert.match(selectionParseMessage, /case này chọn chuyến Vietjet 13:30/);
-  assert.match(selectionParseMessage, /BK-YYYYMMDD-HHMMSS chọn VJ 13:30 hạng Eco/);
+  assert.match(selectionParseMessage, /chọn chuyến Vietjet 22:15/);
+  assert.match(selectionParseMessage, /đặt chuyến VJ 22:15/);
+  assert.match(selectionParseMessage, /BK-YYYYMMDD-HHMMSS chọn VJ 22:15 hạng Eco/);
   assert.match(selectionNoMatchMessage, /Hãng: Vietjet Air \(VJ\)/);
   assert.match(selectionNoMatchMessage, /Giờ bay: 05:00/);
   assert.match(selectionNoMatchMessage, /Hạng: Eco \(ECO\)/);
-  assert.match(selectionNoMatchMessage, /case này chọn chuyến Vietjet Air 05:00 hạng Deluxe/);
+  assert.match(selectionNoMatchMessage, /chọn chuyến Vietjet Air 05:00 hạng Deluxe/);
   assert.doesNotMatch(
     combinedText,
     /No available flight matched|Missing fields:|fromAirportCode|toAirportCode|departureDate\b|departureTime|page\.waitForFunction|OPENAI_API_KEY/i,
@@ -654,6 +736,10 @@ async function main() {
   testFlightSelectionParserBookingClassAliases();
   testFlightSelectionParserRejectsMissingFields();
   testFlightSelectionParserUsesLatestCaseContext();
+  testFlightSelectionParserUsesImplicitLatestCaseContext();
+  testFlightSelectionParserAcceptsNaturalChooseAlias();
+  testFlightSelectionParserRequiresContextForImplicitLatestCase();
+  testFlightSelectionParserDoesNotClaimSearchRequest();
   testFlightSelectionParserAcceptsCombinedPassengerMessage();
   testFlightSelectionParserRequiresLatestCaseContext();
   testLatestFlightSearchCaseContext();

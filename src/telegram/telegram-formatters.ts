@@ -141,8 +141,9 @@ export function formatFlightSelectionParseFailedMessage(missingFields: string[])
     `Cần thêm: ${labels.join(', ')}.`,
     '',
     'Bạn có thể gửi:',
-    'case này chọn chuyến Vietjet 13:30',
-    'BK-YYYYMMDD-HHMMSS chọn VJ 13:30 hạng Eco',
+    'chọn chuyến Vietjet 22:15',
+    'đặt chuyến VJ 22:15',
+    'BK-YYYYMMDD-HHMMSS chọn VJ 22:15 hạng Eco',
   ].join('\n');
 }
 
@@ -172,7 +173,7 @@ export function formatLatestCaseFlightSelectionResolvedMessage(
   input: SelectMatchingFlightInput,
 ) {
   return [
-    `Mình hiểu "case này" là ${input.caseId}.`,
+    `Mình sẽ dùng case gần nhất ${input.caseId} để chọn chuyến nhé.`,
     '',
     `Giờ bay: ${input.departureTime}`,
     `Hãng: ${
@@ -752,10 +753,10 @@ function buildFlightSelectionRetryExample(input?: SelectMatchingFlightInput) {
   const time = input?.departureTime ?? '13:30';
 
   if (input?.bookingClass) {
-    return `case này chọn chuyến ${airline} ${time} hạng Deluxe`;
+    return `chọn chuyến ${airline} ${time} hạng Deluxe`;
   }
 
-  return `case này chọn chuyến ${airline} ${time}`;
+  return `chọn chuyến ${airline} ${time}`;
 }
 
 function formatSelectionAirline(input: SelectMatchingFlightInput) {
