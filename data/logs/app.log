@@ -228,3 +228,9 @@ Call log:
 2026-06-07T15:46:18.874Z INFO one_booking_pnr_extracted case=BK-20260607-224410 Extracted held-booking PNR. meta={"pnrCode":"9JR93F"}
 2026-06-07T17:09:26.093Z INFO telegram_request_received case=BK-20260608-000926 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
 2026-06-07T17:09:29.148Z WARN flight_request_missing_fields case=BK-20260608-000926 Missing fields: toAirportCode, toAirportText
+2026-06-09T04:35:15.412Z INFO telegram_request_received case=BK-20260609-113515 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-06-09T04:35:18.507Z WARN flight_request_missing_fields case=BK-20260609-113515 Missing fields: fromAirportCode, fromAirportText, toAirportCode, toAirportText, departureDate
+2026-06-09T04:36:04.349Z INFO telegram_request_received case=BK-20260609-113604 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-06-09T04:36:39.954Z INFO one_booking_search_completed case=BK-20260609-113604 1Booking search completed. meta={"flightCount":72,"screenshotPath":"screenshots/1booking-search-flights-1.png","screenshotPaths":["screenshots/1booking-search-flights-1.png","screenshots/1booking-search-flights-2.png","screenshots/1booking-search-flights-3.png","screenshots/1booking-search-flights-4.png","screenshots/1booking-search-flights-5.png","screenshots/1booking-search-flights-6.png","screenshots/1booking-search-flights-7.png","screenshots/1booking-search-flights-8.png"]}
+2026-06-09T04:39:43.408Z INFO telegram_request_received case=BK-20260609-113943 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-06-09T04:39:45.470Z WARN flight_request_missing_fields case=BK-20260609-113943 Missing fields: fromAirportCode, fromAirportText, toAirportCode, toAirportText, departureDate

@@ -27,7 +27,7 @@ export async function handleTelegramSettingsCommand(
     await bot.sendMessage(
       chatId,
       [
-        'Agent settings:',
+        '⚙️ Cài đặt Agent hiện tại:',
         `agentEnabled: ${settings.agentEnabled}`,
         `autoSearchFlights: ${settings.autoSearchFlights}`,
         `autoHoldBooking: ${settings.autoHoldBooking}`,
@@ -44,7 +44,7 @@ export async function handleTelegramSettingsCommand(
       agentEnabled: text === '/agent_on',
     });
 
-    await bot.sendMessage(chatId, `agentEnabled: ${settings.agentEnabled}`);
+    await bot.sendMessage(chatId, `✅ agentEnabled: ${settings.agentEnabled}`);
     return true;
   }
 
@@ -53,7 +53,7 @@ export async function handleTelegramSettingsCommand(
       autoSearchFlights: text === '/auto_search_on',
     });
 
-    await bot.sendMessage(chatId, `autoSearchFlights: ${settings.autoSearchFlights}`);
+    await bot.sendMessage(chatId, `✅ autoSearchFlights: ${settings.autoSearchFlights}`);
     return true;
   }
 
@@ -62,7 +62,7 @@ export async function handleTelegramSettingsCommand(
       debugMode: text === '/debug_on',
     });
 
-    await bot.sendMessage(chatId, `debugMode: ${settings.debugMode}`);
+    await bot.sendMessage(chatId, `✅ debugMode: ${settings.debugMode}`);
     return true;
   }
 

@@ -536,7 +536,7 @@ function testOperatorFriendlyPassengerFailureMessages() {
   assert.match(notFoundMessage, /Nữ, Nguyễn Thị Oanh/);
   assert.match(caseRequiredMessage, /BK-YYYYMMDD-HHMMSS lấy khách/);
   assert.match(noMentionMessage, /Nữ, Nguyễn Thị Oanh/);
-  assert.match(holdFailedMessage, /Vui lòng kiểm tra lại thông tin khách\/chuyến/);
+  assert.match(holdFailedMessage, /Bạn kiểm tra lại thông tin khách\/chuyến/);
   assert.match(recoveryParseMessage, /recover BK-YYYYMMDD-HHMMSS PNR ABC123/);
   assert.match(recoveryFailedMessage, /PNR cần gồm 6 ký tự/);
   assert.doesNotMatch(
@@ -858,10 +858,10 @@ function testPassengerHoldTelegramMessages() {
       'Please check the existing order manually.',
   );
 
-  assert.match(successMessage, /^GIỮ CHỖ THÀNH CÔNG/);
+  assert.match(successMessage, /^✅ GIỮ CHỖ THÀNH CÔNG/);
   assert.match(successMessage, /\nPNR\nVNT56E\n/);
   assert.ok(successMessage.indexOf('PNR') < successMessage.indexOf('Case:'));
-  assert.match(missingPnrMessage, /\nPNR\nChưa extract được\n/);
+  assert.match(missingPnrMessage, /\nPNR\nChưa lấy được\n/);
   assert.match(
     formatPassengerHoldNeedsReviewMessage('Order page timed out.'),
     /tránh giữ chỗ trùng/,

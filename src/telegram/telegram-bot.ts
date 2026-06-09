@@ -35,7 +35,7 @@ export async function startTelegramAgent() {
       if (message.chat?.id) {
         await bot.sendMessage(
           message.chat.id,
-          '❌ Có lỗi ngoài ý muốn khi xử lý request. Vui lòng kiểm tra log local.',
+          '⚠️ Mình gặp lỗi ngoài ý muốn khi xử lý request. Bạn kiểm tra log local giúp mình nhé.',
         );
       }
     }
@@ -50,7 +50,7 @@ export async function startTelegramAgent() {
       if (callbackQuery.message?.chat.id) {
         await bot.sendMessage(
           callbackQuery.message.chat.id,
-          'Có lỗi khi xử lý lựa chọn khách. Vui lòng kiểm tra log local.',
+          '⚠️ Mình gặp lỗi khi xử lý lựa chọn khách. Bạn kiểm tra log local giúp mình nhé.',
         );
       }
     }

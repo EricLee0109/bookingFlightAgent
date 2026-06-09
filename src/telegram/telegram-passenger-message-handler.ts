@@ -113,14 +113,14 @@ export async function handleTelegramCallbackQuery(
   await bot.answerCallbackQuery(callbackQuery.id);
 
   if (!isAllowedTelegramOperator(telegramUserId)) {
-    await bot.sendMessage(chatId, 'Bạn không có quyền sử dụng Agent này.');
+    await bot.sendMessage(chatId, 'Bạn chưa có quyền sử dụng Agent này nhé.');
     return;
   }
 
   const existingCase = await readLocalFlightCase(payload.caseId);
 
   if (!existingCase) {
-    await bot.sendMessage(chatId, `Không tìm thấy case ${payload.caseId}.`);
+    await bot.sendMessage(chatId, `Mình chưa tìm thấy case ${payload.caseId}. Bạn kiểm tra lại mã case giúp mình nhé.`);
     return;
   }
 
@@ -764,7 +764,7 @@ export async function runAutomaticPassengerHold(
 
     if (result.errorScreenshotPath) {
       await bot.sendPhoto(chatId, result.errorScreenshotPath, {
-        caption: 'Screenshot trạng thái giữ chỗ cần kiểm tra thủ công.',
+        caption: 'Screenshot trạng thái giữ chỗ để bạn kiểm tra thủ công nhé.',
       });
     }
 
@@ -775,7 +775,7 @@ export async function runAutomaticPassengerHold(
 
   if (result.errorScreenshotPath) {
     await bot.sendPhoto(chatId, result.errorScreenshotPath, {
-      caption: 'Screenshot lỗi khi tự động nhập thông tin và giữ chỗ.',
+      caption: 'Screenshot để mình cùng đối chiếu lỗi nhập thông tin và giữ chỗ.',
     });
   }
 }

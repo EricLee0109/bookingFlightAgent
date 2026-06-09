@@ -77,7 +77,7 @@ export async function handleTelegramMessage(
   const text = message.text?.trim();
 
   if (!telegramUserId || !isAllowedTelegramOperator(telegramUserId)) {
-    await bot.sendMessage(chatId, 'Bạn không có quyền sử dụng Agent này.');
+    await bot.sendMessage(chatId, 'Bạn chưa có quyền sử dụng Agent này nhé.');
     return;
   }
 
@@ -88,7 +88,7 @@ export async function handleTelegramMessage(
   if (!text) {
     await bot.sendMessage(
       chatId,
-      'MVP hiện tại chỉ hỗ trợ request dạng text. Vui lòng gửi nội dung yêu cầu đặt vé.',
+      'MVP hiện tại chỉ hỗ trợ request dạng text. Bạn gửi nội dung yêu cầu đặt vé bằng tin nhắn giúp mình nhé.',
     );
     return;
   }
@@ -99,7 +99,7 @@ export async function handleTelegramMessage(
       [
         'Xin chào, mình là Booking Flight Agent MVP.',
         '',
-        'Bạn có thể gửi yêu cầu dạng:',
+        'Bạn có thể gửi yêu cầu như:',
         '"Khách muốn bay từ Hà Nội vào Sài Gòn ngày mai buổi sáng"',
         '',
         'Lệnh cài đặt: /settings, /agent_on, /agent_off, /auto_search_on, /auto_search_off, /debug_on, /debug_off',
@@ -111,7 +111,7 @@ export async function handleTelegramMessage(
   const settings = await readLocalAgentSettings();
 
   if (!settings.agentEnabled) {
-    await bot.sendMessage(chatId, 'Agent hiện đang tắt. Dùng /agent_on để bật lại.');
+    await bot.sendMessage(chatId, 'Agent hiện đang tắt. Bạn dùng /agent_on để bật lại nhé.');
     return;
   }
 
@@ -183,7 +183,7 @@ export async function handleTelegramMessage(
   // Telegram bot solving request from rawMessage
   await bot.sendMessage(
     chatId,
-    `Mình đã nhận request ${flightCase.caseId}. Đang phân tích yêu cầu...`,
+    `⏳ Mình đã nhận request ${flightCase.caseId}. Đang phân tích yêu cầu nhé...`,
   );
 
   let parsedRequest;
@@ -305,12 +305,12 @@ export async function handleTelegramMessage(
   if (!settings.autoSearchFlights) {
     await bot.sendMessage(
       chatId,
-      'autoSearchFlights đang tắt. Mình đã lưu case nhưng chưa chạy 1Booking.',
+      'autoSearchFlights đang tắt. Mình đã lưu case rồi, nhưng chưa chạy 1Booking nhé.',
     );
     return;
   }
 
-  await bot.sendMessage(chatId, 'Đang tìm chuyến trên 1Booking...');
+  await bot.sendMessage(chatId, '⏳ Mình đang tìm chuyến trên 1Booking...');
 
   const result = await searchOneBookingFlights(searchInput, {
     onAuthRefresh: () =>
@@ -337,7 +337,7 @@ export async function handleTelegramMessage(
 
     if (result.errorScreenshotPath) {
       await bot.sendPhoto(chatId, result.errorScreenshotPath, {
-        caption: 'Screenshot lỗi khi search 1Booking.',
+        caption: 'Screenshot để mình cùng đối chiếu lỗi search 1Booking.',
       });
     }
 
@@ -370,7 +370,7 @@ export async function handleTelegramMessage(
       await bot.sendPhoto(chatId, result.screenshotPaths[index], {
         caption:
           result.screenshotPaths.length === 1
-            ? 'Ảnh lịch trình chuyến bay từ 1Booking.'
+            ? 'Ảnh lịch trình chuyến bay từ 1Booking nhé.'
             : `Ảnh lịch trình chuyến bay ${index + 1}/${result.screenshotPaths.length}.`,
       });
     }
@@ -391,7 +391,7 @@ export async function handleTelegramMessage(
   }
 
   await bot.sendPhoto(chatId, result.screenshotPath, {
-    caption: 'Ảnh lịch trình chuyến bay từ 1Booking.',
+    caption: 'Ảnh lịch trình chuyến bay từ 1Booking nhé.',
   });
 
   currentCase = await updateLocalFlightCase(currentCase, {
@@ -525,7 +525,7 @@ async function handleTelegramFlightSelection(
 
     if (result.errorScreenshotPath) {
       await bot.sendPhoto(chatId, result.errorScreenshotPath, {
-        caption: 'Screenshot lỗi khi chọn chuyến trên 1Booking.',
+        caption: 'Screenshot để mình cùng đối chiếu lỗi chọn chuyến trên 1Booking.',
       });
     }
 
@@ -579,7 +579,7 @@ async function handleTelegramFlightSelection(
   );
   await bot.sendPhoto(chatId, result.result.screenshotPath, {
     caption:
-      'Screenshot sau khi bấm Giữ chỗ và vào màn hình thông tin khách hàng.',
+      'Screenshot sau khi bấm Giữ chỗ và vào màn hình thông tin khách hàng nhé.',
   });
 
   if (passengerOutcome && passengerOutcome.status !== 'not_attempted') {

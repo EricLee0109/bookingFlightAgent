@@ -14,6 +14,11 @@ import { type PassengerProfile } from '../passengers/passenger-types';
  * messages, call OpenAI, validate contracts, map automation input, or run
  * Playwright. Parser logic belongs in src/agent, and automation logic belongs
  * in src/automation or src/services.
+ *
+ * Voice rule:
+ * - Warm, concise, operator-first, and safe enough for future customer-facing use.
+ * - Use light status emoji only where it helps scanning.
+ * - Never expose raw debug, selector, credential, or AI error text to Telegram.
  */
 
 /**
@@ -38,8 +43,8 @@ export function formatParsedRequestMessage(parsed: ParsedFlightRequest) {
     `Khung giờ: ${parsed.preferredTime ?? 'Không rõ'}`,
     '',
     parsed.missingFields.length > 0
-      ? `⚠️ Còn thiếu: ${parsed.missingFields.join(', ')}`
-      : 'Thông tin cơ bản đã đủ để tìm chuyến.',
+      ? `📝 Mình cần bổ sung: ${parsed.missingFields.join(', ')}`
+      : 'Thông tin cơ bản đã sẵn sàng để tìm chuyến.',
   ].join('\n');
 }
 
@@ -53,7 +58,7 @@ export function formatMissingFlightFieldsMessage(missingFields: string[]) {
   const labels = Array.from(new Set(formatOperatorFieldLabels(missingFields)));
 
   return [
-    'Mình còn thiếu thông tin để tìm chuyến.',
+    '📝 Mình cần thêm một chút thông tin để tìm chuyến nhé.',
     '',
     `Cần thêm: ${labels.join(', ')}.`,
     '',
@@ -68,9 +73,9 @@ export function formatMissingFlightFieldsMessage(missingFields: string[]) {
  */
 export function formatParserFailedMessage() {
   return [
-    'Mình chưa phân tích được yêu cầu bay.',
+    '📝 Mình chưa đọc rõ yêu cầu bay này.',
     '',
-    'Vui lòng gửi lại ngắn gọn theo mẫu:',
+    'Bạn gửi lại ngắn gọn theo mẫu giúp mình nhé:',
     'bay từ SGN ra HAN ngày 30/07',
   ].join('\n');
 }
@@ -84,7 +89,7 @@ export function formatSearchSuccessMessage(flightCount: number) {
   return [
     `✅ Đã tìm thấy ${flightCount} kết quả chuyến bay.`,
     '',
-    'Mình gửi screenshot lịch trình bên dưới.',
+    'Mình gửi ảnh lịch trình bên dưới nhé.',
     'Bạn có thể gửi ảnh này lại cho khách trên Zalo.',
   ].join('\n');
 }
@@ -96,14 +101,14 @@ export function formatSearchSuccessMessage(flightCount: number) {
  */
 export function formatSearchFailedMessage(message?: string) {
   return [
-    'Chưa tìm được chuyến trên 1Booking.',
+    '⚠️ Mình chưa tìm được chuyến trên 1Booking.',
     '',
     formatSearchFailureReason(message),
     '',
     'Bạn có thể thử lại theo mẫu:',
     'bay từ SGN ra HAN ngày 30/07',
     '',
-    'Mình gửi screenshot bên dưới để bạn đối chiếu nếu có.',
+    'Mình gửi screenshot bên dưới để bạn đối chiếu nếu có nhé.',
   ]
     .filter(Boolean)
     .join('\n');
@@ -114,9 +119,9 @@ export function formatSearchFailedMessage(message?: string) {
  */
 export function formatSearchInputMappingFailedMessage() {
   return [
-    'Mình chưa đủ thông tin để tạo yêu cầu tìm chuyến.',
+    '📝 Mình cần thêm một chút thông tin để tạo yêu cầu tìm chuyến.',
     '',
-    'Vui lòng gửi lại theo mẫu:',
+    'Bạn gửi lại theo mẫu giúp mình nhé:',
     'bay từ SGN ra HAN ngày 30/07',
   ].join('\n');
 }
@@ -131,7 +136,7 @@ export function formatFlightSelectionParseFailedMessage(missingFields: string[])
   const labels = Array.from(new Set(formatOperatorFieldLabels(missingFields)));
 
   return [
-    'Mình chưa đủ thông tin để chọn chuyến.',
+    '📝 Mình cần thêm một chút thông tin để chọn đúng chuyến nhé.',
     '',
     `Cần thêm: ${labels.join(', ')}.`,
     '',
@@ -148,7 +153,7 @@ export function formatFlightSelectionStartedMessage(
   input: SelectMatchingFlightInput,
 ) {
   return [
-    `Đang mở lại case ${input.caseId} và kiểm tra chuyến còn khả dụng trên 1Booking...`,
+    `⏳ Mình đang mở lại case ${input.caseId} và kiểm tra chuyến còn khả dụng trên 1Booking...`,
     '',
     `Hãng: ${
       input.airlineName && input.airlineCode
@@ -177,7 +182,7 @@ export function formatLatestCaseFlightSelectionResolvedMessage(
     }`,
     `Hạng đặt chỗ: ${formatSelectionBookingClass(input.bookingClass)}`,
     '',
-    'Mình sẽ kiểm tra lại danh sách chuyến live trước khi chọn.',
+    'Mình sẽ kiểm tra lại danh sách chuyến live trước khi chọn nhé.',
   ].join('\n');
 }
 
@@ -192,7 +197,7 @@ export function formatCombinedFlightSelectionProgressMessage(
       ? `${input.airlineName} ${input.airlineCode}`
       : 'chuyến phù hợp';
 
-  return `Đang xử lý case ${input.caseId}: chọn ${airline} ${input.departureTime} và kiểm tra khách...`;
+  return `⏳ Mình đang xử lý case ${input.caseId}: chọn ${airline} ${input.departureTime} và kiểm tra khách...`;
 }
 
 /**
@@ -204,7 +209,7 @@ export function formatFlightSelectionSuccessMessage(
   selectedFlight: FlightSelectionCandidate,
 ) {
   return [
-    'Đã chọn đúng chuyến trên 1Booking.',
+    '✅ Đã chọn đúng chuyến trên 1Booking.',
     '',
     `Hãng: ${selectedFlight.airlineName} (${selectedFlight.airlineCode})`,
     `Mã chuyến: ${selectedFlight.flightNumber}`,
@@ -214,7 +219,7 @@ export function formatFlightSelectionSuccessMessage(
     `Hạng đặt chỗ: ${BOOKING_CLASS_LABELS[selectedFlight.bookingClass]} (${selectedFlight.bookingClass})`,
     selectedFlight.priceText ? `Giá hiển thị: ${selectedFlight.priceText}` : null,
     '',
-    'Mình đã bấm Giữ chỗ và dừng ở màn hình thông tin khách hàng để review.',
+    'Mình đã bấm Giữ chỗ và dừng ở màn hình thông tin khách hàng để mình cùng review.',
   ]
     .filter((line): line is string => line !== null)
     .join('\n');
@@ -228,14 +233,14 @@ export function formatFlightSelectionFailedMessage(
   input?: SelectMatchingFlightInput,
 ) {
   return [
-    'Chưa chọn được chuyến.',
+    '⚠️ Mình chưa chọn được chuyến này.',
     '',
     formatFlightSelectionFailureReason(message, input),
     '',
-    'Vui lòng đối chiếu screenshot và gửi lại, ví dụ:',
+    'Bạn đối chiếu screenshot rồi gửi lại theo mẫu này giúp mình nhé:',
     buildFlightSelectionRetryExample(input),
     '',
-    'Mình gửi screenshot bên dưới để bạn đối chiếu nếu có.',
+    'Mình gửi screenshot bên dưới để bạn dễ kiểm tra.',
   ].join('\n');
 }
 
@@ -248,8 +253,8 @@ export function formatCombinedSelectionPassengerReadyMessage(
   _profile: PassengerProfile,
 ) {
   return [
-    `Đã chọn chuyến và nhận khách cho case ${caseId}.`,
-    'Mình đang giữ chỗ trên 1Booking...',
+    `✅ Đã chọn chuyến và nhận khách cho case ${caseId}.`,
+    'Mình đang giữ chỗ trên 1Booking nhé...',
   ].join('\n');
 }
 
@@ -261,12 +266,12 @@ export function formatPassengerReadySelectionStillNeededMessage(
   profile: PassengerProfile,
 ) {
   return [
-    `Đã lưu khách vào case ${caseId}.`,
+    `✅ Đã lưu khách vào case ${caseId}.`,
     '',
     ...formatPassengerSummaryLines(profile),
     '',
-    'Chưa chọn được chuyến.',
-    'Vui lòng chọn lại chuyến theo mẫu:',
+    'Mình vẫn cần chọn lại chuyến để làm tiếp.',
+    'Bạn gửi theo mẫu:',
     `case ${caseId} chọn chuyến Vietjet 13:30`,
   ].join('\n');
 }
@@ -276,11 +281,11 @@ export function formatPassengerReadySelectionStillNeededMessage(
  */
 export function formatPassengerMatchedMessage(profile: PassengerProfile) {
   return [
-    'Mình đã tìm thấy khách phù hợp:',
+    '✅ Mình đã tìm thấy khách phù hợp:',
     '',
     ...formatPassengerSummaryLines(profile),
     '',
-    'Vui lòng xác nhận trước khi gắn khách vào case.',
+    'Bạn xác nhận giúp mình trước khi gắn khách vào case nhé.',
   ].join('\n');
 }
 
@@ -289,8 +294,8 @@ export function formatPassengerMatchedMessage(profile: PassengerProfile) {
  */
 export function formatPassengerAmbiguousMessage(candidateCount: number) {
   return [
-    `Có ${candidateCount} khách gần giống.`,
-    'Vui lòng chọn đúng khách bên dưới.',
+    `📝 Mình thấy có ${candidateCount} khách gần giống.`,
+    'Bạn chọn đúng khách bên dưới giúp mình nhé.',
   ].join('\n');
 }
 
@@ -299,7 +304,7 @@ export function formatPassengerAmbiguousMessage(candidateCount: number) {
  */
 export function formatPassengerNotFoundMessage() {
   return [
-    'Mình chưa tìm thấy khách phù hợp trong dữ liệu local.',
+    '📝 Mình chưa tìm thấy khách phù hợp trong dữ liệu local.',
     '',
     'Cần: Giới tính + Họ tên.',
     '',
@@ -330,11 +335,11 @@ export function formatPassengerMissingFieldsMessage(
   });
 
   return [
-    `Mình đã tìm thấy ${profile.normalizedFullName}, nhưng còn thiếu thông tin.`,
+    `📝 Mình đã tìm thấy ${profile.normalizedFullName}, nhưng còn thiếu một chút thông tin.`,
     '',
     `Còn thiếu: ${labels.join(', ')}.`,
     '',
-    'Bạn có thể gửi nhanh theo mẫu:',
+    'Bạn có thể gửi nhanh theo mẫu này nhé:',
     ...sampleLines,
   ].join('\n');
 }
@@ -353,7 +358,7 @@ export function formatNewPassengerMissingFieldsMessage(
   const sampleLines = buildPassengerQuickInputExamples(mention);
 
   return [
-    'Mình chưa đủ thông tin để lưu khách mới.',
+    '📝 Mình cần thêm một chút thông tin để lưu khách mới.',
     '',
     ...knownLines,
     knownLines.length > 0 ? '' : null,
@@ -362,7 +367,7 @@ export function formatNewPassengerMissingFieldsMessage(
     'Gửi theo mẫu:',
     ...sampleLines,
     '',
-    'Ngày sinh không bắt buộc, chỉ thêm khi cần.',
+    'Ngày sinh không bắt buộc, chỉ thêm khi cần nhé.',
   ]
     .filter((line): line is string => line !== null)
     .join('\n');
@@ -376,12 +381,12 @@ export function formatPassengerAttachedMessage(
   profile: PassengerProfile,
 ) {
   return [
-    `Đã gắn khách vào case ${caseId}.`,
+    `✅ Đã gắn khách vào case ${caseId}.`,
     '',
     ...formatPassengerSummaryLines(profile),
     '',
     'Trạng thái: passenger_ready.',
-    'Mình sẽ tự động nhập form và tiến hành giữ chỗ trên 1Booking.',
+    'Mình sẽ tự động nhập form và giữ chỗ trên 1Booking nhé.',
   ].join('\n');
 }
 
@@ -389,7 +394,7 @@ export function formatPassengerAttachedMessage(
  * Formats the automatic form-fill and hold progress message.
  */
 export function formatPassengerHoldRunningMessage(caseId: string) {
-  return `Đang nhập thông tin khách và giữ chỗ cho case ${caseId} trên 1Booking...`;
+  return `⏳ Mình đang nhập thông tin khách và giữ chỗ cho case ${caseId} trên 1Booking...`;
 }
 
 /**
@@ -397,9 +402,9 @@ export function formatPassengerHoldRunningMessage(caseId: string) {
  */
 export function formatPassengerHoldMissingDobMessage(profile: PassengerProfile) {
   return [
-    `Chuyến Vietnam Airlines cần ngày sinh của ${profile.normalizedFullName} trước khi giữ chỗ.`,
+    `📝 Chuyến Vietnam Airlines cần ngày sinh của ${profile.normalizedFullName} trước khi giữ chỗ.`,
     '',
-    'Vui lòng bổ sung dạng: sinh 02/01/1995',
+    'Bạn bổ sung giúp mình theo mẫu: sinh 02/01/1995',
   ].join('\n');
 }
 
@@ -412,10 +417,10 @@ export function formatPassengerHoldSuccessMessage(
   pnrWarning?: string,
 ) {
   return [
-    'GIỮ CHỖ THÀNH CÔNG',
+    '✅ GIỮ CHỖ THÀNH CÔNG',
     '',
     'PNR',
-    pnrCode ?? 'Chưa extract được',
+    pnrCode ?? 'Chưa lấy được',
     '',
     `Case: ${caseId}`,
     'Trạng thái: successful_hold',
@@ -429,7 +434,7 @@ export function formatPassengerHoldSuccessMessage(
  * Formats the brief operator notice shown before automatic 1Booking re-login.
  */
 export function formatOneBookingAuthRefreshStartedMessage() {
-  return 'Phiên 1Booking đã hết hạn, mình đang tự đăng nhập lại...';
+  return '⏳ Phiên 1Booking đã hết hạn, mình đang tự đăng nhập lại nhé...';
 }
 
 /**
@@ -437,9 +442,9 @@ export function formatOneBookingAuthRefreshStartedMessage() {
  */
 export function formatPassengerHoldNeedsReviewMessage(message: string) {
   return [
-    'Đã gửi thao tác giữ chỗ lên 1Booking nhưng chưa thể xác nhận trạng thái cuối.',
+    '⚠️ Mình đã gửi thao tác giữ chỗ lên 1Booking, nhưng chưa xác nhận được trạng thái cuối.',
     '',
-    'Vui lòng kiểm tra đơn hàng hiện có trên 1Booking trước khi thử lại để tránh giữ chỗ trùng.',
+    'Bạn kiểm tra đơn hàng hiện có trên 1Booking trước khi thử lại để tránh giữ chỗ trùng nhé.',
     '',
     message,
   ].join('\n');
@@ -450,13 +455,13 @@ export function formatPassengerHoldNeedsReviewMessage(message: string) {
  */
 export function formatPassengerHoldFailedMessage(message: string) {
   return [
-    'Chưa giữ chỗ được trên 1Booking.',
+    '⚠️ Mình chưa giữ chỗ được trên 1Booking.',
     '',
     formatPassengerHoldFailureReason(message),
     '',
-    'Vui lòng kiểm tra lại thông tin khách/chuyến rồi thử lại.',
+    'Bạn kiểm tra lại thông tin khách/chuyến rồi thử lại giúp mình nhé.',
     '',
-    'Mình gửi screenshot bên dưới để bạn đối chiếu nếu có.',
+    'Mình gửi screenshot bên dưới để bạn đối chiếu nếu có nhé.',
   ].join('\n');
 }
 
@@ -465,9 +470,9 @@ export function formatPassengerHoldFailedMessage(message: string) {
  */
 export function formatPassengerParserFailedMessage() {
   return [
-    'Mình chưa phân tích được thông tin khách.',
+    '📝 Mình chưa đọc rõ thông tin khách.',
     '',
-    'Vui lòng gửi theo mẫu:',
+    'Bạn gửi theo mẫu này giúp mình nhé:',
     'Nữ, Nguyễn Thị Oanh',
     'Nam, Nguyễn Văn A',
   ].join('\n');
@@ -478,9 +483,9 @@ export function formatPassengerParserFailedMessage() {
  */
 export function formatPassengerCaseRequiredMessage() {
   return [
-    'Mình chưa biết đang thao tác case nào.',
+    '📝 Mình chưa biết đang thao tác case nào.',
     '',
-    'Vui lòng gửi theo mẫu:',
+    'Bạn gửi theo mẫu này giúp mình nhé:',
     'BK-YYYYMMDD-HHMMSS lấy khách Nữ, Nguyễn Thị Oanh',
     'hoặc chọn chuyến trước rồi gửi: Nữ, Nguyễn Thị Oanh',
   ].join('\n');
@@ -491,9 +496,9 @@ export function formatPassengerCaseRequiredMessage() {
  */
 export function formatPassengerCaseNotReadyMessage(caseId: string) {
   return [
-    `Case ${caseId} chưa sẵn sàng để nhận thông tin khách.`,
+    `📝 Case ${caseId} chưa sẵn sàng để nhận thông tin khách.`,
     '',
-    'Vui lòng chọn chuyến trước, rồi gửi khách theo mẫu:',
+    'Bạn chọn chuyến trước, rồi gửi khách theo mẫu:',
     'Nữ, Nguyễn Thị Oanh',
   ].join('\n');
 }
@@ -503,9 +508,9 @@ export function formatPassengerCaseNotReadyMessage(caseId: string) {
  */
 export function formatPassengerProfileMissingMessage() {
   return [
-    'Mình không tìm thấy khách này trong dữ liệu local.',
+    '📝 Mình chưa tìm thấy khách này trong dữ liệu local.',
     '',
-    'Vui lòng gửi lại tên khách theo mẫu:',
+    'Bạn gửi lại tên khách theo mẫu này giúp mình nhé:',
     'Nữ, Nguyễn Thị Oanh',
   ].join('\n');
 }
@@ -516,15 +521,15 @@ export function formatPassengerProfileMissingMessage() {
 export function formatPassengerMentionMissingMessage(isRejectIntent: boolean) {
   return isRejectIntent
     ? [
-        'Mình chưa biết cần tìm khách nào khác.',
+        '📝 Mình chưa biết cần tìm khách nào khác.',
         '',
-        'Vui lòng gửi lại theo mẫu:',
+        'Bạn gửi lại theo mẫu này giúp mình nhé:',
         'tìm khách Nguyễn Thị Oanh khác',
       ].join('\n')
     : [
-        'Mình chưa nhận ra tên khách.',
+        '📝 Mình chưa nhận ra tên khách.',
         '',
-        'Vui lòng gửi lại theo mẫu:',
+        'Bạn gửi lại theo mẫu này giúp mình nhé:',
         'Nữ, Nguyễn Thị Oanh',
       ].join('\n');
 }
@@ -534,9 +539,9 @@ export function formatPassengerMentionMissingMessage(isRejectIntent: boolean) {
  */
 export function formatHoldRecoveryParseFailedMessage() {
   return [
-    'Mình chưa hiểu lệnh recover hold.',
+    '📝 Mình chưa hiểu lệnh recover hold.',
     '',
-    'Vui lòng gửi đúng mẫu:',
+    'Bạn gửi đúng mẫu này giúp mình nhé:',
     'recover BK-YYYYMMDD-HHMMSS PNR ABC123',
   ].join('\n');
 }
@@ -547,7 +552,7 @@ export function formatHoldRecoveryParseFailedMessage() {
 export function formatHoldRecoveryFailedMessage(message: string) {
   if (/PNR .*không hợp lệ|PNR phải/i.test(message)) {
     return [
-      'PNR chưa đúng định dạng.',
+      '📝 PNR chưa đúng định dạng.',
       '',
       'PNR cần gồm 6 ký tự chữ/số, ví dụ:',
       'recover BK-YYYYMMDD-HHMMSS PNR ABC123',
@@ -556,15 +561,15 @@ export function formatHoldRecoveryFailedMessage(message: string) {
 
   if (/không tìm thấy case/i.test(message)) {
     return [
-      'Mình không tìm thấy case cần recover.',
+      '📝 Mình chưa tìm thấy case cần recover.',
       '',
-      'Vui lòng kiểm tra lại mã case và gửi:',
+      'Bạn kiểm tra lại mã case rồi gửi theo mẫu:',
       'recover BK-YYYYMMDD-HHMMSS PNR ABC123',
     ].join('\n');
   }
 
   return [
-    'Chưa thể recover hold cho case này.',
+    '⚠️ Mình chưa recover hold được cho case này.',
     '',
     'Chỉ recover khi case đang cần kiểm tra hold hoặc đã hold nhưng thiếu PNR.',
   ].join('\n');
@@ -684,14 +689,14 @@ function formatSelectionBookingClass(
 
 function formatSearchFailureReason(message?: string) {
   if (message && /auth session expired|login is required|đăng nhập/i.test(message)) {
-    return 'Phiên 1Booking có thể vừa hết hạn. Bot sẽ tự đăng nhập lại khi flow cho phép.';
+    return 'Phiên 1Booking có thể vừa hết hạn. Mình sẽ tự đăng nhập lại khi flow cho phép.';
   }
 
   if (message && /loading|timeout|load|still/i.test(message)) {
-    return '1Booking tải kết quả quá lâu hoặc chưa trả danh sách chuyến ổn định.';
+    return '1Booking đang tải hơi lâu hoặc chưa trả danh sách chuyến ổn định.';
   }
 
-  return 'Có thể 1Booking chưa trả kết quả ổn định hoặc không có chuyến phù hợp.';
+  return 'Có thể 1Booking chưa trả kết quả ổn định hoặc chưa có chuyến phù hợp.';
 }
 
 function formatFlightSelectionFailureReason(
@@ -699,31 +704,31 @@ function formatFlightSelectionFailureReason(
   input?: SelectMatchingFlightInput,
 ) {
   if (/case .*not found|không tìm thấy case/i.test(message)) {
-    return 'Mình không tìm thấy mã case này trong dữ liệu local.';
+    return 'Mình chưa tìm thấy mã case này trong dữ liệu local.';
   }
 
   if (/no saved search input|chưa có searchInput/i.test(message)) {
-    return 'Case này chưa có kết quả tìm chuyến đã lưu. Vui lòng search chuyến trước.';
+    return 'Case này chưa có kết quả tìm chuyến đã lưu. Bạn search chuyến trước giúp mình nhé.';
   }
 
   if (/multiple matching|Found \d+ matching/i.test(message)) {
     return [
       'Có nhiều chuyến cùng khớp thông tin đã gửi.',
       '',
-      'Vui lòng thêm hạng đặt chỗ hoặc hãng rõ hơn.',
+      'Bạn thêm hạng đặt chỗ hoặc hãng rõ hơn giúp mình nhé.',
     ].join('\n');
   }
 
   if (input && /No available flight matched/i.test(message)) {
     return [
-      'Mình không thấy chuyến khớp:',
+      'Mình chưa thấy chuyến khớp:',
       `Hãng: ${formatSelectionAirline(input)}`,
       `Giờ bay: ${input.departureTime}`,
       `Hạng: ${formatSelectionBookingClassShort(input.bookingClass)}`,
     ].join('\n');
   }
 
-  return 'Danh sách chuyến live trên 1Booking không khớp với thông tin vừa gửi.';
+  return 'Danh sách chuyến live trên 1Booking chưa khớp với thông tin vừa gửi.';
 }
 
 function formatPassengerHoldFailureReason(message: string) {
@@ -739,7 +744,7 @@ function formatPassengerHoldFailureReason(message: string) {
     return '1Booking chưa xác nhận kịp trạng thái trên màn hình.';
   }
 
-  return 'Automation chưa hoàn tất được bước nhập khách hoặc giữ chỗ.';
+  return 'Mình chưa hoàn tất được bước nhập khách hoặc giữ chỗ.';
 }
 
 function buildFlightSelectionRetryExample(input?: SelectMatchingFlightInput) {

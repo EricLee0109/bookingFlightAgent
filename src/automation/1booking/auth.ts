@@ -54,9 +54,9 @@ export function readOneBookingCredentialsFromEnv(
   }
 
   return {
-    agentId,
-    username,
-    password,
+    agentId: agentId ?? '',
+    username: username ?? '',
+    password: password ?? '',
   };
 }
 
