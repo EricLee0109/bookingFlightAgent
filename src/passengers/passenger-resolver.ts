@@ -54,7 +54,7 @@ export class PassengerResolver {
     const candidates = this.scoreCandidates(lookupQuery).filter(
       (candidate) => !excludedIds.has(candidate.profile.id),
     );
-    const topCandidate = candidates[0];
+    let topCandidate = candidates[0];
 
     if (!topCandidate || topCandidate.score < 0.58) {
       return createNotFoundResult();
@@ -67,25 +67,34 @@ export class PassengerResolver {
     );
 
     if (closeCandidates.length > 1) {
-      const profiles = closeCandidates.slice(0, 5).map(({ profile }) => profile);
+      const decisiveCandidate =
+        chooseDecisiveCachedCandidate(closeCandidates);
 
-      for (const profile of profiles) {
-        this.store.insertConfidenceScore({
-          passengerProfileId: profile.id,
-          score: topCandidate.score,
+      if (decisiveCandidate) {
+        topCandidate = decisiveCandidate;
+      } else {
+        const profiles = closeCandidates
+          .slice(0, 5)
+          .map(({ profile }) => profile);
+
+        for (const profile of profiles) {
+          this.store.insertConfidenceScore({
+            passengerProfileId: profile.id,
+            score: topCandidate.score,
+            reason: 'ambiguous_candidate',
+            source: 'operator_input',
+            observedQuery: lookupQuery,
+          });
+        }
+
+        return {
+          status: 'ambiguous',
+          confidenceScore: topCandidate.score,
           reason: 'ambiguous_candidate',
-          source: 'operator_input',
-          observedQuery: lookupQuery,
-        });
+          candidates: profiles,
+          missingFields: [],
+        };
       }
-
-      return {
-        status: 'ambiguous',
-        confidenceScore: topCandidate.score,
-        reason: 'ambiguous_candidate',
-        candidates: profiles,
-        missingFields: [],
-      };
     }
 
     const missingFields = getMissingRequiredPassengerFields(
@@ -230,6 +239,43 @@ function setHigherScore(
       reason,
     });
   }
+}
+
+/**
+ * Prefers a strong cached passenger over a low-confidence manual duplicate.
+ *
+ * This protects local cache quality after a previous bad manual insert such as
+ * `CHI / LANH`. Real same-name passengers from 1Booking with similar evidence
+ * still remain ambiguous and require operator confirmation.
+ */
+function chooseDecisiveCachedCandidate(
+  candidates: ScoredPassengerCandidate[],
+) {
+  const [topCandidate, secondCandidate] = candidates;
+
+  if (!topCandidate || !secondCandidate) {
+    return topCandidate ?? null;
+  }
+
+  const hasStrongHistory =
+    topCandidate.profile.seenCount >= 3 &&
+    topCandidate.profile.seenCount - secondCandidate.profile.seenCount >= 3;
+  const trustedTop = isTrustedPassengerSource(topCandidate.profile.source);
+  const untrustedSecond = !isTrustedPassengerSource(
+    secondCandidate.profile.source,
+  );
+
+  return hasStrongHistory && trustedTop && untrustedSecond
+    ? topCandidate
+    : null;
+}
+
+function isTrustedPassengerSource(source: PassengerProfile['source']) {
+  return (
+    source === 'onebooking_suggest' ||
+    source === 'onebooking_form_hydrated' ||
+    source === 'successful_hold'
+  );
 }
 
 function calculateSimilarity(left: string, right: string) {

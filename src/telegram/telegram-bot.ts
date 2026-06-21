@@ -26,6 +26,14 @@ export async function startTelegramAgent() {
     polling: true,
   });
 
+  bot.on('polling_error', (error) => {
+    console.error('Telegram long polling error:', error);
+  });
+
+  bot.on('error', (error) => {
+    console.error('Telegram bot runtime error:', error);
+  });
+
   bot.on('message', async (message) => {
     try {
       await handleTelegramMessage(bot, message);

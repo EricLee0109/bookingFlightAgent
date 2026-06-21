@@ -271,3 +271,106 @@ Call log:
 2026-06-09T09:43:21.007Z INFO one_booking_hold_success_modal_observed case=BK-20260609-164103 Observed transient 1Booking hold success modal.
 2026-06-09T09:43:25.522Z INFO one_booking_hold_order_page_confirmed case=BK-20260609-164103 Confirmed durable 1Booking held-order page. meta={"orderId":"#HS2200389000141","orderDetailUrl":"https://pro.1booking.vn/order/HS2200389000141"}
 2026-06-09T09:43:25.567Z INFO one_booking_pnr_extracted case=BK-20260609-164103 Extracted held-booking PNR. meta={"pnrCode":"6QJ7A4"}
+2026-06-16T08:30:59.822Z INFO telegram_request_received case=BK-20260616-153059 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-06-16T08:31:03.371Z WARN flight_request_missing_fields case=BK-20260616-153059 Missing fields: fromAirportCode, fromAirportText, toAirportCode, toAirportText, departureDate
+2026-06-16T08:31:14.071Z INFO telegram_request_received case=BK-20260616-153114 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-06-16T08:31:48.548Z INFO one_booking_search_completed case=BK-20260616-153114 1Booking search completed. meta={"flightCount":70,"screenshotPath":"screenshots/1booking-search-flights-1.png","screenshotPaths":["screenshots/1booking-search-flights-1.png","screenshots/1booking-search-flights-2.png","screenshots/1booking-search-flights-3.png","screenshots/1booking-search-flights-4.png","screenshots/1booking-search-flights-5.png","screenshots/1booking-search-flights-6.png","screenshots/1booking-search-flights-7.png"]}
+2026-06-16T08:32:49.809Z INFO flight_selection_requested case=BK-20260616-153114 Received Telegram flight selection request. meta={"telegramUserId":2053205692,"chatId":2053205692,"selectionInput":{"caseId":"BK-20260616-153114","airlineCode":"VJ","airlineName":"Vietjet Air","departureTime":"14:10","bookingClass":null}}
+2026-06-16T08:33:50.887Z INFO one_booking_selection_completed case=BK-20260616-153114 1Booking flight selection completed. meta={"selectedFlight":{"cardIndex":69,"airlineCode":"VJ","airlineName":"Vietjet Air","flightNumber":"VJ140","departureTime":"14:10","arrivalTime":"16:20","bookingClass":"ECO","priceText":"VND\n3,729,000","selectedAt":"2026-06-16T08:33:50.886Z"},"selectionScreenshotPath":"screenshots/BK-20260616-153114-selected-flight.png"}
+2026-06-16T09:30:25.131Z INFO flight_selection_requested case=BK-20260616-153114 Received Telegram flight selection request. meta={"telegramUserId":2053205692,"chatId":2053205692,"selectionInput":{"caseId":"BK-20260616-153114","airlineCode":"VJ","airlineName":"Vietjet Air","departureTime":"14:10","bookingClass":null}}
+2026-06-16T09:30:26.025Z INFO telegram_request_received case=BK-20260616-163026 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-06-16T09:30:26.025Z INFO telegram_request_received case=BK-20260616-163026 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-06-16T09:30:26.026Z INFO telegram_request_received case=BK-20260616-163026 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-06-16T09:30:26.026Z INFO flight_selection_requested case=BK-20260616-153114 Received Telegram flight selection request. meta={"telegramUserId":2053205692,"chatId":2053205692,"selectionInput":{"caseId":"BK-20260616-153114","airlineCode":"VJ","airlineName":"Vietjet Air","departureTime":"14:10","bookingClass":null}}
+2026-06-16T09:30:26.027Z INFO telegram_request_received case=BK-20260616-163026 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-06-16T09:30:26.028Z INFO telegram_request_received case=BK-20260616-163026 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-06-16T09:30:47.610Z ERROR one_booking_selection_failed case=BK-20260616-153114 ⏳ Agent đang ✈️ Chọn chuyến bay. Vui lòng chờ hoàn tất rồi gửi tiếp meta={"errorScreenshotPath":null}
+2026-06-16T09:30:58.226Z ERROR one_booking_selection_failed case=BK-20260616-153114 locator.click: Target page, context or browser has been closed
+Call log:
+[2m  - waiting for getByRole('textbox', { name: 'Chọn điểm đi' })[22m
+[2m    - locator resolved to <input value="" type="text" name="startPoint" autocomplete="off" placeholder="Chọn điểm đi" class="ant-input css-mpmors ant-input-outlined w-full !border-none !bg-transparent p-0 font-medium focus:!shadow-none"/>[22m
+[2m  - attempting click action[22m
+[2m    2 × waiting for element to be visible, enabled and stable[22m
+[2m      - element is visible, enabled and stable[22m
+[2m      - scrolling into view if needed[22m
+[2m      - done scrolling[22m
+[2m      - <div class="ant-drawer-mask"></div> from <div>…</div> subtree intercepts pointer events[22m
+[2m    - retrying click action[22m
+[2m    - waiting 20ms[22m
+[2m    2 × waiting for element to be visible, enabled and stable[22m
+[2m      - element is visible, enabled and stable[22m
+[2m      - scrolling into view if needed[22m
+[2m      - done scrolling[22m
+[2m      - <div class="ant-drawer-mask"></div> from <div>…</div> subtree intercepts pointer events[22m
+[2m    - retrying click action[22m
+[2m      - waiting 100ms[22m
+[2m    13 × waiting for element to be visible, enabled and stable[22m
+[2m       - element is visible, enabled and stable[22m
+[2m       - scrolling into view if needed[22m
+[2m       - done scrolling[22m
+[2m       - <div class="ant-drawer-mask"></div> from <div>…</div> subtree intercepts pointer events[22m
+[2m     - retrying click action[22m
+[2m       - waiting 500ms[22m
+[2m    - waiting for element to be visible, enabled and stable[22m
+ meta={"errorScreenshotPath":null}
+2026-06-16T09:31:04.995Z WARN flight_request_missing_fields case=BK-20260616-163026 Missing fields: fromAirportCode, fromAirportText, toAirportCode, toAirportText, departureDate
+2026-06-16T09:31:04.996Z WARN flight_request_missing_fields case=BK-20260616-163026 Missing fields: departureDate
+2026-06-16T09:31:04.995Z WARN flight_request_missing_fields case=BK-20260616-163026 Missing fields: fromAirportCode, fromAirportText, toAirportCode, toAirportText, departureDate
+2026-06-16T09:31:05.000Z WARN flight_request_missing_fields case=BK-20260616-163026 Missing fields: fromAirportCode, fromAirportText, toAirportCode, toAirportText, departureDate
+2026-06-16T09:31:35.749Z ERROR one_booking_search_failed case=BK-20260616-163026 locator.click: Target page, context or browser has been closed
+Call log:
+[2m  - waiting for getByRole('textbox', { name: 'Chọn điểm đi' })[22m
+[2m    - locator resolved to <input value="" type="text" name="startPoint" autocomplete="off" placeholder="Chọn điểm đi" class="ant-input css-mpmors ant-input-outlined w-full !border-none !bg-transparent p-0 font-medium focus:!shadow-none"/>[22m
+[2m  - attempting click action[22m
+[2m    2 × waiting for element to be visible, enabled and stable[22m
+[2m      - element is visible, enabled and stable[22m
+[2m      - scrolling into view if needed[22m
+[2m      - done scrolling[22m
+[2m      - <div class="ant-drawer-mask"></div> from <div>…</div> subtree intercepts pointer events[22m
+[2m    - retrying click action[22m
+[2m    - waiting 20ms[22m
+[2m    2 × waiting for element to be visible, enabled and stable[22m
+[2m      - element is visible, enabled and stable[22m
+[2m      - scrolling into view if needed[22m
+[2m      - done scrolling[22m
+[2m      - <div class="ant-drawer-mask"></div> from <div>…</div> subtree intercepts pointer events[22m
+[2m    - retrying click action[22m
+[2m      - waiting 100ms[22m
+[2m    10 × waiting for element to be visible, enabled and stable[22m
+[2m       - element is visible, enabled and stable[22m
+[2m       - scrolling into view if needed[22m
+[2m       - done scrolling[22m
+[2m       - <div class="ant-drawer-mask"></div> from <div>…</div> subtree intercepts pointer events[22m
+[2m     - retrying click action[22m
+[2m       - waiting 500ms[22m
+ meta={"errorScreenshotPath":null}
+2026-06-17T05:01:55.148Z INFO telegram_request_received case=BK-20260617-120155 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-06-17T05:01:58.357Z WARN flight_request_missing_fields case=BK-20260617-120155 Missing fields: fromAirportCode, fromAirportText, toAirportCode, toAirportText, departureDate
+2026-06-17T05:02:06.736Z INFO telegram_request_received case=BK-20260617-120206 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-06-17T05:02:33.668Z INFO one_booking_search_completed case=BK-20260617-120206 1Booking search completed. meta={"flightCount":43,"screenshotPath":"screenshots/1booking-search-flights-1.png","screenshotPaths":["screenshots/1booking-search-flights-1.png","screenshots/1booking-search-flights-2.png","screenshots/1booking-search-flights-3.png","screenshots/1booking-search-flights-4.png","screenshots/1booking-search-flights-5.png"]}
+2026-06-17T05:02:56.611Z INFO flight_selection_requested case=BK-20260617-120206 Received Telegram flight selection request. meta={"telegramUserId":2053205692,"chatId":2053205692,"selectionInput":{"caseId":"BK-20260617-120206","airlineCode":"VJ","airlineName":"Vietjet Air","departureTime":"19:45","bookingClass":null}}
+2026-06-17T05:05:05.128Z INFO one_booking_selection_completed case=BK-20260617-120206 1Booking flight selection completed. meta={"selectedFlight":{"cardIndex":25,"airlineCode":"VJ","airlineName":"Vietjet Air","flightNumber":"VJ194","departureTime":"19:45","arrivalTime":"21:50","bookingClass":"ECO","priceText":"VND\n1,903,800","selectedAt":"2026-06-17T05:05:05.127Z"},"selectionScreenshotPath":"screenshots/BK-20260617-120206-selected-flight.png"}
+2026-06-17T05:07:15.967Z INFO one_booking_hold_loading_observed case=BK-20260617-120206 Observed transient 1Booking hold loading modal.
+2026-06-17T05:07:15.967Z INFO one_booking_hold_submitted case=BK-20260617-120206 Submitted final 1Booking hold action.
+2026-06-17T05:07:27.055Z INFO one_booking_hold_success_modal_observed case=BK-20260617-120206 Observed transient 1Booking hold success modal.
+2026-06-17T05:07:31.694Z INFO one_booking_hold_order_page_confirmed case=BK-20260617-120206 Confirmed durable 1Booking held-order page. meta={"orderId":"#HS2200389000157","orderDetailUrl":"https://pro.1booking.vn/order/HS2200389000157"}
+2026-06-17T05:07:31.741Z INFO one_booking_pnr_extracted case=BK-20260617-120206 Extracted held-booking PNR. meta={"pnrCode":"FJPC5E"}
+2026-06-19T09:56:58.488Z INFO telegram_request_received case=BK-20260619-165658 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-06-19T09:57:31.757Z INFO one_booking_search_completed case=BK-20260619-165658 1Booking search completed. meta={"flightCount":76,"screenshotPath":"screenshots/1booking-search-flights-1.png","screenshotPaths":["screenshots/1booking-search-flights-1.png","screenshots/1booking-search-flights-2.png","screenshots/1booking-search-flights-3.png","screenshots/1booking-search-flights-4.png","screenshots/1booking-search-flights-5.png","screenshots/1booking-search-flights-6.png","screenshots/1booking-search-flights-7.png","screenshots/1booking-search-flights-8.png"]}
+2026-06-19T09:58:10.490Z INFO flight_selection_requested case=BK-20260619-165658 Received Telegram flight selection request. meta={"telegramUserId":2053205692,"chatId":2053205692,"selectionInput":{"caseId":"BK-20260619-165658","airlineCode":"VJ","airlineName":"Vietjet Air","departureTime":"14:35","bookingClass":null}}
+2026-06-19T09:58:44.039Z INFO one_booking_selection_completed case=BK-20260619-165658 1Booking flight selection completed. meta={"selectedFlight":{"cardIndex":5,"airlineCode":"VJ","airlineName":"Vietjet Air","flightNumber":"VJ192","departureTime":"14:35","arrivalTime":"16:45","bookingClass":"ECO","priceText":"VND\n1,644,600","selectedAt":"2026-06-19T09:58:44.037Z"},"selectionScreenshotPath":"screenshots/BK-20260619-165658-selected-flight.png"}
+2026-06-21T05:40:22.165Z INFO telegram_request_received case=BK-20260621-124022 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-06-21T05:40:47.874Z INFO one_booking_search_completed case=BK-20260621-124022 1Booking search completed. meta={"flightCount":69,"screenshotPath":"screenshots/1booking-search-flights-1.png","screenshotPaths":["screenshots/1booking-search-flights-1.png","screenshots/1booking-search-flights-2.png","screenshots/1booking-search-flights-3.png","screenshots/1booking-search-flights-4.png","screenshots/1booking-search-flights-5.png","screenshots/1booking-search-flights-6.png","screenshots/1booking-search-flights-7.png"]}
+2026-06-21T05:41:14.519Z INFO flight_selection_requested case=BK-20260621-124022 Received Telegram flight selection request. meta={"telegramUserId":2053205692,"chatId":2053205692,"selectionInput":{"caseId":"BK-20260621-124022","airlineCode":"VJ","airlineName":"Vietjet Air","departureTime":"06:05","bookingClass":null}}
+2026-06-21T05:41:49.304Z INFO one_booking_selection_completed case=BK-20260621-124022 1Booking flight selection completed. meta={"selectedFlight":{"cardIndex":5,"airlineCode":"VJ","airlineName":"Vietjet Air","flightNumber":"VJ124","departureTime":"06:05","arrivalTime":"08:15","bookingClass":"ECO","priceText":"VND\n1,774,200","selectedAt":"2026-06-21T05:41:49.302Z"},"selectionScreenshotPath":"screenshots/BK-20260621-124022-selected-flight.png"}
+2026-06-21T05:42:24.689Z INFO one_booking_hold_loading_observed case=BK-20260621-124022 Observed transient 1Booking hold loading modal.
+2026-06-21T05:42:24.689Z INFO one_booking_hold_submitted case=BK-20260621-124022 Submitted final 1Booking hold action.
+2026-06-21T15:07:46.669Z INFO telegram_request_received case=BK-20260621-220746 Received Telegram flight request. meta={"telegramUserId":2053205692,"chatId":2053205692}
+2026-06-21T15:08:09.008Z INFO one_booking_search_completed case=BK-20260621-220746 1Booking search completed. meta={"flightCount":76,"screenshotPath":"screenshots/1booking-search-flights-1.png","screenshotPaths":["screenshots/1booking-search-flights-1.png","screenshots/1booking-search-flights-2.png","screenshots/1booking-search-flights-3.png","screenshots/1booking-search-flights-4.png","screenshots/1booking-search-flights-5.png","screenshots/1booking-search-flights-6.png","screenshots/1booking-search-flights-7.png","screenshots/1booking-search-flights-8.png"]}
+2026-06-21T15:08:45.027Z INFO flight_selection_requested case=BK-20260621-220746 Received Telegram flight selection request. meta={"telegramUserId":2053205692,"chatId":2053205692,"selectionInput":{"caseId":"BK-20260621-220746","airlineCode":"VJ","airlineName":"Vietjet Air","departureTime":"20:30","bookingClass":null}}
+2026-06-21T15:09:15.222Z INFO one_booking_selection_completed case=BK-20260621-220746 1Booking flight selection completed. meta={"selectedFlight":{"cardIndex":25,"airlineCode":"VJ","airlineName":"Vietjet Air","flightNumber":"VJ160","departureTime":"20:30","arrivalTime":"22:40","bookingClass":"ECO","priceText":"VND\n2,076,600","selectedAt":"2026-06-21T15:09:15.220Z"},"selectionScreenshotPath":"screenshots/BK-20260621-220746-selected-flight.png"}
+2026-06-21T15:09:47.288Z INFO one_booking_hold_submitted case=BK-20260621-220746 Submitted final 1Booking hold action.
+2026-06-21T15:09:47.341Z INFO one_booking_hold_loading_observed case=BK-20260621-220746 Observed transient 1Booking hold loading modal.
+2026-06-21T15:09:58.867Z INFO one_booking_hold_success_modal_observed case=BK-20260621-220746 Observed transient 1Booking hold success modal.
+2026-06-21T15:10:02.576Z INFO one_booking_hold_order_page_confirmed case=BK-20260621-220746 Confirmed durable 1Booking held-order page. meta={"orderId":"#HS2200389000163","orderDetailUrl":"https://pro.1booking.vn/order/HS2200389000163"}
+2026-06-21T15:10:02.596Z INFO one_booking_pnr_extracted case=BK-20260621-220746 Extracted held-booking PNR. meta={"pnrCode":"3W8V3E"}

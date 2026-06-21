@@ -1,5 +1,8 @@
 import { type Locator, type Page } from 'playwright';
 
+const ONE_BOOKING_IMPORTANT_NOTICE_HEADING =
+  /LƯU Ý QUAN TRỌNG|LUU Y QUAN TRONG/i;
+
 export class RetryableOneBookingSearchError extends Error {
   readonly retryable = true;
 }
@@ -55,6 +58,80 @@ export async function throwIfOneBookingLoginModalVisible(
       '1Booking auth session expired or login is required. Refreshing 1Booking auth state is required.',
     );
   }
+}
+
+/**
+ * Closes the optional 1Booking important-notice drawer when it appears.
+ *
+ * 1Booking can show this right-side banner after dashboard navigation. It is
+ * not part of the booking flow and can cover search/result locators, so browser
+ * flows call this helper before interacting with the page.
+ */
+export async function closeOneBookingImportantNoticeDrawer(
+  page: Page,
+  timeoutMs = 2000,
+) {
+  const heading = page.getByText(ONE_BOOKING_IMPORTANT_NOTICE_HEADING).first();
+  const isNoticeVisible = await heading
+    .isVisible({
+      timeout: timeoutMs,
+    })
+    .catch(() => false);
+
+  if (!isNoticeVisible) {
+    return false;
+  }
+
+  const drawer = page
+    .locator('.ant-drawer:visible, [class*="drawer"]:visible')
+    .filter({
+      hasText: ONE_BOOKING_IMPORTANT_NOTICE_HEADING,
+    })
+    .last();
+
+  const closeTargets = [
+    page.locator('.ant-drawer-close:visible').last(),
+    drawer.locator('.ant-drawer-close').first(),
+    drawer.locator('[aria-label="Close"], [aria-label="close"]').first(),
+    drawer.getByRole('button', { name: /close|đóng|dong/i }).first(),
+    drawer.locator('button').first(),
+  ];
+
+  for (const closeTarget of closeTargets) {
+    const canClick = await closeTarget
+      .isVisible({
+        timeout: 500,
+      })
+      .catch(() => false);
+
+    if (!canClick) {
+      continue;
+    }
+
+    await closeTarget
+      .click({
+        timeout: 2000,
+      })
+      .catch(() => null);
+    await heading
+      .waitFor({
+        state: 'hidden',
+        timeout: 3000,
+      })
+      .catch(() => null);
+
+    return true;
+  }
+
+  await page.keyboard.press('Escape').catch(() => null);
+  await heading
+    .waitFor({
+      state: 'hidden',
+      timeout: 3000,
+    })
+    .catch(() => null);
+
+  return true;
 }
 
 /**

@@ -443,17 +443,6 @@ async function handleTelegramFlightSelection(
   });
   let passengerOutcome: TelegramPassengerResolutionOutcome | null = null;
 
-  if (messageLooksLikePassengerInfo(rawMessage)) {
-    passengerOutcome = await resolvePassengerMessageForCase(
-      rawMessage,
-      currentCase,
-      {
-        autoConfirmReadyPassenger: true,
-      },
-    );
-    currentCase = passengerOutcome.flightCase;
-  }
-
   await appendLocalLog({
     level: 'info',
     event: 'flight_selection_requested',
@@ -472,6 +461,17 @@ async function handleTelegramFlightSelection(
       ? formatCombinedFlightSelectionProgressMessage(selectionInput)
       : formatFlightSelectionStartedMessage(selectionInput),
   );
+
+  if (messageLooksLikePassengerInfo(rawMessage)) {
+    passengerOutcome = await resolvePassengerMessageForCase(
+      rawMessage,
+      currentCase,
+      {
+        autoConfirmReadyPassenger: true,
+      },
+    );
+    currentCase = passengerOutcome.flightCase;
+  }
 
   const result = await selectMatchingOneBookingFlight(selectionInput, {
     onAuthRefresh: () =>

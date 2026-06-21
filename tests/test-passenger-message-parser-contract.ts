@@ -9,9 +9,11 @@ import { parseFlightSelectionMessage } from '../src/agent/flight-selection-parse
 import {
   assertSafeFinalHoldCtaText,
   buildPassengerQuickInput,
+  HoldBookingNotSupportedError,
   isDurableHeldOrderTerminalState,
   PostSubmitHoldError,
 } from '../src/automation/1booking/hold-booking';
+import { readOneBookingHoldContactInfoFromEnv } from '../src/automation/1booking/hold-contact';
 import { OneBookingAuthExpiredError } from '../src/automation/1booking/waiters';
 import {
   buildExactFlightNumberPattern,
@@ -259,6 +261,120 @@ function testPassengerResolverStates() {
       caseId: 'BK-20260525-162456',
       passengerProfileId: nguyenLanh.id,
     });
+  } finally {
+    store.close();
+  }
+}
+
+/**
+ * Verifies honorific-only mentions resolve existing cache aliases before any
+ * fallback manual passenger insert can create a fake `CHI / LANH` profile.
+ */
+function testHonorificMentionResolvesCachedPassenger() {
+  const store = new PassengerStore(
+    path.join(TEST_DIR, 'honorific-passengers.sqlite'),
+  );
+
+  try {
+    const cachedProfile = store.upsertPassengerProfile({
+      passengerType: 0,
+      lastName: 'NGUYEN',
+      firstName: 'THI LANH',
+      title: 'MS',
+      gender: false,
+      source: 'successful_hold',
+    });
+    const service = new PassengerResolutionService(store);
+    const resolved = service.resolveMention(
+      {
+        fullName: 'chị Lanh',
+        gender: 'female',
+        dob: null,
+      },
+      {
+        caseId: 'BK-20260621-124022',
+      },
+    );
+
+    assert.equal(resolved.status, 'matched');
+
+    if (resolved.status !== 'matched') {
+      throw new Error('Expected honorific mention to resolve cached passenger.');
+    }
+
+    assert.equal(resolved.profile.id, cachedProfile.id);
+    assert.equal(resolved.profile.lastName, 'NGUYEN');
+    assert.equal(resolved.profile.firstName, 'THI LANH');
+    assert.equal(store.findProfilesByNormalizedFullName('CHI LANH').length, 0);
+
+    const missingFullName = service.resolveMention(
+      {
+        fullName: 'chị Oanh',
+        gender: 'female',
+        dob: null,
+      },
+      {
+        caseId: 'BK-20260621-124022',
+      },
+    );
+
+    assert.equal(missingFullName.status, 'new_passenger_missing_fields');
+
+    if (missingFullName.status === 'new_passenger_missing_fields') {
+      assert.deepEqual(missingFullName.missingFields, ['fullName']);
+    }
+  } finally {
+    store.close();
+  }
+}
+
+/**
+ * Verifies an accidental low-history manual duplicate does not beat a trusted
+ * cached passenger with strong previous 1Booking evidence.
+ */
+function testResolverPrefersTrustedCachedPassengerOverManualDuplicate() {
+  const store = new PassengerStore(
+    path.join(TEST_DIR, 'trusted-duplicate-passengers.sqlite'),
+  );
+
+  try {
+    let trustedProfile = store.upsertPassengerProfile({
+      passengerType: 0,
+      lastName: 'NGUYEN',
+      firstName: 'THI LANH',
+      title: 'MS',
+      gender: false,
+      source: 'successful_hold',
+    });
+
+    for (let index = 0; index < 5; index++) {
+      trustedProfile = store.upsertPassengerProfile({
+        passengerType: 0,
+        lastName: 'NGUYEN',
+        firstName: 'THI LANH',
+        title: 'MS',
+        gender: false,
+        source: 'successful_hold',
+      });
+    }
+
+    store.upsertManualPassenger({
+      passengerType: 0,
+      lastName: 'CHI',
+      firstName: 'LANH',
+      title: 'MS',
+      gender: false,
+      source: 'operator_input',
+    });
+
+    const result = new PassengerResolver(store).resolve('chị Lanh');
+
+    assert.equal(result.status, 'matched');
+
+    if (result.status === 'matched') {
+      assert.equal(result.profile.id, trustedProfile.id);
+      assert.equal(result.profile.normalizedFullName, 'NGUYEN THI LANH');
+    }
   } finally {
     store.close();
   }
@@ -629,6 +745,36 @@ function testPassengerQuickInputAndAirlineDobRules() {
 }
 
 /**
+ * Verifies required 1Booking hold contact defaults are validated from env.
+ */
+function testOneBookingHoldContactInfoValidation() {
+  assert.deepEqual(
+    readOneBookingHoldContactInfoFromEnv({
+      ONE_BOOKING_HOLD_PHONENUMBER: '900000001',
+      ONE_BOOKING_HOLD_EMAIL: 'hold-contact@example.test',
+      ONE_BOOKING_HOLD_NAME: 'TEST CONTACT',
+    }),
+    {
+      phoneNumber: '900000001',
+      email: 'hold-contact@example.test',
+      contactName: 'TEST CONTACT',
+    },
+  );
+  assert.throws(
+    () =>
+      readOneBookingHoldContactInfoFromEnv({
+        ONE_BOOKING_HOLD_PHONENUMBER: '900000001',
+        ONE_BOOKING_HOLD_EMAIL: '',
+        ONE_BOOKING_HOLD_NAME: 'TEST CONTACT',
+      }),
+    (error) =>
+      error instanceof Error &&
+      /ONE_BOOKING_HOLD_EMAIL/.test(error.message) &&
+      !/900000001|TEST CONTACT/.test(error.message),
+  );
+}
+
+/**
  * Verifies that final hold automation permits only `Giữ chỗ`.
  *
  * Ticket issuance is permanently forbidden and must fail before any click.
@@ -641,6 +787,14 @@ function testSafeFinalHoldCtaGuard() {
     /must never click "Xuất vé ngay"/,
   );
   assert.throws(() => assertSafeFinalHoldCtaText('Hủy'));
+
+  const unsupportedHoldMessage = formatPassengerHoldFailedMessage(
+    new HoldBookingNotSupportedError().message,
+  );
+
+  assert.match(unsupportedHoldMessage, /chưa hỗ trợ giữ chỗ/);
+  assert.match(unsupportedHoldMessage, /nút Giữ chỗ/);
+  assert.doesNotMatch(unsupportedHoldMessage, /locator\.waitFor|Timeout/i);
 }
 
 /**
@@ -708,6 +862,14 @@ function testSubmittedHoldFailureSafety() {
       hasExpectedHeldFlight: false,
     }),
     false,
+  );
+  assert.equal(
+    isDurableHeldOrderTerminalState({
+      orderId: '',
+      hasExpectedHeldFlight: true,
+      pnrCode: 'DQ7S2J',
+    }),
+    true,
   );
   assert.equal(getPnrExtractionStatus('VNT56E'), 'PNR_EXTRACTED');
   assert.equal(getPnrExtractionStatus(null), 'HOLD_SUCCESS');
@@ -1087,6 +1249,8 @@ async function main() {
   await testOpenAIPassengerMessageParser();
   testPassengerQuickInputParserContract();
   testPassengerResolverStates();
+  testHonorificMentionResolvesCachedPassenger();
+  testResolverPrefersTrustedCachedPassengerOverManualDuplicate();
   testPassengerProfileEnrichment();
   testNewPassengerUpsertAndCaseAttachment();
   testIncompleteNewPassengerIsNotInserted();
@@ -1094,6 +1258,7 @@ async function main() {
   testPassengerMissingFieldTelegramMessages();
   testOperatorFriendlyPassengerFailureMessages();
   testPassengerQuickInputAndAirlineDobRules();
+  testOneBookingHoldContactInfoValidation();
   testSafeFinalHoldCtaGuard();
   testHeldBookingPnrExtraction();
   testSubmittedHoldFailureSafety();

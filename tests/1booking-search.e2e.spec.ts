@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { existsSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import {
@@ -14,10 +15,17 @@ import {
   fillAndAssertPassengerInformation,
   openPassengerHoldReview,
 } from '../src/automation/1booking/hold-booking';
+import {
+  fillAndAssertHoldContactInformation,
+  readOneBookingHoldContactInfoFromEnv,
+} from '../src/automation/1booking/hold-contact';
 import { searchFlights } from '../src/automation/1booking/flight-search';
 import { takeFullPageScreenshot } from '../src/automation/1booking/screenshots';
 
 test.setTimeout(240000);
+
+const SEARCH_DEPARTURE_DATE = getFutureIsoDate(7);
+const HOLD_ELIGIBLE_DEPARTURE_DATE = getFutureIsoDate(7);
 
 /**
  * End-to-end coverage for the MVP 1Booking search automation.
@@ -44,10 +52,12 @@ test('searches 1Booking flights with departure date', async ({ browser }) => {
       fromAirportText: 'Sân bay Tân Sơn Nhất (SGN)',
       toAirportCode: 'HAN',
       toAirportText: 'Sân bay Nội Bài (HAN)',
-      departureDate: '2026-05-13',
+      departureDate: SEARCH_DEPARTURE_DATE,
     });
 
-    expect(formatIsoDateForOneBooking('2026-05-13')).toBe('13/05/2026');
+    expect(formatIsoDateForOneBooking(SEARCH_DEPARTURE_DATE)).toMatch(
+      /^\d{2}\/\d{2}\/\d{4}$/,
+    );
     expect(result.success).toBe(true);
     expect(result.flightCount).toBeGreaterThan(0);
     expect(existsSync(result.screenshotPath)).toBe(true);
@@ -83,7 +93,7 @@ test('selects a matching ECO flight and opens passenger information page', async
     fromAirportText: 'Sân bay Tân Sơn Nhất (SGN)',
     toAirportCode: 'HAN',
     toAirportText: 'Sân bay Nội Bài (HAN)',
-    departureDate: '2026-06-20',
+    departureDate: HOLD_ELIGIBLE_DEPARTURE_DATE,
   };
 
   const context = await browser.newContext({
@@ -145,7 +155,7 @@ test('fills and asserts split passenger information before hold confirmation', a
     fromAirportText: 'Sân bay Tân Sơn Nhất (SGN)',
     toAirportCode: 'DAD',
     toAirportText: 'Sân bay Đà Nẵng (DAD)',
-    departureDate: '2026-06-20',
+    departureDate: HOLD_ELIGIBLE_DEPARTURE_DATE,
   };
   const context = await browser.newContext({
     storageState: ONE_BOOKING_STORAGE_STATE_PATH,
@@ -178,6 +188,10 @@ test('fills and asserts split passenger information before hold confirmation', a
       firstName: 'THI LANH',
       dob: null,
     });
+    await fillAndAssertHoldContactInformation(
+      page,
+      readOneBookingHoldContactInfoFromEnv(),
+    );
 
     await expect(
       page.getByRole('button', {
@@ -212,3 +226,18 @@ test('fills and asserts split passenger information before hold confirmation', a
     await context.close();
   }
 });
+
+/**
+ * Returns a local ISO date far enough out for 1Booking hold-enabled fares.
+ */
+function getFutureIsoDate(daysFromToday: number) {
+  const date = new Date();
+
+  date.setDate(date.getDate() + daysFromToday);
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}

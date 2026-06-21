@@ -61,17 +61,20 @@ export class PassengerResolutionService {
       ? this.store.getPassengerProfileById(options.pendingPassengerProfileId)
       : null;
 
-    if (pendingProfile && hasPassengerDetails(mention)) {
+    if (pendingProfile && shouldEnrichProfile(pendingProfile, mention)) {
       const enrichedProfile = this.enrichProfile(pendingProfile, mention);
 
       return this.resolver.resolve(enrichedProfile.normalizedFullName, options);
     }
 
     const query = mention.fullName ?? '';
+    const manualFullName = getManualPassengerFullName(mention.fullName);
+    const hasLeadingHonorific = manualFullName !== mention.fullName?.trim();
 
     if (
-      isCompletePassengerName(mention.fullName) &&
-      this.store.findProfilesByNormalizedFullName(mention.fullName).length === 0
+      !hasLeadingHonorific &&
+      isCompletePassengerName(manualFullName) &&
+      this.store.findProfilesByNormalizedFullName(manualFullName).length === 0
     ) {
       return this.upsertNewPassenger(mention, options.caseId);
     }
@@ -85,7 +88,7 @@ export class PassengerResolutionService {
     if (
       (result.status === 'matched' ||
         result.status === 'matched_but_missing_fields') &&
-      hasPassengerDetails(mention)
+      shouldEnrichProfile(result.profile, mention)
     ) {
       const enrichedProfile = this.enrichProfile(result.profile, mention);
 
@@ -129,7 +132,8 @@ export class PassengerResolutionService {
       };
     }
 
-    const nameParts = mention.fullName?.trim().split(/\s+/).filter(Boolean) ?? [];
+    const manualFullName = getManualPassengerFullName(mention.fullName);
+    const nameParts = manualFullName.trim().split(/\s+/).filter(Boolean);
     const gender = inferGender(mention);
     const profile = this.store.upsertManualPassenger({
       passengerType: 0,
@@ -206,8 +210,9 @@ export class PassengerResolutionService {
  */
 export function getMissingNewPassengerFields(mention: PassengerMention) {
   const missingFields: string[] = [];
+  const manualFullName = getManualPassengerFullName(mention.fullName);
 
-  if (!isCompletePassengerName(mention.fullName)) missingFields.push('fullName');
+  if (!isCompletePassengerName(manualFullName)) missingFields.push('fullName');
   if (!mention.gender) missingFields.push('gender');
 
   return missingFields;
@@ -224,8 +229,47 @@ function inferGender(mention: PassengerMention) {
   return null;
 }
 
-function hasPassengerDetails(mention: PassengerMention) {
-  return Boolean(mention.gender || mention.dob);
+function shouldEnrichProfile(
+  profile: PassengerProfile,
+  mention: PassengerMention,
+) {
+  return Boolean(mention.dob || (mention.gender && profile.gender === null));
+}
+
+const PASSENGER_NAME_HONORIFICS = new Set([
+  'ANH',
+  'A',
+  'CHI',
+  'C',
+  'CO',
+  'CHU',
+  'BAC',
+  'EM',
+  'BE',
+  'ONG',
+  'BA',
+]);
+
+/**
+ * Removes leading Vietnamese honorifics before deciding whether a new manual
+ * passenger is complete enough to save into SQLite.
+ *
+ * Local resolver matching still receives the original parser text first, so
+ * messages like `chị Lanh` can match the existing `LANH` alias. This sanitizer
+ * only protects the fallback "create new passenger" path from saving
+ * `CHI / LANH` as a fake family/given-name split.
+ */
+function getManualPassengerFullName(fullName: string | null) {
+  const tokens = fullName?.trim().split(/\s+/).filter(Boolean) ?? [];
+
+  while (
+    tokens.length > 0 &&
+    PASSENGER_NAME_HONORIFICS.has(normalizePassengerNameToken(tokens[0]))
+  ) {
+    tokens.shift();
+  }
+
+  return tokens.join(' ');
 }
 
 /**
@@ -233,4 +277,13 @@ function hasPassengerDetails(mention: PassengerMention) {
  */
 function isCompletePassengerName(fullName: string | null) {
   return (fullName?.trim().split(/\s+/).filter(Boolean).length ?? 0) >= 2;
+}
+
+function normalizePassengerNameToken(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/gi, 'd')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toUpperCase();
 }

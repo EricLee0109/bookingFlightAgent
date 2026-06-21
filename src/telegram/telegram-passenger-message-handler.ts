@@ -15,6 +15,7 @@ import {
   readLocalFlightCase,
   updateLocalFlightCase,
 } from '../storage/local-case-store';
+import { appendLocalLog } from '../storage/local-log-store';
 import { isAllowedTelegramOperator } from './telegram-access';
 import {
   formatPassengerAmbiguousMessage,
@@ -48,6 +49,8 @@ import {
   parsePassengerCallbackData,
 } from './telegram-passenger-keyboards';
 import { tryHandleTelegramPnrDetailCallback } from './telegram-pnr-detail';
+
+const PASSENGER_PARSER_TIMEOUT_MS = 15000;
 
 type LocalPassengerReadyCase = NonNullable<
   Awaited<ReturnType<typeof readLocalFlightCase>>
@@ -252,20 +255,26 @@ export async function resolvePassengerMessageForCase(
   let parsedPassengerMessage;
 
   try {
-    const parser = createOpenAIPassengerMessageParser();
-    parsedPassengerMessage = await parser.parse(rawMessage);
+    parsedPassengerMessage = await parsePassengerMessageWithTimeout(rawMessage);
   } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Passenger parser failed.';
     const currentCase = await updateLocalFlightCase(existingCase, {
       status: 'PASSENGER_INFO_FAILED',
-      passengerErrorMessage:
-        error instanceof Error ? error.message : 'Passenger parser failed.',
+      passengerErrorMessage: message,
+    });
+
+    await appendLocalLog({
+      level: 'error',
+      event: 'passenger_parser_failed',
+      caseId: existingCase.caseId,
+      message,
     });
 
     return {
       status: 'parser_failed',
       flightCase: currentCase,
-      message:
-        error instanceof Error ? error.message : 'Passenger parser failed.',
+      message,
     };
   }
 
@@ -413,6 +422,36 @@ export async function resolvePassengerMessageForCase(
       result,
     } satisfies TelegramPassengerResolutionOutcome;
   });
+}
+
+/**
+ * Parses passenger text with a bounded wait so Telegram never appears silent.
+ */
+async function parsePassengerMessageWithTimeout(rawMessage: string) {
+  const parser = createOpenAIPassengerMessageParser();
+  const parsePromise = parser.parse(rawMessage);
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      parsePromise,
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => {
+          reject(
+            new Error(
+              `Passenger parser timed out after ${PASSENGER_PARSER_TIMEOUT_MS}ms.`,
+            ),
+          );
+        }, PASSENGER_PARSER_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+
+    parsePromise.catch(() => null);
+  }
 }
 
 /**

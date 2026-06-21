@@ -23,6 +23,7 @@ import {
 } from '../src/automation/1booking/auth';
 import { matchFlightSelectionCandidate } from '../src/automation/1booking/flight-selection';
 import {
+  closeOneBookingImportantNoticeDrawer,
   OneBookingAuthExpiredError,
   throwIfOneBookingLoginModalVisible,
 } from '../src/automation/1booking/waiters';
@@ -607,6 +608,80 @@ async function testOneBookingAuthExpiredPasswordModalDetection() {
 }
 
 /**
+ * Verifies that the optional 1Booking notice drawer is closed when visible.
+ */
+async function testOneBookingImportantNoticeDrawerClose() {
+  let closeClicked = false;
+  let escapePressed = false;
+
+  const fakeHeading = {
+    first() {
+      return this;
+    },
+    async isVisible() {
+      return true;
+    },
+    async waitFor() {
+      return null;
+    },
+  };
+  const fakeCloseTarget = {
+    first() {
+      return this;
+    },
+    last() {
+      return this;
+    },
+    async isVisible() {
+      return true;
+    },
+    async click() {
+      closeClicked = true;
+    },
+  };
+  const fakeDrawer = {
+    filter() {
+      return this;
+    },
+    last() {
+      return this;
+    },
+    locator() {
+      return fakeCloseTarget;
+    },
+    getByRole() {
+      return fakeCloseTarget;
+    },
+  };
+  const fakePage = {
+    getByText() {
+      return fakeHeading;
+    },
+    locator(selector: string) {
+      if (selector.includes('ant-drawer-close')) {
+        return fakeCloseTarget;
+      }
+
+      return fakeDrawer;
+    },
+    keyboard: {
+      async press() {
+        escapePressed = true;
+      },
+    },
+  };
+
+  const didClose = await closeOneBookingImportantNoticeDrawer(
+    fakePage as never,
+    0,
+  );
+
+  assert.equal(didClose, true);
+  assert.equal(closeClicked, true);
+  assert.equal(escapePressed, false);
+}
+
+/**
  * Verifies automatic 1Booking login credential validation before browser launch.
  */
 function testOneBookingCredentialValidation() {
@@ -747,6 +822,7 @@ async function main() {
   testFlightSelectionMatcher();
   await testOneBookingAuthExpiredToastDetection();
   await testOneBookingAuthExpiredPasswordModalDetection();
+  await testOneBookingImportantNoticeDrawerClose();
   testOneBookingCredentialValidation();
   testParserFactoryProviderSelection();
   testOpenAIParserRequiresApiKey();

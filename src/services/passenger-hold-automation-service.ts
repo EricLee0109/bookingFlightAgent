@@ -5,6 +5,10 @@ import {
   fillAndAssertPassengerInformation,
   PostSubmitHoldError,
 } from '../automation/1booking/hold-booking';
+import {
+  fillAndAssertHoldContactInformation,
+  readOneBookingHoldContactInfoFromEnv,
+} from '../automation/1booking/hold-contact';
 import { extractHeldBookingPnr } from '../automation/1booking/pnr';
 import { takeFullPageScreenshot } from '../automation/1booking/screenshots';
 import { type SelectMatchingFlightInput } from '../contracts/flight';
@@ -129,6 +133,19 @@ async function fillPassengerAndHoldOneBookingCaseUnlocked(
     return createFailure(caseId, validationError);
   }
 
+  let holdContactInfo;
+
+  try {
+    holdContactInfo = readOneBookingHoldContactInfoFromEnv();
+  } catch (error) {
+    return createFailure(
+      caseId,
+      error instanceof Error
+        ? error.message
+        : 'Missing 1Booking hold contact info.',
+    );
+  }
+
   const authRetry = new OneBookingAuthRefreshRetryController({
     caseId,
     onAuthRefresh: options.onAuthRefresh,
@@ -155,6 +172,7 @@ async function fillPassengerAndHoldOneBookingCaseUnlocked(
         page,
         flightCase.attachedPassengerInfo!,
       );
+      await fillAndAssertHoldContactInformation(page, holdContactInfo);
 
       flightCase = await updateLocalFlightCase(flightCase, {
         status: 'FILL_PASSENGER_DONE',
@@ -242,10 +260,12 @@ async function fillPassengerAndHoldOneBookingCaseUnlocked(
       }
 
       try {
-        const pnrCode = await extractHeldBookingPnr(
-          page,
-          flightCase.selectedFlight!.flightNumber,
-        );
+        const pnrCode =
+          heldOrder.pnrCode ??
+          (await extractHeldBookingPnr(
+            page,
+            flightCase.selectedFlight!.flightNumber,
+          ));
 
         flightCase = await patchPersistedFlightCase(caseId, {
           status: getPnrExtractionStatus(pnrCode),

@@ -9,6 +9,7 @@ import {
 import { submitFlightSearch } from './search-form';
 import { takeFlightResultsBatchScreenshots } from './screenshots';
 import {
+  closeOneBookingImportantNoticeDrawer,
   throwIfOneBookingLoginModalVisible,
   waitForFlightResultsReady,
 } from './waiters';
@@ -43,6 +44,7 @@ export async function searchFlights(
     waitUntil: 'domcontentloaded',
     timeout: 60000,
   });
+  await closeOneBookingImportantNoticeDrawer(page);
   await throwIfOneBookingLoginModalVisible(page);
 
   await selectAirport(page, {
@@ -60,6 +62,7 @@ export async function searchFlights(
   await selectDepartureDate(page, input.departureDate);
 
   await submitFlightSearch(page);
+  await closeOneBookingImportantNoticeDrawer(page, 500);
   await throwIfOneBookingLoginModalVisible(page, 5000);
 
   const flightCount = await waitForFlightResultsReady(page);

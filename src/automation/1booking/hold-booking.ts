@@ -1,6 +1,10 @@
 import { type Locator, type Page } from 'playwright';
 import { type PassengerInfo } from '../../passengers/passenger-types';
-import { getHeldOrderFlightCards } from './pnr';
+import {
+  extractPnrCodesFromHeldOrderText,
+  getHeldOrderFlightCards,
+  isValidPnrCode,
+} from './pnr';
 import { throwIfOneBookingLoginModalVisible } from './waiters';
 
 /**
@@ -98,14 +102,31 @@ export type ConfirmPassengerHoldOptions = {
 export type HeldOrderPageProof = {
   orderId: string;
   orderDetailUrl: string;
+  pnrCode?: string;
 };
 
 export type HeldOrderTerminalState = {
   orderId: string;
   hasExpectedHeldFlight: boolean;
+  pnrCode?: string | null;
 };
 
 export type PostSubmitHoldCheckpoint = 'terminal_order_page';
+
+/**
+ * Error raised before submission when a 1Booking fare cannot be held.
+ *
+ * This is a safe failure: no irreversible hold action has been clicked and the
+ * forbidden `Xuất vé ngay` CTA must remain untouched.
+ */
+export class HoldBookingNotSupportedError extends Error {
+  constructor() {
+    super(
+      'Selected 1Booking fare does not support hold booking. Automation stopped before the forbidden "Xuất vé ngay" CTA.',
+    );
+    this.name = 'HoldBookingNotSupportedError';
+  }
+}
 
 /**
  * Marks an automation failure that occurred after the irreversible hold click.
@@ -149,6 +170,23 @@ export async function openPassengerHoldReview(
   page: Page,
   expectation: PassengerHoldReviewExpectation,
 ) {
+  const reviewDrawer = await openPassengerHoldReviewSummary(page, expectation);
+  await getSafeFinalHoldButton(reviewDrawer);
+
+  return reviewDrawer;
+}
+
+/**
+ * Opens and verifies the final review drawer without requiring hold support.
+ *
+ * Safe E2E tests use this because live 1Booking fares can expose only
+ * `Xuất vé ngay`. Production hold confirmation still calls
+ * `openPassengerHoldReview()` and requires the exact `Giữ chỗ` CTA.
+ */
+export async function openPassengerHoldReviewSummary(
+  page: Page,
+  expectation: PassengerHoldReviewExpectation,
+) {
   await throwIfOneBookingLoginModalVisible(page, 500);
   await clickPassengerFormConfirmation(page);
   await throwIfOneBookingLoginModalVisible(page, 1500);
@@ -156,7 +194,6 @@ export async function openPassengerHoldReview(
   const reviewDrawer = await waitForPassengerHoldReviewDrawer(page);
 
   await assertPassengerHoldReviewSummary(reviewDrawer, expectation);
-  await getSafeFinalHoldButton(reviewDrawer);
 
   return reviewDrawer;
 }
@@ -314,10 +351,20 @@ async function getSafeFinalHoldButton(reviewDrawer: Locator) {
     name: /^Giữ chỗ$|^Giu cho$/i,
   });
 
-  await holdButton.waitFor({
-    state: 'visible',
-    timeout: 10000,
-  });
+  const hasVisibleHoldButton = await holdButton
+    .first()
+    .isVisible({
+      timeout: 10000,
+    })
+    .catch(() => false);
+
+  if (!hasVisibleHoldButton) {
+    await throwIfHoldBookingUnsupported(reviewDrawer);
+
+    throw new Error(
+      'Cannot hold booking because the review drawer did not expose "Giữ chỗ".',
+    );
+  }
 
   if ((await holdButton.count()) !== 1) {
     throw new Error(
@@ -328,6 +375,29 @@ async function getSafeFinalHoldButton(reviewDrawer: Locator) {
   assertSafeFinalHoldCtaText(await holdButton.innerText());
 
   return holdButton;
+}
+
+/**
+ * Fails safely when the review drawer offers ticket issuance but not hold.
+ */
+async function throwIfHoldBookingUnsupported(reviewDrawer: Locator) {
+  const drawerText = normalizeVietnameseText(await reviewDrawer.innerText());
+  const hasUnsupportedHoldWarning = drawerText.includes(
+    'chuyen bay khong ho tro giu cho',
+  );
+  const hasForbiddenTicketCta = await reviewDrawer
+    .getByRole('button', {
+      name: /^Xuất vé ngay$|^Xuat ve ngay$/i,
+    })
+    .first()
+    .isVisible({
+      timeout: 500,
+    })
+    .catch(() => false);
+
+  if (hasUnsupportedHoldWarning || hasForbiddenTicketCta) {
+    throw new HoldBookingNotSupportedError();
+  }
 }
 
 /**
@@ -368,6 +438,34 @@ async function waitForHeldOrderPage(page: Page, flightNumber: string) {
   const orderId = page.getByText(/^#HS\d+$/i).first();
   const heldFlightCard = getHeldOrderFlightCards(page, flightNumber).first();
 
+  const orderPageProof = await waitForOrderDetailHeldState(
+    page,
+    orderId,
+    heldFlightCard,
+  ).catch(async (error) => {
+    const dashboardProof = await waitForDashboardHeldBookingProof(
+      page,
+      flightNumber,
+    ).catch(() => null);
+
+    if (dashboardProof) {
+      return dashboardProof;
+    }
+
+    throw error;
+  });
+
+  return orderPageProof;
+}
+
+/**
+ * Confirms the preferred order-detail terminal state after hold submission.
+ */
+async function waitForOrderDetailHeldState(
+  page: Page,
+  orderId: Locator,
+  heldFlightCard: Locator,
+) {
   await orderId.waitFor({
     state: 'visible',
     timeout: 120000,
@@ -395,6 +493,52 @@ async function waitForHeldOrderPage(page: Page, flightNumber: string) {
 }
 
 /**
+ * Confirms the new dashboard `Booking đến hạn` fallback state.
+ *
+ * Some 1Booking sessions now return to the dashboard after a successful hold.
+ * The visible card contains a PNR but not the flight number, so this fallback
+ * accepts only one valid PNR on a page that visibly contains `Booking đến hạn`.
+ */
+async function waitForDashboardHeldBookingProof(
+  page: Page,
+  flightNumber: string,
+) {
+  const bookingDueHeading = page.getByText(
+    /Booking đến hạn|Booking den han/i,
+  );
+
+  await bookingDueHeading.first().waitFor({
+    state: 'visible',
+    timeout: 120000,
+  });
+
+  const pageText = await page.locator('body').innerText();
+  const pnrCodes = extractPnrCodesFromHeldOrderText(pageText, flightNumber);
+
+  if (pnrCodes.length !== 1) {
+    throw new Error(
+      `Dashboard held-booking proof expected one PNR, found ${pnrCodes.length}.`,
+    );
+  }
+
+  if (
+    !isDurableHeldOrderTerminalState({
+      orderId: '',
+      hasExpectedHeldFlight: true,
+      pnrCode: pnrCodes[0],
+    })
+  ) {
+    throw new Error('Dashboard booking card did not expose a durable PNR state.');
+  }
+
+  return {
+    orderId: '',
+    orderDetailUrl: page.url(),
+    pnrCode: pnrCodes[0],
+  };
+}
+
+/**
  * Treats the durable held-order page as the source of truth after submission.
  *
  * Transient loading and success modals are intentionally absent from this
@@ -403,7 +547,11 @@ async function waitForHeldOrderPage(page: Page, flightNumber: string) {
 export function isDurableHeldOrderTerminalState(
   state: HeldOrderTerminalState,
 ) {
-  return /^#HS\d+$/i.test(state.orderId.trim()) && state.hasExpectedHeldFlight;
+  return (
+    (/^#HS\d+$/i.test(state.orderId.trim()) ||
+      Boolean(state.pnrCode && isValidPnrCode(state.pnrCode))) &&
+    state.hasExpectedHeldFlight
+  );
 }
 
 /**

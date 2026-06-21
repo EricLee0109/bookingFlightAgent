@@ -845,6 +845,18 @@ function formatPassengerHoldFailureReason(message: string) {
     return 'Phiên 1Booking có thể vừa hết hạn trước khi giữ chỗ.';
   }
 
+  if (
+    /does not support hold booking|không hỗ trợ giữ chỗ|khong ho tro giu cho|Xuất vé ngay|Xuat ve ngay/i.test(
+      message,
+    )
+  ) {
+    return [
+      'Chuyến/hạng này chưa hỗ trợ giữ chỗ trên 1Booking.',
+      '',
+      'Bạn chọn lại chuyến hoặc hạng khác có nút Giữ chỗ giúp mình nhé.',
+    ].join('\n');
+  }
+
   if (/passenger|gender|full name|quick input|Nhập nhanh/i.test(message)) {
     return '1Booking chưa nhận đúng thông tin khách trong form.';
   }
