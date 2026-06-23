@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { type FlightResultFilterSummary } from '../automation/1booking/flight-result-ranking';
 import { type SearchFlightsInput } from '../automation/1booking/flight-search';
 import { type ParsedFlightRequest, type SelectedFlight } from '../contracts/flight';
 import { type ParsedPassengerMessage } from '../contracts/passenger';
@@ -56,6 +57,8 @@ export type LocalFlightCase = {
   parsedRequest?: ParsedFlightRequest;
   searchInput?: SearchFlightsInput;
   flightCount?: number;
+  displayedFlightCount?: number;
+  flightResultFilter?: FlightResultFilterSummary;
   screenshotPath?: string;
   screenshotPaths?: string[];
   selectedFlight?: SelectedFlight;

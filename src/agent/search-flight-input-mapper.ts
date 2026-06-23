@@ -91,6 +91,9 @@ export function mapParsedRequestToSearchFlightsInput(
     toAirportCode: toAirport.code,
     toAirportText: toAirport.text,
     departureDate,
+    preferredTime: normalizedParsed.preferredTime,
+    specificTime: normalizedParsed.specificTime,
+    resultRanking: normalizedParsed.resultRanking,
   };
 }
 

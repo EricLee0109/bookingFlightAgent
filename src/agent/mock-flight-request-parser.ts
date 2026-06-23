@@ -30,6 +30,7 @@ export async function mockParseFlightRequest(
 
     preferredTime: 'morning',
     specificTime: null,
+    resultRanking: null,
 
     tripType: 'one_way',
 

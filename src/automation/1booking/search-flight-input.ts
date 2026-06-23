@@ -1,5 +1,7 @@
 import {
+  type FlightResultRanking,
   type ParsedFlightRequest,
+  type PreferredTime,
   validateAutomationSupport,
   validateSearchFlightInput,
 } from '../../contracts/flight';
@@ -17,6 +19,9 @@ export type SearchFlightsInput = {
   toAirportCode: string | null;
   toAirportText: string | null;
   departureDate: string | null;
+  preferredTime?: PreferredTime;
+  specificTime?: string | null;
+  resultRanking?: FlightResultRanking;
 };
 
 export type SearchFlightsInputValidation = {
@@ -121,6 +126,9 @@ export function mapParsedFlightRequestToSearchFlightsInput(
       toAirportCode: parsed.toAirportCode,
       toAirportText: parsed.toAirportText,
       departureDate: parsed.departureDate,
+      preferredTime: parsed.preferredTime,
+      specificTime: parsed.specificTime,
+      resultRanking: parsed.resultRanking,
     },
   };
 }

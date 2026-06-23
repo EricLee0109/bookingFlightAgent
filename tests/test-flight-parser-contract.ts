@@ -23,6 +23,13 @@ import {
 } from '../src/automation/1booking/auth';
 import { matchFlightSelectionCandidate } from '../src/automation/1booking/flight-selection';
 import {
+  extractLowestVndPriceAmount,
+  getFlightTimeBucketForPreferredTime,
+  isFlightTimeInBucket,
+  rankFlightResultsForSearch,
+  type FlightResultCandidate,
+} from '../src/automation/1booking/flight-result-ranking';
+import {
   closeOneBookingImportantNoticeDrawer,
   OneBookingAuthExpiredError,
   throwIfOneBookingLoginModalVisible,
@@ -32,6 +39,10 @@ import {
   getLatestFlightSearchCase,
   setLatestFlightSearchCase,
 } from '../src/telegram/telegram-flight-selection-context';
+import {
+  buildCheapestBucketSearchPatch,
+  parseCheapestBucketFollowUpMessage,
+} from '../src/telegram/telegram-message-handler';
 import {
   formatFlightSelectionFailedMessage,
   formatFlightSelectionParseFailedMessage,
@@ -49,6 +60,7 @@ const validOneWayRequest = {
   returnDate: null,
   preferredTime: 'morning',
   specificTime: null,
+  resultRanking: null,
   tripType: 'one_way',
   missingFields: [],
 } as const;
@@ -166,6 +178,25 @@ function testOpenAIParserPromptIncludesAirportCatalog() {
 
   assert.match(prompt, /cam ranh.*CXR/i);
   assert.match(prompt, /da nang.*DAD/i);
+}
+
+/**
+ * Verifies the standardized time buckets and cheapest-ranking schema contract.
+ */
+function testFlightTimeBucketAndRankingSchema() {
+  const prompt = buildFlightParserSystemPrompt('2026-05-19', 'Asia/Ho_Chi_Minh');
+  const parsed = ParsedFlightRequestSchema.parse({
+    ...validOneWayRequest,
+    preferredTime: 'early_morning',
+    resultRanking: 'cheapest',
+  });
+
+  assert.equal(parsed.preferredTime, 'early_morning');
+  assert.equal(parsed.resultRanking, 'cheapest');
+  assert.match(prompt, /early_morning/);
+  assert.match(prompt, /00:00-05:59/);
+  assert.match(prompt, /resultRanking to cheapest/);
+  assert.match(prompt, /rẻ nhất/);
 }
 
 /**
@@ -395,6 +426,65 @@ function testLatestFlightSearchCaseContext() {
 }
 
 /**
+ * Verifies cheapest bucket follow-up replies are combined into the latest case.
+ */
+function testCheapestBucketFollowUpPatch() {
+  const earlyMorning = parseCheapestBucketFollowUpMessage('sáng sớm');
+  const allCheapest = parseCheapestBucketFollowUpMessage(
+    'tất cả chuyến rẻ nhất',
+  );
+  const searchRequest = parseCheapestBucketFollowUpMessage(
+    'mình muốn bay từ SGN ra HAN ngày 30/07',
+  );
+
+  assert.deepEqual(earlyMorning, {
+    preferredTime: 'early_morning',
+    label: 'Sáng sớm',
+  });
+  assert.deepEqual(allCheapest, {
+    preferredTime: null,
+    label: 'Tất cả chuyến rẻ nhất',
+  });
+  assert.equal(searchRequest, null);
+
+  if (!earlyMorning || !allCheapest) {
+    throw new Error('Expected bucket follow-up parse results.');
+  }
+
+  const parsedRequest = ParsedFlightRequestSchema.parse({
+    ...validOneWayRequest,
+    preferredTime: 'morning',
+    resultRanking: 'cheapest',
+  });
+  const searchInput = mapParsedRequestToSearchFlightsInput(parsedRequest);
+
+  const earlyPatch = buildCheapestBucketSearchPatch(
+    {
+      searchInput,
+      parsedRequest,
+    },
+    earlyMorning,
+  );
+
+  assert.equal(earlyPatch.searchInput?.preferredTime, 'early_morning');
+  assert.equal(earlyPatch.searchInput?.resultRanking, 'cheapest');
+  assert.equal(earlyPatch.parsedRequest?.preferredTime, 'early_morning');
+  assert.equal(earlyPatch.parsedRequest?.resultRanking, 'cheapest');
+
+  const allPatch = buildCheapestBucketSearchPatch(
+    {
+      searchInput,
+      parsedRequest,
+    },
+    allCheapest,
+  );
+
+  assert.equal(allPatch.searchInput?.preferredTime, null);
+  assert.equal(allPatch.searchInput?.resultRanking, 'cheapest');
+  assert.equal(allPatch.parsedRequest?.preferredTime, null);
+}
+
+/**
  * Verifies Telegram flight failures use retry patterns instead of raw internals.
  */
 function testOperatorFriendlyFlightFailureMessages() {
@@ -440,6 +530,86 @@ function testOperatorFriendlyFlightFailureMessages() {
     combinedText,
     /No available flight matched|Missing fields:|fromAirportCode|toAirportCode|departureDate\b|departureTime|page\.waitForFunction|OPENAI_API_KEY/i,
   );
+}
+
+/**
+ * Verifies fixed Vietnam time buckets and top-cheapest result ranking.
+ */
+function testFlightResultRanking() {
+  const candidates: FlightResultCandidate[] = [
+    createRankingCandidate(0, '05:59', 900000),
+    createRankingCandidate(1, '06:00', 700000),
+    createRankingCandidate(2, '07:30', 500000),
+    createRankingCandidate(3, '08:30', 600000),
+    createRankingCandidate(4, '09:30', 800000),
+    createRankingCandidate(5, '11:59', 550000),
+    createRankingCandidate(6, '12:00', 300000),
+    createRankingCandidate(7, '17:59', 400000),
+    createRankingCandidate(8, '18:00', 200000),
+  ];
+
+  assert.equal(isFlightTimeInBucket('05:59', 'early_morning'), true);
+  assert.equal(isFlightTimeInBucket('06:00', 'morning'), true);
+  assert.equal(isFlightTimeInBucket('11:59', 'morning'), true);
+  assert.equal(isFlightTimeInBucket('12:00', 'afternoon'), true);
+  assert.equal(isFlightTimeInBucket('17:59', 'afternoon'), true);
+  assert.equal(isFlightTimeInBucket('18:00', 'night'), true);
+  assert.equal(getFlightTimeBucketForPreferredTime('specific_time'), null);
+
+  const morningCheapest = rankFlightResultsForSearch({
+    candidates,
+    preferredTime: 'morning',
+    resultRanking: 'cheapest',
+  });
+
+  assert.deepEqual(
+    morningCheapest?.candidates.map((candidate) => candidate.cardIndex),
+    [2, 5, 3, 1, 4],
+  );
+  assert.equal(morningCheapest?.summary.matchedCount, 5);
+  assert.equal(morningCheapest?.summary.displayedCount, 5);
+
+  const allCheapest = rankFlightResultsForSearch({
+    candidates,
+    preferredTime: null,
+    resultRanking: 'cheapest',
+  });
+
+  assert.deepEqual(
+    allCheapest?.candidates.map((candidate) => candidate.cardIndex),
+    [8, 6, 7, 2, 5],
+  );
+
+  const emptyBucket = rankFlightResultsForSearch({
+    candidates: [createRankingCandidate(10, '14:10', 450000)],
+    preferredTime: 'early_morning',
+    resultRanking: 'cheapest',
+  });
+
+  assert.equal(emptyBucket?.summary.displayedCount, 0);
+  assert.equal(emptyBucket?.summary.matchedCount, 0);
+  assert.equal(
+    extractLowestVndPriceAmount('VND 1,832,520\nVND 1,616,520'),
+    1616520,
+  );
+}
+
+function createRankingCandidate(
+  cardIndex: number,
+  departureTime: string,
+  priceAmount: number,
+): FlightResultCandidate {
+  return {
+    cardIndex,
+    airlineCode: 'VJ',
+    airlineName: 'Vietjet Air',
+    flightNumber: `VJ${120 + cardIndex}`,
+    departureTime,
+    arrivalTime: null,
+    bookingClass: 'ECO',
+    priceText: `VND ${priceAmount}`,
+    priceAmount,
+  };
 }
 
 /**
@@ -806,6 +976,7 @@ async function main() {
   testParsedAirportNormalizationBeforeMissingFieldCheck();
   testAirportCatalogAliases();
   testOpenAIParserPromptIncludesAirportCatalog();
+  testFlightTimeBucketAndRankingSchema();
   testAirportCatalogCodeLookup();
   testFlightSelectionParserLeavesBookingClassUnspecified();
   testFlightSelectionParserBookingClassAliases();
@@ -818,7 +989,9 @@ async function main() {
   testFlightSelectionParserAcceptsCombinedPassengerMessage();
   testFlightSelectionParserRequiresLatestCaseContext();
   testLatestFlightSearchCaseContext();
+  testCheapestBucketFollowUpPatch();
   testOperatorFriendlyFlightFailureMessages();
+  testFlightResultRanking();
   testFlightSelectionMatcher();
   await testOneBookingAuthExpiredToastDetection();
   await testOneBookingAuthExpiredPasswordModalDetection();

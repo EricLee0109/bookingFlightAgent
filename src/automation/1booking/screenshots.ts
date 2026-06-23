@@ -93,6 +93,7 @@ export async function takeFlightResultsBatchScreenshots(
   page: Page,
   fileNamePrefix: string,
   batchSize = DEFAULT_FLIGHT_RESULTS_BATCH_SIZE,
+  includedCardIndexes?: number[],
 ) {
   await ensureScreenshotDir();
   await removeExistingFlightResultScreenshots(fileNamePrefix);
@@ -102,15 +103,19 @@ export async function takeFlightResultsBatchScreenshots(
   });
   const flightOptions = flightResults.locator(':scope > div');
   const visibleOptionIndexes = await getVisibleLocatorIndexes(flightOptions);
+  const screenshotOptionIndexes =
+    includedCardIndexes && includedCardIndexes.length > 0
+      ? includedCardIndexes.filter((index) => visibleOptionIndexes.includes(index))
+      : visibleOptionIndexes;
 
-  if (visibleOptionIndexes.length === 0) {
+  if (screenshotOptionIndexes.length === 0) {
     throw new Error('Could not locate visible flight options for screenshots.');
   }
 
   const paths: string[] = [];
 
-  for (let startIndex = 0; startIndex < visibleOptionIndexes.length; startIndex += batchSize) {
-    const batchIndexes = visibleOptionIndexes.slice(startIndex, startIndex + batchSize);
+  for (let startIndex = 0; startIndex < screenshotOptionIndexes.length; startIndex += batchSize) {
+    const batchIndexes = screenshotOptionIndexes.slice(startIndex, startIndex + batchSize);
     const path = `${SCREENSHOT_DIR}/${fileNamePrefix}-${paths.length + 1}.png`;
 
     await captureFlightOptionsBatch(page, flightResults, flightOptions, batchIndexes, path);

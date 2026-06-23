@@ -7,12 +7,17 @@ import { z } from 'zod';
  * set `specificTime`.
  */
 export type PreferredTime =
+  | 'early_morning'
   | 'morning'
   | 'afternoon'
-  | 'evening'
   | 'night'
   | 'specific_time'
   | null;
+
+/**
+ * Optional ranking intent extracted from a customer/operator request.
+ */
+export type FlightResultRanking = 'cheapest' | null;
 
 /**
  * Trip type values supported by the shared flight request contract.
@@ -50,10 +55,18 @@ export const ParsedFlightRequestSchema = z
     returnDate: z.string().nullable(),
 
     preferredTime: z
-      .enum(['morning', 'afternoon', 'evening', 'night', 'specific_time'])
+      .enum([
+        'early_morning',
+        'morning',
+        'afternoon',
+        'night',
+        'specific_time',
+      ])
       .nullable(),
 
     specificTime: z.string().nullable(),
+
+    resultRanking: z.enum(['cheapest']).nullable(),
 
     tripType: z.enum(['one_way', 'round_trip']),
 

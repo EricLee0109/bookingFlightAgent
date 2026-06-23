@@ -3,6 +3,11 @@ import { selectAirport } from './airports';
 import { ONE_BOOKING_URL } from './constants';
 import { selectDepartureDate } from './dates';
 import {
+  extractFlightResultCandidates,
+  rankFlightResultsForSearch,
+  type FlightResultFilterSummary,
+} from './flight-result-ranking';
+import {
   assertSearchFlightsAutomationInput,
   type SearchFlightsInput,
 } from './search-flight-input';
@@ -17,6 +22,8 @@ import {
 export type SearchFlightsResult = {
   success: boolean;
   flightCount: number;
+  displayedFlightCount: number;
+  filterSummary?: FlightResultFilterSummary;
   screenshotPath: string;
   screenshotPaths: string[];
 };
@@ -66,10 +73,22 @@ export async function searchFlights(
   await throwIfOneBookingLoginModalVisible(page, 5000);
 
   const flightCount = await waitForFlightResultsReady(page);
+  const candidates = await extractFlightResultCandidates(page);
+  const rankedResult = rankFlightResultsForSearch({
+    candidates,
+    preferredTime: input.preferredTime,
+    resultRanking: input.resultRanking,
+  });
+
+  if (rankedResult && rankedResult.summary.displayedCount === 0) {
+    throw new CheapestFlightBucketEmptyError(rankedResult.summary);
+  }
 
   const screenshotPaths = await takeFlightResultsBatchScreenshots(
     page,
     '1booking-search-flights',
+    undefined,
+    rankedResult?.cardIndexes,
   );
   const [screenshotPath] = screenshotPaths;
 
@@ -80,7 +99,21 @@ export async function searchFlights(
   return {
     success: true,
     flightCount,
+    displayedFlightCount: rankedResult?.summary.displayedCount ?? flightCount,
+    filterSummary: rankedResult?.summary,
     screenshotPath,
     screenshotPaths,
   };
+}
+
+/**
+ * Signals that 1Booking returned flights, but none matched the requested
+ * cheapest-flight time bucket. Telegram can ask the operator for another bucket
+ * without widening results silently.
+ */
+export class CheapestFlightBucketEmptyError extends Error {
+  constructor(readonly summary: FlightResultFilterSummary) {
+    super('No cheapest flight results matched the requested time bucket.');
+    this.name = 'CheapestFlightBucketEmptyError';
+  }
 }

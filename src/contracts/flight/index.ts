@@ -6,6 +6,7 @@
  */
 export {
   ParsedFlightRequestSchema,
+  type FlightResultRanking,
   type ParsedFlightRequest,
   type PreferredTime,
   type TripType,

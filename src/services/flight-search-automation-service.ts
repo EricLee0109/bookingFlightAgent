@@ -1,4 +1,5 @@
 import { createOneBookingBrowserSession } from '../automation/1booking/browser';
+import { type FlightResultFilterSummary } from '../automation/1booking/flight-result-ranking';
 import { searchFlights } from '../automation/1booking/flight-search';
 import { type SearchFlightsInput } from '../automation/1booking/search-flight-input';
 import { takeFullPageScreenshot } from '../automation/1booking/screenshots';
@@ -10,6 +11,8 @@ export type FlightSearchAutomationResult =
   | {
       ok: true;
       flightCount: number;
+      displayedFlightCount: number;
+      filterSummary?: FlightResultFilterSummary;
       screenshotPath: string;
       screenshotPaths: string[];
       authRefreshed?: boolean;
@@ -73,6 +76,8 @@ async function searchOneBookingFlightsUnlocked(
       return {
         ok: true,
         flightCount: result.flightCount,
+        displayedFlightCount: result.displayedFlightCount,
+        filterSummary: result.filterSummary,
         screenshotPath: result.screenshotPath,
         screenshotPaths: result.screenshotPaths,
         authRefreshed: authRetry.authRefreshed || undefined,

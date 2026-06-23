@@ -1,4 +1,5 @@
 import { InlineKeyboardMarkup } from 'node-telegram-bot-api';
+import { type FlightResultFilterSummary } from '../automation/1booking/flight-result-ranking';
 import {
   BOOKING_CLASS_LABELS,
   type FlightSelectionCandidate,
@@ -88,7 +89,30 @@ export function formatParserFailedMessage() {
  *
  * This message is sent right before or together with the screenshot.
  */
-export function formatSearchSuccessMessage(flightCount: number) {
+export function formatSearchSuccessMessage(
+  flightCount: number,
+  filterSummary?: FlightResultFilterSummary,
+) {
+  if (filterSummary?.ranking === 'cheapest') {
+    const bucketText = filterSummary.requestedTimeBucketLabel
+      ? `trong khung ${filterSummary.requestedTimeBucketLabel}`
+      : 'trong toàn bộ danh sách';
+    const priceRangeLine = filterSummary.priceRangeText
+      ? `Khoảng giá: ${filterSummary.priceRangeText}.`
+      : null;
+
+    return [
+      `✅ Mình đã lọc ${filterSummary.displayedCount} chuyến rẻ nhất ${bucketText}.`,
+      `Tổng kết quả live: ${filterSummary.totalVisibleCount} chuyến.`,
+      priceRangeLine,
+      '',
+      'Mình gửi ảnh lịch trình bên dưới nhé.',
+      'Bạn có thể gửi ảnh này lại cho khách trên Zalo.',
+    ]
+      .filter((line): line is string => line !== null)
+      .join('\n');
+  }
+
   return [
     `✅ Đã tìm thấy ${flightCount} kết quả chuyến bay.`,
     '',
@@ -115,6 +139,50 @@ export function formatSearchFailedMessage(message?: string) {
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+/**
+ * Asks the operator which cheapest-result bucket to show next.
+ *
+ * The bot does not silently widen cheapest results because customer-facing
+ * screenshots should remain traceable to the operator's requested time frame.
+ */
+export function formatCheapestMoreOptionsMessage(flightCase: LocalFlightCase) {
+  const currentBucket =
+    flightCase.flightResultFilter?.requestedTimeBucketLabel ?? 'toàn bộ danh sách';
+
+  return [
+    `📝 Mình đang hiển thị nhóm chuyến rẻ nhất của case ${flightCase.caseId}.`,
+    `Khung hiện tại: ${currentBucket}.`,
+    '',
+    'Bạn muốn mình xem thêm nhóm nào?',
+    '⛅ Sáng sớm',
+    '🌤️ Sáng',
+    '🌥️ Chiều',
+    '🌙 Tối',
+    '✈️ Tất cả chuyến rẻ nhất',
+  ].join('\n');
+}
+
+/**
+ * Formats progress while rerunning the same cheapest-result case with a new
+ * time bucket selected by the operator.
+ */
+export function formatCheapestBucketRerunStartedMessage(
+  caseId: string,
+  bucketLabel: string,
+) {
+  return `⏳ Mình đang lọc lại case ${caseId} theo khung ${bucketLabel}...`;
+}
+
+/**
+ * Formats the rare case where a cheapest follow-up has no saved search input.
+ */
+export function formatCheapestFollowUpMissingSearchMessage(caseId: string) {
+  return [
+    `📝 Mình chưa có dữ liệu chuyến đã lưu cho case ${caseId}.`,
+    'Bạn search lại chuyến giúp mình nhé.',
+  ].join('\n');
 }
 
 /**
@@ -797,6 +865,19 @@ function formatSelectionBookingClass(
 }
 
 function formatSearchFailureReason(message?: string) {
+  if (message && /No cheapest flight results matched/i.test(message)) {
+    return [
+      'Mình chưa thấy chuyến rẻ nhất nào trong khung giờ đã chọn.',
+      '',
+      'Bạn chọn giúp mình khung khác hoặc toàn bộ chuyến rẻ nhất:',
+      'sáng sớm',
+      'sáng',
+      'chiều',
+      'tối',
+      'tất cả chuyến rẻ nhất',
+    ].join('\n');
+  }
+
   if (message && /auth session expired|login is required|đăng nhập/i.test(message)) {
     return 'Phiên 1Booking có thể vừa hết hạn. Mình sẽ tự đăng nhập lại khi flow cho phép.';
   }
