@@ -5,7 +5,4 @@ auth/
 test-results
 screenshots/
 .pnpm-store/
-data/passengers/
-data/cases/
-data/logs/
-screenshots/
+data/
