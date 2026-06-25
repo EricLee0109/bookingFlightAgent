@@ -3,6 +3,9 @@ import path from 'node:path';
 import { zipSync } from 'fflate';
 import { SCREENSHOT_DIR } from '../automation/1booking/constants';
 
+export const TELEGRAM_DOWNLOAD_ARCHIVE_CONTENT_TYPE =
+  'application/octet-stream';
+
 /**
  * Creates one ZIP file containing all customer-facing result screenshots.
  *
@@ -33,4 +36,20 @@ export async function createTelegramScreenshotArchive(
   await fs.writeFile(archivePath, zipBuffer);
 
   return archivePath;
+}
+
+/**
+ * Builds explicit Telegram upload metadata for the screenshot archive.
+ *
+ * node-telegram-bot-api is moving toward requiring explicit file content types
+ * for path uploads. ZIP archives are binary downloads, so we mark them as
+ * application/octet-stream and keep the real filename for operator downloads.
+ */
+export function createTelegramScreenshotArchiveFileOptions(
+  archivePath: string,
+) {
+  return {
+    filename: path.basename(archivePath),
+    contentType: TELEGRAM_DOWNLOAD_ARCHIVE_CONTENT_TYPE,
+  };
 }

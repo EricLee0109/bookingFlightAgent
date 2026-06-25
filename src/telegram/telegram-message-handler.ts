@@ -57,7 +57,10 @@ import {
   tryHandleTelegramPassengerMessage,
   type TelegramPassengerResolutionOutcome,
 } from './telegram-passenger-message-handler';
-import { createTelegramScreenshotArchive } from './telegram-screenshot-archive';
+import {
+  createTelegramScreenshotArchive,
+  createTelegramScreenshotArchiveFileOptions,
+} from './telegram-screenshot-archive';
 import { PassengerProfile } from '../passengers/passenger-types';
 
 /**
@@ -415,9 +418,14 @@ export async function handleTelegramMessage(
       result.screenshotPaths,
     );
 
-    await bot.sendDocument(chatId, archivePath, {
-      caption: 'Download All Files',
-    });
+    await bot.sendDocument(
+      chatId,
+      archivePath,
+      {
+        caption: 'Download All Files',
+      },
+      createTelegramScreenshotArchiveFileOptions(archivePath),
+    );
 
     currentCase = await updateLocalFlightCase(currentCase, {
       status: 'OPTIONS_SENT',
@@ -581,9 +589,14 @@ async function tryHandleCheapestBucketFollowUpRequest(
       result.screenshotPaths,
     );
 
-    await bot.sendDocument(chatId, archivePath, {
-      caption: 'Download All Files',
-    });
+    await bot.sendDocument(
+      chatId,
+      archivePath,
+      {
+        caption: 'Download All Files',
+      },
+      createTelegramScreenshotArchiveFileOptions(archivePath),
+    );
 
     await updateLocalFlightCase(currentCase, {
       status: 'OPTIONS_SENT',
