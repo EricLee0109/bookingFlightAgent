@@ -42,6 +42,8 @@ import {
 import {
   buildCheapestBucketSearchPatch,
   buildCheapestMoreSearchPatch,
+  canShowCheapestMoreOptionsForCase,
+  looksLikeMoreCheapestOptionsRequest,
   parseCheapestBucketFollowUpMessage,
   parseCheapestMoreSearchRequest,
 } from '../src/telegram/telegram-message-handler';
@@ -627,6 +629,31 @@ function testCheapestMoreSearchPatch() {
   assert.equal(earlyMorningPatch.searchInput.preferredTime, 'early_morning');
   assert.equal(earlyMorningPatch.searchInput.resultLimit, 5);
 }
+
+/**
+ * Verifies plain "need more" wording opens the bucket menu for a saved case.
+ */
+function testCheapestMoreOptionsMenuEligibility() {
+  const parsedRequest = ParsedFlightRequestSchema.parse({
+    ...validOneWayRequest,
+    preferredTime: null,
+    resultRanking: null,
+  });
+  const searchInput = mapParsedRequestToSearchFlightsInput(parsedRequest);
+
+  assert.equal(looksLikeMoreCheapestOptionsRequest('toi can them'), true);
+  assert.equal(
+    looksLikeMoreCheapestOptionsRequest('minh muon bay tu SGN ra HAN ngay 30/07'),
+    false,
+  );
+  assert.equal(
+    canShowCheapestMoreOptionsForCase({
+      searchInput,
+    }),
+    true,
+  );
+  assert.equal(canShowCheapestMoreOptionsForCase({}), false);
+}
 /**
  * Verifies Telegram flight failures use retry patterns instead of raw internals.
  */
@@ -1148,6 +1175,7 @@ async function main() {
   testLatestFlightSearchCaseContext();
   testCheapestBucketFollowUpPatch();
   testCheapestMoreSearchPatch();
+  testCheapestMoreOptionsMenuEligibility();
   testOperatorFriendlyFlightFailureMessages();
   testFlightResultRanking();
   testFlightSelectionMatcher();

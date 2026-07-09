@@ -664,7 +664,15 @@ async function tryHandleCheapestBucketFollowUpRequest(
 
   const flightCase = await readLocalFlightCase(latestCaseId);
 
-  if (flightCase?.flightResultFilter?.ranking !== 'cheapest') {
+  if (!canShowCheapestMoreOptionsForCase(flightCase)) {
+    if (flightCase) {
+      await bot.sendMessage(
+        chatId,
+        formatCheapestFollowUpMissingSearchMessage(flightCase.caseId),
+      );
+      return true;
+    }
+
     return false;
   }
 
@@ -1041,7 +1049,15 @@ async function tryHandleMoreCheapestOptionsRequest(
 
   const flightCase = await readLocalFlightCase(latestCaseId);
 
-  if (flightCase?.flightResultFilter?.ranking !== 'cheapest') {
+  if (!canShowCheapestMoreOptionsForCase(flightCase)) {
+    if (flightCase) {
+      await bot.sendMessage(
+        chatId,
+        formatCheapestFollowUpMissingSearchMessage(flightCase.caseId),
+      );
+      return true;
+    }
+
     return false;
   }
 
@@ -1053,17 +1069,28 @@ async function tryHandleMoreCheapestOptionsRequest(
 /**
  * Detects short follow-up wording for more cheapest-flight options.
  */
-function looksLikeMoreCheapestOptionsRequest(text: string) {
-  return /(?:cần|can|muốn|muon|xem|cho|lấy|lay)\s+thêm|xem thêm|thêm chuyến|more/i.test(
-    text,
+export function looksLikeMoreCheapestOptionsRequest(text: string) {
+  const normalizedText = normalizeVietnameseFollowUpText(text);
+
+  return /(?:can|muon|xem|cho|lay)\s+them|xem them|them chuyen|more/.test(
+    normalizedText,
   );
+}
+
+/**
+ * Checks whether the latest case has enough saved data to show cheapest buckets.
+ */
+export function canShowCheapestMoreOptionsForCase(
+  flightCase: Pick<LocalFlightCase, 'searchInput'> | null | undefined,
+) {
+  return Boolean(flightCase?.searchInput);
 }
 
 /**
  * Handles selecting a flight from a previous Telegram search case.
  *
- * The selection path updates the existing case memory and calls the dedicated
- * 1Booking selection service instead of creating a new flight-search case.
+ * The selection path updates existing case memory and delegates live 1Booking
+ * matching to the selection automation service.
  */
 async function handleTelegramFlightSelection(
   bot: TelegramBot,
