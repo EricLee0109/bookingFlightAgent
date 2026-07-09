@@ -27,7 +27,9 @@ import {
   formatCombinedSelectionPassengerReadyMessage,
   formatCheapestBucketRerunStartedMessage,
   formatCheapestFollowUpMissingSearchMessage,
+  formatCheapestMoreMissingLatestCaseMessage,
   formatCheapestMoreOptionsMessage,
+  formatCheapestMoreSearchStartedMessage,
   formatFlightSelectionFailedMessage,
   formatFlightSelectionParseFailedMessage,
   formatLatestCaseFlightSelectionResolvedMessage,
@@ -128,6 +130,17 @@ export async function handleTelegramMessage(
   }
 
   const latestSearchCase = getLatestFlightSearchCase(chatId);
+
+  if (
+    await tryHandleCheapestMoreSearchRequest(
+      bot,
+      chatId,
+      text,
+      latestSearchCase?.latestSearchCaseId,
+    )
+  ) {
+    return;
+  }
 
   if (
     await tryHandleCheapestBucketFollowUpRequest(
@@ -453,6 +466,186 @@ export type CheapestBucketFollowUp = {
   label: string;
 };
 
+export type CheapestMoreSearchRequest = {
+  resultLimit: 5 | 10;
+  preferredTime?: PreferredTime;
+  bucketLabel?: string | null;
+};
+
+/**
+ * Handles requests such as `thêm chuyến bay giá rẻ` after a normal flight list.
+ *
+ * Unlike `tôi cần thêm`, this is an explicit request to rerun the latest saved
+ * search and show only the top cheapest customer-facing options.
+ */
+async function tryHandleCheapestMoreSearchRequest(
+  bot: TelegramBot,
+  chatId: number,
+  text: string,
+  latestCaseId?: string,
+) {
+  const cheapestRequest = parseCheapestMoreSearchRequest(text);
+
+  if (!cheapestRequest) {
+    return false;
+  }
+
+  if (!latestCaseId) {
+    await bot.sendMessage(chatId, formatCheapestMoreMissingLatestCaseMessage());
+    return true;
+  }
+
+  const flightCase = await readLocalFlightCase(latestCaseId);
+
+  if (!flightCase) {
+    await bot.sendMessage(chatId, formatCheapestMoreMissingLatestCaseMessage());
+    return true;
+  }
+
+  if (!flightCase.searchInput) {
+    await bot.sendMessage(
+      chatId,
+      formatCheapestFollowUpMissingSearchMessage(flightCase.caseId),
+    );
+    return true;
+  }
+
+  const patch = buildCheapestMoreSearchPatch(flightCase, cheapestRequest);
+  let currentCase = await updateLocalFlightCase(flightCase, {
+    ...patch,
+    status: 'SEARCH_RUNNING',
+    errorMessage: undefined,
+    screenshotPath: undefined,
+    screenshotPaths: undefined,
+    flightResultFilter: undefined,
+  });
+
+  await appendLocalLog({
+    level: 'info',
+    event: 'cheapest_more_search_requested',
+    caseId: currentCase.caseId,
+    message: 'Received cheapest-flight rerun request for latest case.',
+    meta: {
+      preferredTime: patch.searchInput.preferredTime ?? null,
+      resultLimit: patch.searchInput.resultLimit ?? null,
+    },
+  });
+
+  await bot.sendMessage(
+    chatId,
+    formatCheapestMoreSearchStartedMessage(
+      currentCase.caseId,
+      cheapestRequest.resultLimit,
+      getCheapestMoreProgressBucketLabel(
+        cheapestRequest,
+        patch.searchInput.preferredTime,
+      ),
+    ),
+  );
+
+  const result = await searchOneBookingFlights(patch.searchInput, {
+    onAuthRefresh: () =>
+      Promise.resolve(
+        void bot.sendMessage(chatId, formatOneBookingAuthRefreshStartedMessage()),
+      ),
+  });
+
+  if (!result.ok) {
+    await updateLocalFlightCase(currentCase, {
+      status: 'SEARCH_FAILED',
+      errorMessage: result.message,
+      screenshotPath: result.errorScreenshotPath ?? undefined,
+    });
+    await appendLocalLog({
+      level: 'error',
+      event: 'one_booking_search_failed',
+      caseId: currentCase.caseId,
+      message: result.message,
+      meta: {
+        errorScreenshotPath: result.errorScreenshotPath,
+      },
+    });
+
+    await bot.sendMessage(chatId, formatSearchFailedMessage(result.message));
+
+    if (result.errorScreenshotPath) {
+      await bot.sendPhoto(chatId, result.errorScreenshotPath, {
+        caption: 'Screenshot để mình cùng đối chiếu lỗi search 1Booking.',
+      });
+    }
+
+    return true;
+  }
+
+  currentCase = await updateLocalFlightCase(currentCase, {
+    status: 'SEARCH_DONE',
+    flightCount: result.flightCount,
+    displayedFlightCount: result.displayedFlightCount,
+    flightResultFilter: result.filterSummary,
+    screenshotPath: result.screenshotPath,
+    screenshotPaths: result.screenshotPaths,
+  });
+  setLatestFlightSearchCase(chatId, currentCase.caseId);
+  await appendLocalLog({
+    level: 'info',
+    event: 'one_booking_search_completed',
+    caseId: currentCase.caseId,
+    message: '1Booking cheapest rerun search completed.',
+    meta: {
+      flightCount: result.flightCount,
+      displayedFlightCount: result.displayedFlightCount,
+      flightResultFilter: result.filterSummary,
+      screenshotPath: result.screenshotPath,
+      screenshotPaths: result.screenshotPaths,
+    },
+  });
+
+  await bot.sendMessage(
+    chatId,
+    formatSearchSuccessMessage(result.flightCount, result.filterSummary),
+  );
+
+  if (result.screenshotPaths.length > 0) {
+    for (let index = 0; index < result.screenshotPaths.length; index++) {
+      await bot.sendPhoto(chatId, result.screenshotPaths[index], {
+        caption:
+          result.screenshotPaths.length === 1
+            ? 'Ảnh lịch trình chuyến bay từ 1Booking nhé.'
+            : `Ảnh lịch trình chuyến bay ${index + 1}/${result.screenshotPaths.length}.`,
+      });
+    }
+
+    const archivePath = await createTelegramScreenshotArchive(
+      currentCase.caseId,
+      result.screenshotPaths,
+    );
+
+    await bot.sendDocument(
+      chatId,
+      archivePath,
+      {
+        caption: 'Download All Files',
+      },
+      createTelegramScreenshotArchiveFileOptions(archivePath),
+    );
+
+    await updateLocalFlightCase(currentCase, {
+      status: 'OPTIONS_SENT',
+    });
+    return true;
+  }
+
+  await bot.sendPhoto(chatId, result.screenshotPath, {
+    caption: 'Ảnh lịch trình chuyến bay từ 1Booking nhé.',
+  });
+
+  await updateLocalFlightCase(currentCase, {
+    status: 'OPTIONS_SENT',
+  });
+
+  return true;
+}
+
 /**
  * Handles bucket-only replies such as `sáng sớm` after SakuraBot has already
  * shown cheapest results for the latest case.
@@ -616,6 +809,140 @@ async function tryHandleCheapestBucketFollowUpRequest(
 }
 
 /**
+ * Parses explicit cheap-flight rerun requests for the latest saved search.
+ */
+export function parseCheapestMoreSearchRequest(
+  text: string,
+): CheapestMoreSearchRequest | null {
+  const normalizedText = normalizeVietnameseFollowUpText(text);
+  const hasExplicitCount = /\b(?:5|10)\s+chuyen(?:\s+bay)?\b/.test(
+    normalizedText,
+  );
+  const hasCheapIntent =
+    /\bgia re\b/.test(normalizedText) || /\bre nhat\b/.test(normalizedText);
+  const hasMoreFlightIntent =
+    /\bthem\b/.test(normalizedText) &&
+    (/\bchuyen(?:\s+bay)?\b/.test(normalizedText) || hasCheapIntent);
+
+  if (!hasExplicitCount && !hasMoreFlightIntent) {
+    return null;
+  }
+
+  return {
+    resultLimit: /\b10\s+chuyen(?:\s+bay)?\b/.test(normalizedText) ? 10 : 5,
+    ...parseCheapestFollowUpTimeBucket(normalizedText),
+  };
+}
+
+/**
+ * Parses an optional time bucket embedded in a cheapest-rerun request.
+ */
+function parseCheapestFollowUpTimeBucket(
+  normalizedText: string,
+): Pick<CheapestMoreSearchRequest, 'preferredTime' | 'bucketLabel'> {
+  if (/\b(?:tat ca|toan bo|all)\b/.test(normalizedText)) {
+    return {
+      preferredTime: null,
+      bucketLabel: null,
+    };
+  }
+
+  if (/\b(?:sang som|rang sang|bay dem|dem som)\b/.test(normalizedText)) {
+    return {
+      preferredTime: 'early_morning',
+      bucketLabel: 's\u00e1ng s\u1edbm',
+    };
+  }
+
+  if (/\b(?:buoi sang|sang)\b/.test(normalizedText)) {
+    return {
+      preferredTime: 'morning',
+      bucketLabel: 'bu\u1ed5i s\u00e1ng',
+    };
+  }
+
+  if (/\b(?:buoi chieu|chieu)\b/.test(normalizedText)) {
+    return {
+      preferredTime: 'afternoon',
+      bucketLabel: 'bu\u1ed5i chi\u1ec1u',
+    };
+  }
+
+  if (/\b(?:buoi toi|toi|dem)\b/.test(normalizedText)) {
+    return {
+      preferredTime: 'night',
+      bucketLabel: 'bu\u1ed5i t\u1ed1i',
+    };
+  }
+
+  return {};
+}
+
+/**
+ * Chooses the bucket label shown in the rerun progress message.
+ *
+ * Explicit labels from the operator message win. If the message omits a bucket,
+ * the latest saved case bucket is shown so the operator sees what is preserved.
+ */
+function getCheapestMoreProgressBucketLabel(
+  cheapestRequest: CheapestMoreSearchRequest,
+  preferredTime: PreferredTime | undefined,
+) {
+  if ('bucketLabel' in cheapestRequest) {
+    return cheapestRequest.bucketLabel;
+  }
+
+  switch (preferredTime) {
+    case 'early_morning':
+      return 's\u00e1ng s\u1edbm';
+    case 'morning':
+      return 'bu\u1ed5i s\u00e1ng';
+    case 'afternoon':
+      return 'bu\u1ed5i chi\u1ec1u';
+    case 'night':
+      return 'bu\u1ed5i t\u1ed1i';
+    default:
+      return null;
+  }
+}
+
+/**
+ * Builds a local case patch that turns the latest saved search into a
+ * top-cheapest rerun while preserving the existing time bucket if not provided.
+ */
+export function buildCheapestMoreSearchPatch(
+  flightCase: Pick<LocalFlightCase, 'searchInput' | 'parsedRequest'>,
+  cheapestRequest: CheapestMoreSearchRequest,
+): {
+  searchInput: SearchFlightsInput;
+  parsedRequest: LocalFlightCase['parsedRequest'];
+} {
+  const preferredTime =
+    'preferredTime' in cheapestRequest
+      ? cheapestRequest.preferredTime
+      : (flightCase.searchInput?.preferredTime ??
+        flightCase.parsedRequest?.preferredTime ??
+        null);
+  const searchInput = {
+    ...(flightCase.searchInput as SearchFlightsInput),
+    preferredTime,
+    resultRanking: 'cheapest',
+    resultLimit: cheapestRequest.resultLimit,
+  } satisfies SearchFlightsInput;
+
+  return {
+    searchInput,
+    parsedRequest: flightCase.parsedRequest
+      ? {
+          ...flightCase.parsedRequest,
+          preferredTime,
+          resultRanking: 'cheapest',
+        }
+      : undefined,
+  };
+}
+
+/**
  * Parses one bucket-only reply for cheapest-result reruns.
  */
 export function parseCheapestBucketFollowUpMessage(
@@ -626,28 +953,28 @@ export function parseCheapestBucketFollowUpMessage(
   if (/^(sang som|rang sang|bay dem|dem som)$/.test(normalizedText)) {
     return {
       preferredTime: 'early_morning',
-      label: 'Sáng sớm',
+      label: 'S\u00e1ng s\u1edbm',
     };
   }
 
   if (/^(sang|buoi sang)$/.test(normalizedText)) {
     return {
       preferredTime: 'morning',
-      label: 'Sáng',
+      label: 'S\u00e1ng',
     };
   }
 
   if (/^(chieu|buoi chieu)$/.test(normalizedText)) {
     return {
       preferredTime: 'afternoon',
-      label: 'Chiều',
+      label: 'Chi\u1ec1u',
     };
   }
 
   if (/^(toi|dem|buoi toi|toi dem)$/.test(normalizedText)) {
     return {
       preferredTime: 'night',
-      label: 'Tối/Đêm',
+      label: 'T\u1ed1i/\u0110\u00eam',
     };
   }
 
@@ -658,7 +985,7 @@ export function parseCheapestBucketFollowUpMessage(
   ) {
     return {
       preferredTime: null,
-      label: 'Tất cả chuyến rẻ nhất',
+      label: 'T\u1ea5t c\u1ea3 chuy\u1ebfn r\u1ebb nh\u1ea5t',
     };
   }
 
@@ -676,6 +1003,7 @@ export function buildCheapestBucketSearchPatch(
     ...(flightCase.searchInput as SearchFlightsInput),
     preferredTime: bucketFollowUp.preferredTime,
     resultRanking: 'cheapest',
+    resultLimit: flightCase.searchInput?.resultLimit,
   } satisfies SearchFlightsInput;
 
   return {
@@ -701,7 +1029,6 @@ function normalizeVietnameseFollowUpText(text: string) {
     .replace(/\s+/g, ' ')
     .trim();
 }
-
 async function tryHandleMoreCheapestOptionsRequest(
   bot: TelegramBot,
   chatId: number,

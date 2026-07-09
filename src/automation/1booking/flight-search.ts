@@ -78,6 +78,7 @@ export async function searchFlights(
     candidates,
     preferredTime: input.preferredTime,
     resultRanking: input.resultRanking,
+    limit: input.resultLimit,
   });
 
   if (rankedResult && rankedResult.summary.displayedCount === 0) {

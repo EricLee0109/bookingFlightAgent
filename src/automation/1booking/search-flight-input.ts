@@ -22,6 +22,7 @@ export type SearchFlightsInput = {
   preferredTime?: PreferredTime;
   specificTime?: string | null;
   resultRanking?: FlightResultRanking;
+  resultLimit?: 5 | 10;
 };
 
 export type SearchFlightsInputValidation = {

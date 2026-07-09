@@ -176,6 +176,33 @@ export function formatCheapestBucketRerunStartedMessage(
 }
 
 /**
+ * Formats progress while converting the latest normal search into top-cheapest
+ * customer-facing screenshots.
+ */
+export function formatCheapestMoreSearchStartedMessage(
+  caseId: string,
+  resultLimit: 5 | 10,
+  bucketLabel?: string | null,
+) {
+  const bucketText = bucketLabel ? ` ${bucketLabel}` : '';
+
+  return `⏳ Mình đang lọc ${resultLimit} chuyến giá rẻ nhất${bucketText} cho case ${caseId}...`;
+}
+
+/**
+ * Formats the case where the operator asks for cheap flights before any
+ * searchable flight list exists in this chat.
+ */
+export function formatCheapestMoreMissingLatestCaseMessage() {
+  return [
+    '📝 Mình chưa có danh sách chuyến gần nhất để lọc giá rẻ.',
+    '',
+    'Bạn search chuyến trước giúp mình nhé, ví dụ:',
+    'bay từ SGN ra HAN ngày 30/07',
+  ].join('\n');
+}
+
+/**
  * Formats the rare case where a cheapest follow-up has no saved search input.
  */
 export function formatCheapestFollowUpMissingSearchMessage(caseId: string) {

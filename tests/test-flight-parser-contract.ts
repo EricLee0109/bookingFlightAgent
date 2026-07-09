@@ -41,7 +41,9 @@ import {
 } from '../src/telegram/telegram-flight-selection-context';
 import {
   buildCheapestBucketSearchPatch,
+  buildCheapestMoreSearchPatch,
   parseCheapestBucketFollowUpMessage,
+  parseCheapestMoreSearchRequest,
 } from '../src/telegram/telegram-message-handler';
 import {
   formatFlightSelectionFailedMessage,
@@ -482,8 +484,149 @@ function testCheapestBucketFollowUpPatch() {
   assert.equal(allPatch.searchInput?.preferredTime, null);
   assert.equal(allPatch.searchInput?.resultRanking, 'cheapest');
   assert.equal(allPatch.parsedRequest?.preferredTime, null);
+
+  const tenFlightBucketPatch = buildCheapestBucketSearchPatch(
+    {
+      searchInput: {
+        ...searchInput,
+        resultLimit: 10,
+      },
+      parsedRequest,
+    },
+    earlyMorning,
+  );
+
+  assert.equal(tenFlightBucketPatch.searchInput?.resultLimit, 10);
 }
 
+/**
+ * Verifies explicit cheap-flight follow-ups rerun the latest normal case.
+ */
+function testCheapestMoreSearchPatch() {
+  assert.deepEqual(parseCheapestMoreSearchRequest('them chuyen bay'), {
+    resultLimit: 5,
+  });
+  assert.deepEqual(parseCheapestMoreSearchRequest('5 chuyen bay'), {
+    resultLimit: 5,
+  });
+  assert.deepEqual(parseCheapestMoreSearchRequest('10 chuyen bay'), {
+    resultLimit: 10,
+  });
+  assert.deepEqual(
+    parseCheapestMoreSearchRequest('5 chuyen re nhat buoi chieu'),
+    {
+      resultLimit: 5,
+      preferredTime: 'afternoon',
+      bucketLabel: 'buổi chiều',
+    },
+  );
+  assert.deepEqual(
+    parseCheapestMoreSearchRequest('them chuyen gia re vao sang som'),
+    {
+      resultLimit: 5,
+      preferredTime: 'early_morning',
+      bucketLabel: 'sáng sớm',
+    },
+  );
+  assert.deepEqual(parseCheapestMoreSearchRequest('10 chuyen bay gia re toi'), {
+    resultLimit: 10,
+    preferredTime: 'night',
+    bucketLabel: 'buổi tối',
+  });
+  assert.equal(parseCheapestMoreSearchRequest('toi can them'), null);
+  assert.equal(
+    parseCheapestMoreSearchRequest('minh muon bay tu HCM ra HN ngay 22/07'),
+    null,
+  );
+
+  const parsedRequest = ParsedFlightRequestSchema.parse({
+    ...validOneWayRequest,
+    preferredTime: 'morning',
+    resultRanking: null,
+  });
+  const morningSearchInput = mapParsedRequestToSearchFlightsInput(parsedRequest);
+  const defaultRequest = parseCheapestMoreSearchRequest('them chuyen bay');
+
+  if (!defaultRequest) {
+    throw new Error('Expected cheapest follow-up request.');
+  }
+
+  const morningPatch = buildCheapestMoreSearchPatch(
+    {
+      searchInput: morningSearchInput,
+      parsedRequest,
+    },
+    defaultRequest,
+  );
+
+  assert.equal(morningPatch.searchInput.preferredTime, 'morning');
+  assert.equal(morningPatch.searchInput.resultRanking, 'cheapest');
+  assert.equal(morningPatch.searchInput.resultLimit, 5);
+  assert.equal(morningPatch.parsedRequest?.preferredTime, 'morning');
+  assert.equal(morningPatch.parsedRequest?.resultRanking, 'cheapest');
+
+  const afternoonRequest = parseCheapestMoreSearchRequest(
+    '5 chuyen re nhat buoi chieu',
+  );
+
+  if (!afternoonRequest) {
+    throw new Error('Expected afternoon cheapest follow-up request.');
+  }
+
+  const afternoonPatch = buildCheapestMoreSearchPatch(
+    {
+      searchInput: morningSearchInput,
+      parsedRequest,
+    },
+    afternoonRequest,
+  );
+
+  assert.equal(afternoonPatch.searchInput.preferredTime, 'afternoon');
+  assert.equal(afternoonPatch.searchInput.resultRanking, 'cheapest');
+  assert.equal(afternoonPatch.searchInput.resultLimit, 5);
+
+  const noBucketSearchInput = {
+    ...morningSearchInput,
+    preferredTime: undefined,
+    resultRanking: null,
+  };
+  const noBucketPatch = buildCheapestMoreSearchPatch(
+    {
+      searchInput: noBucketSearchInput,
+      parsedRequest: undefined,
+    },
+    defaultRequest,
+  );
+
+  assert.equal(noBucketPatch.searchInput.preferredTime, null);
+  assert.equal(noBucketPatch.searchInput.resultRanking, 'cheapest');
+  assert.equal(noBucketPatch.parsedRequest, undefined);
+
+  const nightSearchInput = {
+    ...morningSearchInput,
+    preferredTime: 'night',
+    resultRanking: 'cheapest',
+    resultLimit: 10,
+  } as const;
+  const earlyMorningRequest = parseCheapestMoreSearchRequest(
+    'them chuyen gia re vao sang som',
+  );
+
+  if (!earlyMorningRequest) {
+    throw new Error('Expected early-morning cheapest follow-up request.');
+  }
+
+  const earlyMorningPatch = buildCheapestMoreSearchPatch(
+    {
+      searchInput: nightSearchInput,
+      parsedRequest,
+    },
+    earlyMorningRequest,
+  );
+
+  assert.equal(earlyMorningPatch.searchInput.preferredTime, 'early_morning');
+  assert.equal(earlyMorningPatch.searchInput.resultLimit, 5);
+}
 /**
  * Verifies Telegram flight failures use retry patterns instead of raw internals.
  */
@@ -546,6 +689,7 @@ function testFlightResultRanking() {
     createRankingCandidate(6, '12:00', 300000),
     createRankingCandidate(7, '17:59', 400000),
     createRankingCandidate(8, '18:00', 200000),
+    createRankingCandidate(9, '20:00', 950000),
   ];
 
   assert.equal(isFlightTimeInBucket('05:59', 'early_morning'), true);
@@ -579,6 +723,19 @@ function testFlightResultRanking() {
     allCheapest?.candidates.map((candidate) => candidate.cardIndex),
     [8, 6, 7, 2, 5],
   );
+
+  const allCheapestTen = rankFlightResultsForSearch({
+    candidates,
+    preferredTime: null,
+    resultRanking: 'cheapest',
+    limit: 10,
+  });
+
+  assert.deepEqual(
+    allCheapestTen?.candidates.map((candidate) => candidate.cardIndex),
+    [8, 6, 7, 2, 5, 3, 1, 4, 0, 9],
+  );
+  assert.equal(allCheapestTen?.summary.displayedCount, 10);
 
   const emptyBucket = rankFlightResultsForSearch({
     candidates: [createRankingCandidate(10, '14:10', 450000)],
@@ -990,6 +1147,7 @@ async function main() {
   testFlightSelectionParserRequiresLatestCaseContext();
   testLatestFlightSearchCaseContext();
   testCheapestBucketFollowUpPatch();
+  testCheapestMoreSearchPatch();
   testOperatorFriendlyFlightFailureMessages();
   testFlightResultRanking();
   testFlightSelectionMatcher();
