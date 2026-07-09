@@ -36,6 +36,9 @@ import {
   formatFlightSelectionStartedMessage,
   formatFlightSelectionSuccessMessage,
   formatMissingFlightFieldsMessage,
+  formatMoreFlightMissingLatestCaseMessage,
+  formatNormalBucketRerunStartedMessage,
+  formatNormalMoreOptionsMessage,
   formatOneBookingAuthRefreshStartedMessage,
   formatPassengerReadySelectionStillNeededMessage,
   formatParserFailedMessage,
@@ -47,8 +50,10 @@ import {
 import { handleTelegramSettingsCommand } from './telegram-settings-commands';
 import { tryHandleTelegramHoldRecoveryMessage } from './telegram-hold-recovery';
 import {
+  getLatestFlightOptionsFollowUpContext,
   getLatestFlightSearchCase,
   setLatestFlightSearchCase,
+  setLatestFlightOptionsFollowUpContext,
 } from './telegram-flight-selection-context';
 import { setActivePassengerCase } from './telegram-passenger-context';
 import {
@@ -143,7 +148,7 @@ export async function handleTelegramMessage(
   }
 
   if (
-    await tryHandleCheapestBucketFollowUpRequest(
+    await tryHandleFlightBucketFollowUpRequest(
       bot,
       chatId,
       text,
@@ -154,7 +159,7 @@ export async function handleTelegramMessage(
   }
 
   if (
-    await tryHandleMoreCheapestOptionsRequest(
+    await tryHandleMoreFlightOptionsRequest(
       bot,
       chatId,
       text,
@@ -397,6 +402,14 @@ export async function handleTelegramMessage(
     screenshotPaths: result.screenshotPaths,
   });
   setLatestFlightSearchCase(chatId, currentCase.caseId);
+  setLatestFlightOptionsFollowUpContext(chatId, {
+    latestSearchCaseId: currentCase.caseId,
+    mode: result.filterSummary?.ranking === 'cheapest' ? 'cheapest' : 'normal',
+    resultLimit:
+      currentCase.searchInput?.resultRanking === 'cheapest'
+        ? currentCase.searchInput.resultLimit
+        : undefined,
+  });
   await appendLocalLog({
     level: 'info',
     event: 'one_booking_search_completed',
@@ -464,10 +477,16 @@ export async function handleTelegramMessage(
 export type CheapestBucketFollowUp = {
   preferredTime: PreferredTime;
   label: string;
+  resultLimit?: 5 | 10;
 };
 
 export type CheapestMoreSearchRequest = {
   resultLimit: 5 | 10;
+  preferredTime?: PreferredTime;
+  bucketLabel?: string | null;
+};
+
+export type NormalFlightFollowUpRequest = {
   preferredTime?: PreferredTime;
   bucketLabel?: string | null;
 };
@@ -507,6 +526,16 @@ async function tryHandleCheapestMoreSearchRequest(
       chatId,
       formatCheapestFollowUpMissingSearchMessage(flightCase.caseId),
     );
+    return true;
+  }
+
+  if (!('preferredTime' in cheapestRequest)) {
+    setLatestFlightOptionsFollowUpContext(chatId, {
+      latestSearchCaseId: flightCase.caseId,
+      mode: 'cheapest',
+      resultLimit: cheapestRequest.resultLimit,
+    });
+    await bot.sendMessage(chatId, formatCheapestMoreOptionsMessage(flightCase));
     return true;
   }
 
@@ -586,6 +615,11 @@ async function tryHandleCheapestMoreSearchRequest(
     screenshotPaths: result.screenshotPaths,
   });
   setLatestFlightSearchCase(chatId, currentCase.caseId);
+  setLatestFlightOptionsFollowUpContext(chatId, {
+    latestSearchCaseId: currentCase.caseId,
+    mode: 'cheapest',
+    resultLimit: patch.searchInput.resultLimit,
+  });
   await appendLocalLog({
     level: 'info',
     event: 'one_booking_search_completed',
@@ -650,7 +684,7 @@ async function tryHandleCheapestMoreSearchRequest(
  * Handles bucket-only replies such as `sáng sớm` after SakuraBot has already
  * shown cheapest results for the latest case.
  */
-async function tryHandleCheapestBucketFollowUpRequest(
+async function tryHandleFlightBucketFollowUpRequest(
   bot: TelegramBot,
   chatId: number,
   text: string,
@@ -663,6 +697,11 @@ async function tryHandleCheapestBucketFollowUpRequest(
   }
 
   const flightCase = await readLocalFlightCase(latestCaseId);
+  const followUpContext = getLatestFlightOptionsFollowUpContext(chatId);
+  const followUpMode =
+    followUpContext?.latestSearchCaseId === latestCaseId
+      ? followUpContext.mode
+      : 'normal';
 
   if (!canShowCheapestMoreOptionsForCase(flightCase)) {
     if (flightCase) {
@@ -684,7 +723,16 @@ async function tryHandleCheapestBucketFollowUpRequest(
     return true;
   }
 
-  const patch = buildCheapestBucketSearchPatch(flightCase, bucketFollowUp);
+  const patch =
+    followUpMode === 'cheapest'
+      ? buildCheapestBucketSearchPatch(flightCase, {
+          ...bucketFollowUp,
+          resultLimit:
+            followUpContext?.latestSearchCaseId === latestCaseId
+              ? followUpContext.resultLimit
+              : undefined,
+        })
+      : buildNormalBucketSearchPatch(flightCase, bucketFollowUp);
   let currentCase = await updateLocalFlightCase(flightCase, {
     ...patch,
     status: 'SEARCH_RUNNING',
@@ -696,21 +744,38 @@ async function tryHandleCheapestBucketFollowUpRequest(
 
   await appendLocalLog({
     level: 'info',
-    event: 'cheapest_bucket_follow_up_requested',
+    event:
+      followUpMode === 'cheapest'
+        ? 'cheapest_bucket_follow_up_requested'
+        : 'normal_bucket_follow_up_requested',
     caseId: currentCase.caseId,
-    message: 'Received cheapest flight bucket follow-up.',
+    message:
+      followUpMode === 'cheapest'
+        ? 'Received cheapest flight bucket follow-up.'
+        : 'Received normal flight bucket follow-up.',
     meta: {
       preferredTime: bucketFollowUp.preferredTime,
       label: bucketFollowUp.label,
+      mode: followUpMode,
     },
   });
 
+  const progressLabel = getBucketLabelForFollowUpMode(
+    bucketFollowUp,
+    followUpMode,
+  );
+
   await bot.sendMessage(
     chatId,
-    formatCheapestBucketRerunStartedMessage(
-      currentCase.caseId,
-      bucketFollowUp.label,
-    ),
+    followUpMode === 'cheapest'
+      ? formatCheapestBucketRerunStartedMessage(
+          currentCase.caseId,
+          progressLabel,
+        )
+      : formatNormalBucketRerunStartedMessage(
+          currentCase.caseId,
+          progressLabel,
+        ),
   );
 
   const result = await searchOneBookingFlights(patch.searchInput, {
@@ -826,13 +891,16 @@ export function parseCheapestMoreSearchRequest(
   const hasExplicitCount = /\b(?:5|10)\s+chuyen(?:\s+bay)?\b/.test(
     normalizedText,
   );
-  const hasCheapIntent =
-    /\bgia re\b/.test(normalizedText) || /\bre nhat\b/.test(normalizedText);
-  const hasMoreFlightIntent =
-    /\bthem\b/.test(normalizedText) &&
-    (/\bchuyen(?:\s+bay)?\b/.test(normalizedText) || hasCheapIntent);
+  const hasCheapIntent = hasCheapFlightIntent(normalizedText);
+  const hasCheapFollowUpIntent =
+    hasCheapIntent &&
+    !hasNewFlightSearchClues(normalizedText) &&
+    (/\b(?:tim|them|xem|loc|lay|cho)\b/.test(normalizedText) ||
+      hasExplicitCount ||
+      /\bchuyen(?:\s+bay)?\b/.test(normalizedText) ||
+      /\bve\b/.test(normalizedText));
 
-  if (!hasExplicitCount && !hasMoreFlightIntent) {
+  if (!hasCheapFollowUpIntent) {
     return null;
   }
 
@@ -843,40 +911,73 @@ export function parseCheapestMoreSearchRequest(
 }
 
 /**
+ * Parses normal follow-ups that should keep live 1Booking order.
+ *
+ * Cheap-price wording is intentionally excluded here so normal follow-ups never
+ * inherit stale cheapest ranking from an earlier case.
+ */
+export function parseNormalFlightFollowUpRequest(
+  text: string,
+): NormalFlightFollowUpRequest | null {
+  const normalizedText = normalizeVietnameseFollowUpText(text);
+
+  if (hasCheapFlightIntent(normalizedText)) {
+    return null;
+  }
+
+  const timeBucket = parseCheapestFollowUpTimeBucket(normalizedText);
+  const hasBucket = 'preferredTime' in timeBucket;
+  const isBucketOnly = parseCheapestBucketFollowUpMessage(text) !== null;
+  const hasMoreIntent =
+    /(?:can|muon|xem|cho|lay)\s+them|xem them|them chuyen|more/.test(
+      normalizedText,
+    ) ||
+    /\b(?:5|10)\s+chuyen(?:\s+bay)?\b/.test(normalizedText);
+
+  if (!hasMoreIntent && !isBucketOnly) {
+    return null;
+  }
+
+  return hasBucket ? timeBucket : {};
+}
+
+/**
  * Parses an optional time bucket embedded in a cheapest-rerun request.
  */
 function parseCheapestFollowUpTimeBucket(
   normalizedText: string,
 ): Pick<CheapestMoreSearchRequest, 'preferredTime' | 'bucketLabel'> {
-  if (/\b(?:tat ca|toan bo|all)\b/.test(normalizedText)) {
+  const bucketText = normalizedText.replace(/^(?:toi|minh)\s+/, '');
+
+  if (/\b(?:tat ca|toan bo|all)\b/.test(bucketText)) {
     return {
       preferredTime: null,
       bucketLabel: null,
     };
   }
 
-  if (/\b(?:sang som|rang sang|bay dem|dem som)\b/.test(normalizedText)) {
+  if (/\b(?:sang som|rang sang|bay dem|dem som)\b/.test(bucketText)) {
     return {
       preferredTime: 'early_morning',
       bucketLabel: 's\u00e1ng s\u1edbm',
     };
   }
 
-  if (/\b(?:buoi sang|sang)\b/.test(normalizedText)) {
+  if (/\b(?:buoi sang|sang)\b/.test(bucketText)) {
     return {
       preferredTime: 'morning',
       bucketLabel: 'bu\u1ed5i s\u00e1ng',
     };
   }
 
-  if (/\b(?:buoi chieu|chieu)\b/.test(normalizedText)) {
+  if (/\b(?:buoi chieu|chieu)\b/.test(bucketText)) {
     return {
       preferredTime: 'afternoon',
       bucketLabel: 'bu\u1ed5i chi\u1ec1u',
     };
   }
 
-  if (/\b(?:buoi toi|toi|dem)\b/.test(normalizedText)) {
+  if (/\b(?:buoi toi|toi|dem)\b/.test(bucketText)) {
     return {
       preferredTime: 'night',
       bucketLabel: 'bu\u1ed5i t\u1ed1i',
@@ -911,6 +1012,30 @@ function getCheapestMoreProgressBucketLabel(
       return 'bu\u1ed5i t\u1ed1i';
     default:
       return null;
+  }
+}
+
+/**
+ * Chooses the bucket label for normal follow-up reruns.
+ */
+function getNormalFollowUpProgressBucketLabel(
+  normalRequest: NormalFlightFollowUpRequest,
+) {
+  if ('bucketLabel' in normalRequest) {
+    return normalRequest.bucketLabel ?? 't\u1ea5t c\u1ea3 chuy\u1ebfn';
+  }
+
+  switch (normalRequest.preferredTime) {
+    case 'early_morning':
+      return 's\u00e1ng s\u1edbm';
+    case 'morning':
+      return 'bu\u1ed5i s\u00e1ng';
+    case 'afternoon':
+      return 'bu\u1ed5i chi\u1ec1u';
+    case 'night':
+      return 'bu\u1ed5i t\u1ed1i';
+    default:
+      return 't\u1ea5t c\u1ea3 chuy\u1ebfn';
   }
 }
 
@@ -987,7 +1112,7 @@ export function parseCheapestBucketFollowUpMessage(
   }
 
   if (
-    /^(tat ca|tat ca chuyen re nhat|toan bo|toan bo chuyen re nhat|all cheapest)$/.test(
+    /^(tat ca|tat ca chuyen|tat ca chuyen re nhat|toan bo|toan bo chuyen|toan bo chuyen re nhat|all|all cheapest)$/.test(
       normalizedText,
     )
   ) {
@@ -1011,7 +1136,7 @@ export function buildCheapestBucketSearchPatch(
     ...(flightCase.searchInput as SearchFlightsInput),
     preferredTime: bucketFollowUp.preferredTime,
     resultRanking: 'cheapest',
-    resultLimit: flightCase.searchInput?.resultLimit,
+    resultLimit: bucketFollowUp.resultLimit ?? flightCase.searchInput?.resultLimit,
   } satisfies SearchFlightsInput;
 
   return {
@@ -1026,6 +1151,54 @@ export function buildCheapestBucketSearchPatch(
   };
 }
 
+/**
+ * Builds a patch for normal follow-ups. It clears any stale cheapest ranking so
+ * normal reruns keep 1Booking order and show every matching bucket result.
+ */
+export function buildNormalBucketSearchPatch(
+  flightCase: Pick<LocalFlightCase, 'searchInput' | 'parsedRequest'>,
+  bucketFollowUp: NormalFlightFollowUpRequest,
+): Pick<LocalFlightCase, 'searchInput' | 'parsedRequest'> {
+  const searchInput = {
+    ...(flightCase.searchInput as SearchFlightsInput),
+    preferredTime:
+      'preferredTime' in bucketFollowUp
+        ? bucketFollowUp.preferredTime
+        : (flightCase.searchInput?.preferredTime ??
+          flightCase.parsedRequest?.preferredTime ??
+          null),
+    resultRanking: null,
+    resultLimit: undefined,
+  } satisfies SearchFlightsInput;
+
+  return {
+    searchInput,
+    parsedRequest: flightCase.parsedRequest
+      ? {
+          ...flightCase.parsedRequest,
+          preferredTime: searchInput.preferredTime,
+          resultRanking: null,
+        }
+      : undefined,
+  };
+}
+
+/**
+ * Uses mode-specific wording for the all-results bucket label.
+ */
+function getBucketLabelForFollowUpMode(
+  bucketFollowUp: CheapestBucketFollowUp,
+  mode: 'normal' | 'cheapest',
+) {
+  if (bucketFollowUp.preferredTime === null) {
+    return mode === 'cheapest'
+      ? 'T\u1ea5t c\u1ea3 chuy\u1ebfn r\u1ebb nh\u1ea5t'
+      : 'T\u1ea5t c\u1ea3 chuy\u1ebfn';
+  }
+
+  return bucketFollowUp.label;
+}
+
 function normalizeVietnameseFollowUpText(text: string) {
   return text
     .normalize('NFD')
@@ -1037,14 +1210,50 @@ function normalizeVietnameseFollowUpText(text: string) {
     .replace(/\s+/g, ' ')
     .trim();
 }
-async function tryHandleMoreCheapestOptionsRequest(
+
+/**
+ * Detects explicit cheap-price intent for the cheapest-flight lane.
+ */
+function hasCheapFlightIntent(normalizedText: string) {
+  return (
+    /\bgia re\b/.test(normalizedText) ||
+    /\bre nhat\b/.test(normalizedText) ||
+    /\bchuyen re\b/.test(normalizedText) ||
+    /\bve re\b/.test(normalizedText)
+  );
+}
+
+/**
+ * Avoids stealing complete new flight-search requests from the AI parser.
+ */
+function hasNewFlightSearchClues(normalizedText: string) {
+  return (
+    /\b(?:ngay|hom nay|hom qua|ngay mai|mai)\b/.test(normalizedText) ||
+    /\b(?:bay|di)\s+tu\b/.test(normalizedText) ||
+    /\btu\s+(?:hcm|sgn|sai gon|ha noi|hn|han|da nang|dad)\b/.test(
+      normalizedText,
+    ) ||
+    /\b(?:ra|vao|den)\s+(?:hcm|sgn|sai gon|ha noi|hn|han|da nang|dad)\b/.test(
+      normalizedText,
+    )
+  );
+}
+
+async function tryHandleMoreFlightOptionsRequest(
   bot: TelegramBot,
   chatId: number,
   text: string,
   latestCaseId?: string,
 ) {
-  if (!looksLikeMoreCheapestOptionsRequest(text) || !latestCaseId) {
+  const normalRequest = parseNormalFlightFollowUpRequest(text);
+
+  if (!normalRequest) {
     return false;
+  }
+
+  if (!latestCaseId) {
+    await bot.sendMessage(chatId, formatMoreFlightMissingLatestCaseMessage());
+    return true;
   }
 
   const flightCase = await readLocalFlightCase(latestCaseId);
@@ -1061,20 +1270,157 @@ async function tryHandleMoreCheapestOptionsRequest(
     return false;
   }
 
-  await bot.sendMessage(chatId, formatCheapestMoreOptionsMessage(flightCase));
+  if (!flightCase.searchInput) {
+    await bot.sendMessage(
+      chatId,
+      formatCheapestFollowUpMissingSearchMessage(flightCase.caseId),
+    );
+    return true;
+  }
+
+  if ('preferredTime' in normalRequest) {
+    const patch = buildNormalBucketSearchPatch(flightCase, normalRequest);
+    let currentCase = await updateLocalFlightCase(flightCase, {
+      ...patch,
+      status: 'SEARCH_RUNNING',
+      errorMessage: undefined,
+      screenshotPath: undefined,
+      screenshotPaths: undefined,
+      flightResultFilter: undefined,
+    });
+
+    await appendLocalLog({
+      level: 'info',
+      event: 'normal_follow_up_requested',
+      caseId: currentCase.caseId,
+      message: 'Received normal flight follow-up with a time bucket.',
+      meta: {
+        preferredTime: patch.searchInput?.preferredTime ?? null,
+      },
+    });
+
+    await bot.sendMessage(
+      chatId,
+      formatNormalBucketRerunStartedMessage(
+        currentCase.caseId,
+        getNormalFollowUpProgressBucketLabel(normalRequest),
+      ),
+    );
+
+    const result = await searchOneBookingFlights(patch.searchInput, {
+      onAuthRefresh: () =>
+        Promise.resolve(
+          void bot.sendMessage(
+            chatId,
+            formatOneBookingAuthRefreshStartedMessage(),
+          ),
+        ),
+    });
+
+    if (!result.ok) {
+      await updateLocalFlightCase(currentCase, {
+        status: 'SEARCH_FAILED',
+        errorMessage: result.message,
+        screenshotPath: result.errorScreenshotPath ?? undefined,
+      });
+      await appendLocalLog({
+        level: 'error',
+        event: 'one_booking_search_failed',
+        caseId: currentCase.caseId,
+        message: result.message,
+        meta: {
+          errorScreenshotPath: result.errorScreenshotPath,
+        },
+      });
+
+      await bot.sendMessage(chatId, formatSearchFailedMessage(result.message));
+
+      if (result.errorScreenshotPath) {
+        await bot.sendPhoto(chatId, result.errorScreenshotPath, {
+          caption: 'Screenshot Ä‘á»ƒ mÃ¬nh cÃ¹ng Ä‘á»‘i chiáº¿u lá»—i search 1Booking.',
+        });
+      }
+
+      return true;
+    }
+
+    currentCase = await updateLocalFlightCase(currentCase, {
+      status: 'SEARCH_DONE',
+      flightCount: result.flightCount,
+      displayedFlightCount: result.displayedFlightCount,
+      flightResultFilter: result.filterSummary,
+      screenshotPath: result.screenshotPath,
+      screenshotPaths: result.screenshotPaths,
+    });
+    setLatestFlightSearchCase(chatId, currentCase.caseId);
+    setLatestFlightOptionsFollowUpContext(chatId, {
+      latestSearchCaseId: currentCase.caseId,
+      mode: 'normal',
+    });
+
+    await bot.sendMessage(
+      chatId,
+      formatSearchSuccessMessage(result.flightCount, result.filterSummary),
+    );
+
+    if (result.screenshotPaths.length > 0) {
+      for (let index = 0; index < result.screenshotPaths.length; index++) {
+        await bot.sendPhoto(chatId, result.screenshotPaths[index], {
+          caption:
+            result.screenshotPaths.length === 1
+              ? 'áº¢nh lá»‹ch trÃ¬nh chuyáº¿n bay tá»« 1Booking nhÃ©.'
+              : `áº¢nh lá»‹ch trÃ¬nh chuyáº¿n bay ${index + 1}/${result.screenshotPaths.length}.`,
+        });
+      }
+
+      const archivePath = await createTelegramScreenshotArchive(
+        currentCase.caseId,
+        result.screenshotPaths,
+      );
+
+      await bot.sendDocument(
+        chatId,
+        archivePath,
+        {
+          caption: 'Download All Files',
+        },
+        createTelegramScreenshotArchiveFileOptions(archivePath),
+      );
+
+      await updateLocalFlightCase(currentCase, {
+        status: 'OPTIONS_SENT',
+      });
+      return true;
+    }
+
+    await bot.sendPhoto(chatId, result.screenshotPath, {
+      caption: 'áº¢nh lá»‹ch trÃ¬nh chuyáº¿n bay tá»« 1Booking nhÃ©.',
+    });
+
+    await updateLocalFlightCase(currentCase, {
+      status: 'OPTIONS_SENT',
+    });
+    return true;
+  }
+
+  setLatestFlightOptionsFollowUpContext(chatId, {
+    latestSearchCaseId: flightCase.caseId,
+    mode: 'normal',
+  });
+
+  await bot.sendMessage(
+    chatId,
+    formatNormalMoreOptionsMessage(flightCase),
+  );
 
   return true;
 }
 
 /**
- * Detects short follow-up wording for more cheapest-flight options.
+ * Detects short follow-up wording for more flight options.
  */
 export function looksLikeMoreCheapestOptionsRequest(text: string) {
-  const normalizedText = normalizeVietnameseFollowUpText(text);
-
-  return /(?:can|muon|xem|cho|lay)\s+them|xem them|them chuyen|more/.test(
-    normalizedText,
-  );
+  return parseNormalFlightFollowUpRequest(text) !== null;
 }
 
 /**

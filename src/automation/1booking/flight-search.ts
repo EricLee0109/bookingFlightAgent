@@ -4,7 +4,7 @@ import { ONE_BOOKING_URL } from './constants';
 import { selectDepartureDate } from './dates';
 import {
   extractFlightResultCandidates,
-  rankFlightResultsForSearch,
+  selectFlightResultsForSearch,
   type FlightResultFilterSummary,
 } from './flight-result-ranking';
 import {
@@ -74,22 +74,22 @@ export async function searchFlights(
 
   const flightCount = await waitForFlightResultsReady(page);
   const candidates = await extractFlightResultCandidates(page);
-  const rankedResult = rankFlightResultsForSearch({
+  const selectedResult = selectFlightResultsForSearch({
     candidates,
     preferredTime: input.preferredTime,
     resultRanking: input.resultRanking,
     limit: input.resultLimit,
   });
 
-  if (rankedResult && rankedResult.summary.displayedCount === 0) {
-    throw new CheapestFlightBucketEmptyError(rankedResult.summary);
+  if (selectedResult && selectedResult.summary.displayedCount === 0) {
+    throw new FlightResultBucketEmptyError(selectedResult.summary);
   }
 
   const screenshotPaths = await takeFlightResultsBatchScreenshots(
     page,
     '1booking-search-flights',
     undefined,
-    rankedResult?.cardIndexes,
+    selectedResult?.cardIndexes,
   );
   const [screenshotPath] = screenshotPaths;
 
@@ -100,8 +100,8 @@ export async function searchFlights(
   return {
     success: true,
     flightCount,
-    displayedFlightCount: rankedResult?.summary.displayedCount ?? flightCount,
-    filterSummary: rankedResult?.summary,
+    displayedFlightCount: selectedResult?.summary.displayedCount ?? flightCount,
+    filterSummary: selectedResult?.summary,
     screenshotPath,
     screenshotPaths,
   };
@@ -109,12 +109,17 @@ export async function searchFlights(
 
 /**
  * Signals that 1Booking returned flights, but none matched the requested
- * cheapest-flight time bucket. Telegram can ask the operator for another bucket
- * without widening results silently.
+ * time bucket. Telegram can ask the operator for another bucket without
+ * widening results silently.
  */
-export class CheapestFlightBucketEmptyError extends Error {
+export class FlightResultBucketEmptyError extends Error {
   constructor(readonly summary: FlightResultFilterSummary) {
-    super('No cheapest flight results matched the requested time bucket.');
-    this.name = 'CheapestFlightBucketEmptyError';
+    super('No flight results matched the requested time bucket.');
+    this.name = 'FlightResultBucketEmptyError';
   }
 }
+
+/**
+ * Legacy export kept for older imports while callers migrate to the neutral name.
+ */
+export class CheapestFlightBucketEmptyError extends FlightResultBucketEmptyError {}

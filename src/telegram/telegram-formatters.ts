@@ -113,6 +113,16 @@ export function formatSearchSuccessMessage(
       .join('\n');
   }
 
+  if (filterSummary?.requestedTimeBucketLabel) {
+    return [
+      `✅ Mình đã lọc ${filterSummary.displayedCount} chuyến trong khung ${filterSummary.requestedTimeBucketLabel}.`,
+      `Tổng kết quả live: ${filterSummary.totalVisibleCount} chuyến.`,
+      '',
+      'Mình gửi ảnh lịch trình bên dưới nhé.',
+      'Bạn có thể gửi ảnh này lại cho khách trên Zalo.',
+    ].join('\n');
+  }
+
   return [
     `✅ Đã tìm thấy ${flightCount} kết quả chuyến bay.`,
     '',
@@ -176,6 +186,41 @@ export function formatCheapestBucketRerunStartedMessage(
 }
 
 /**
+ * Asks which normal flight time bucket to show next.
+ *
+ * This copy intentionally avoids cheap-flight wording so normal follow-ups do
+ * not look like SakuraBot silently changed the operator's intent.
+ */
+export function formatNormalMoreOptionsMessage(flightCase: LocalFlightCase) {
+  const currentBucket =
+    flightCase.flightResultFilter?.requestedTimeBucketLabel ??
+    'to\u00e0n b\u1ed9 danh s\u00e1ch';
+
+  return [
+    `\u{1F4DD} M\u00ecnh \u0111ang hi\u1ec3n th\u1ecb danh s\u00e1ch chuy\u1ebfn c\u1ee7a case ${flightCase.caseId}.`,
+    `Khung hi\u1ec7n t\u1ea1i: ${currentBucket}.`,
+    '',
+    'B\u1ea1n mu\u1ed1n m\u00ecnh xem th\u00eam nh\u00f3m n\u00e0o?',
+    '\u26C5 S\u00e1ng s\u1edbm',
+    '\u{1F324}\uFE0F S\u00e1ng',
+    '\u{1F325}\uFE0F Chi\u1ec1u',
+    '\u{1F319} T\u1ed1i',
+    '\u2708\uFE0F T\u1ea5t c\u1ea3 chuy\u1ebfn',
+  ].join('\n');
+}
+
+/**
+ * Formats progress while rerunning the same normal flight case with a new time
+ * bucket. The result remains normal ordered flights, not cheapest ranking.
+ */
+export function formatNormalBucketRerunStartedMessage(
+  caseId: string,
+  bucketLabel: string,
+) {
+  return `\u23F3 M\u00ecnh \u0111ang l\u1ecdc l\u1ea1i danh s\u00e1ch chuy\u1ebfn case ${caseId} theo khung ${bucketLabel}...`;
+}
+
+/**
  * Formats progress while converting the latest normal search into top-cheapest
  * customer-facing screenshots.
  */
@@ -205,6 +250,15 @@ export function formatCheapestMoreMissingLatestCaseMessage() {
 /**
  * Formats the rare case where a cheapest follow-up has no saved search input.
  */
+export function formatMoreFlightMissingLatestCaseMessage() {
+  return [
+    '\u{1F4DD} M\u00ecnh ch\u01b0a c\u00f3 danh s\u00e1ch chuy\u1ebfn g\u1ea7n nh\u1ea5t \u0111\u1ec3 xem th\u00eam.',
+    '',
+    'B\u1ea1n search chuy\u1ebfn tr\u01b0\u1edbc gi\u00fap m\u00ecnh nh\u00e9, v\u00ed d\u1ee5:',
+    'bay t\u1eeb SGN ra HAN ng\u00e0y 30/07',
+  ].join('\n');
+}
+
 export function formatCheapestFollowUpMissingSearchMessage(caseId: string) {
   return [
     `📝 Mình chưa có dữ liệu chuyến đã lưu cho case ${caseId}.`,

@@ -27,6 +27,7 @@ import {
   getFlightTimeBucketForPreferredTime,
   isFlightTimeInBucket,
   rankFlightResultsForSearch,
+  selectFlightResultsForSearch,
   type FlightResultCandidate,
 } from '../src/automation/1booking/flight-result-ranking';
 import {
@@ -42,16 +43,19 @@ import {
 import {
   buildCheapestBucketSearchPatch,
   buildCheapestMoreSearchPatch,
+  buildNormalBucketSearchPatch,
   canShowCheapestMoreOptionsForCase,
   looksLikeMoreCheapestOptionsRequest,
   parseCheapestBucketFollowUpMessage,
   parseCheapestMoreSearchRequest,
+  parseNormalFlightFollowUpRequest,
 } from '../src/telegram/telegram-message-handler';
 import {
   formatFlightSelectionFailedMessage,
   formatFlightSelectionParseFailedMessage,
   formatMissingFlightFieldsMessage,
   formatSearchFailedMessage,
+  formatSearchSuccessMessage,
   formatSearchInputMappingFailedMessage,
 } from '../src/telegram/telegram-formatters';
 
@@ -505,14 +509,14 @@ function testCheapestBucketFollowUpPatch() {
  * Verifies explicit cheap-flight follow-ups rerun the latest normal case.
  */
 function testCheapestMoreSearchPatch() {
-  assert.deepEqual(parseCheapestMoreSearchRequest('them chuyen bay'), {
+  assert.equal(parseCheapestMoreSearchRequest('them chuyen bay'), null);
+  assert.equal(parseCheapestMoreSearchRequest('5 chuyen bay'), null);
+  assert.equal(parseCheapestMoreSearchRequest('10 chuyen bay'), null);
+  assert.deepEqual(parseCheapestMoreSearchRequest('them chuyen bay gia re'), {
     resultLimit: 5,
   });
-  assert.deepEqual(parseCheapestMoreSearchRequest('5 chuyen bay'), {
+  assert.deepEqual(parseCheapestMoreSearchRequest('5 chuyen bay gia re'), {
     resultLimit: 5,
-  });
-  assert.deepEqual(parseCheapestMoreSearchRequest('10 chuyen bay'), {
-    resultLimit: 10,
   });
   assert.deepEqual(
     parseCheapestMoreSearchRequest('5 chuyen re nhat buoi chieu'),
@@ -547,7 +551,9 @@ function testCheapestMoreSearchPatch() {
     resultRanking: null,
   });
   const morningSearchInput = mapParsedRequestToSearchFlightsInput(parsedRequest);
-  const defaultRequest = parseCheapestMoreSearchRequest('them chuyen bay');
+  const defaultRequest = parseCheapestMoreSearchRequest(
+    'them chuyen bay gia re',
+  );
 
   if (!defaultRequest) {
     throw new Error('Expected cheapest follow-up request.');
@@ -642,6 +648,12 @@ function testCheapestMoreOptionsMenuEligibility() {
   const searchInput = mapParsedRequestToSearchFlightsInput(parsedRequest);
 
   assert.equal(looksLikeMoreCheapestOptionsRequest('toi can them'), true);
+  assert.equal(looksLikeMoreCheapestOptionsRequest('them chuyen bay'), true);
+  assert.equal(looksLikeMoreCheapestOptionsRequest('5 chuyen bay'), true);
+  assert.equal(
+    looksLikeMoreCheapestOptionsRequest('them chuyen bay gia re'),
+    false,
+  );
   assert.equal(
     looksLikeMoreCheapestOptionsRequest('minh muon bay tu SGN ra HAN ngay 30/07'),
     false,
@@ -653,6 +665,57 @@ function testCheapestMoreOptionsMenuEligibility() {
     true,
   );
   assert.equal(canShowCheapestMoreOptionsForCase({}), false);
+}
+
+/**
+ * Verifies normal follow-ups stay out of the cheapest lane and clear stale
+ * cheapest ranking before rerunning the latest case.
+ */
+function testNormalFlightFollowUpPatch() {
+  assert.deepEqual(parseNormalFlightFollowUpRequest('them chuyen bay'), {});
+  assert.deepEqual(parseNormalFlightFollowUpRequest('toi can them'), {});
+  assert.deepEqual(parseNormalFlightFollowUpRequest('5 chuyen bay'), {});
+  assert.deepEqual(parseNormalFlightFollowUpRequest('buoi toi'), {
+    preferredTime: 'night',
+    bucketLabel: 'bu\u1ed5i t\u1ed1i',
+  });
+  assert.deepEqual(parseNormalFlightFollowUpRequest('5 chuyen bay buoi chieu'), {
+    preferredTime: 'afternoon',
+    bucketLabel: 'bu\u1ed5i chi\u1ec1u',
+  });
+  assert.equal(
+    parseNormalFlightFollowUpRequest('them chuyen bay gia re'),
+    null,
+  );
+
+  const parsedRequest = ParsedFlightRequestSchema.parse({
+    ...validOneWayRequest,
+    preferredTime: 'morning',
+    resultRanking: 'cheapest',
+  });
+  const searchInput = {
+    ...mapParsedRequestToSearchFlightsInput(parsedRequest),
+    resultLimit: 10,
+  } as const;
+  const nightRequest = parseNormalFlightFollowUpRequest('buoi toi');
+
+  if (!nightRequest) {
+    throw new Error('Expected normal night follow-up request.');
+  }
+
+  const normalPatch = buildNormalBucketSearchPatch(
+    {
+      searchInput,
+      parsedRequest,
+    },
+    nightRequest,
+  );
+
+  assert.equal(normalPatch.searchInput?.preferredTime, 'night');
+  assert.equal(normalPatch.searchInput?.resultRanking, null);
+  assert.equal(normalPatch.searchInput?.resultLimit, undefined);
+  assert.equal(normalPatch.parsedRequest?.preferredTime, 'night');
+  assert.equal(normalPatch.parsedRequest?.resultRanking, null);
 }
 /**
  * Verifies Telegram flight failures use retry patterns instead of raw internals.
@@ -727,6 +790,39 @@ function testFlightResultRanking() {
   assert.equal(isFlightTimeInBucket('18:00', 'night'), true);
   assert.equal(getFlightTimeBucketForPreferredTime('specific_time'), null);
 
+  const normalMorning = selectFlightResultsForSearch({
+    candidates,
+    preferredTime: 'morning',
+    resultRanking: null,
+  });
+
+  assert.deepEqual(
+    normalMorning?.candidates.map((candidate) => candidate.cardIndex),
+    [1, 2, 3, 4, 5],
+  );
+  assert.equal(normalMorning?.summary.ranking, null);
+  assert.equal(normalMorning?.summary.displayedCount, 5);
+  assert.equal(normalMorning?.summary.totalVisibleCount, 10);
+
+  const normalNight = selectFlightResultsForSearch({
+    candidates,
+    preferredTime: 'night',
+    resultRanking: null,
+  });
+
+  assert.deepEqual(
+    normalNight?.candidates.map((candidate) => candidate.cardIndex),
+    [8, 9],
+  );
+
+  const normalSpecificTime = selectFlightResultsForSearch({
+    candidates,
+    preferredTime: 'specific_time',
+    resultRanking: null,
+  });
+
+  assert.equal(normalSpecificTime, null);
+
   const morningCheapest = rankFlightResultsForSearch({
     candidates,
     preferredTime: 'morning',
@@ -772,6 +868,23 @@ function testFlightResultRanking() {
 
   assert.equal(emptyBucket?.summary.displayedCount, 0);
   assert.equal(emptyBucket?.summary.matchedCount, 0);
+
+  const emptyNormalBucket = selectFlightResultsForSearch({
+    candidates: [createRankingCandidate(10, '14:10', 450000)],
+    preferredTime: 'early_morning',
+    resultRanking: null,
+  });
+
+  assert.equal(emptyNormalBucket?.summary.displayedCount, 0);
+  assert.equal(emptyNormalBucket?.summary.matchedCount, 0);
+
+  const normalBucketMessage = formatSearchSuccessMessage(
+    10,
+    normalMorning?.summary,
+  );
+
+  assert.match(normalBucketMessage, /5 chuyến trong khung/i);
+  assert.match(normalBucketMessage, /Tổng kết quả live: 10 chuyến/i);
   assert.equal(
     extractLowestVndPriceAmount('VND 1,832,520\nVND 1,616,520'),
     1616520,
@@ -1176,6 +1289,7 @@ async function main() {
   testCheapestBucketFollowUpPatch();
   testCheapestMoreSearchPatch();
   testCheapestMoreOptionsMenuEligibility();
+  testNormalFlightFollowUpPatch();
   testOperatorFriendlyFlightFailureMessages();
   testFlightResultRanking();
   testFlightSelectionMatcher();
