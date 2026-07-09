@@ -112,7 +112,9 @@ export function matchFlightSelectionCandidate(
     (candidate) =>
       (!input.airlineCode || candidate.airlineCode === input.airlineCode) &&
       candidate.departureTime === input.departureTime &&
-      (!input.bookingClass || candidate.bookingClass === input.bookingClass),
+      (!input.bookingClass ||
+        (candidate.bookingClass !== null &&
+          candidate.bookingClass === input.bookingClass)),
   );
 
   if (matches.length === 1) {
@@ -158,7 +160,7 @@ function formatCandidateSummary(candidates: FlightSelectionCandidate[]) {
         candidate.flightNumber,
         candidate.departureTime,
         candidate.arrivalTime ? `-${candidate.arrivalTime}` : '',
-        candidate.bookingClass,
+        candidate.bookingClass ?? candidate.rawBookingClassCode ?? 'no fare code',
         candidate.priceText ? `, ${candidate.priceText}` : '',
       ].join(''),
     )

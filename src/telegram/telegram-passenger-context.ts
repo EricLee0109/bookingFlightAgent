@@ -27,6 +27,16 @@ export function getTelegramPassengerContext(chatId: number) {
 }
 
 /**
+ * Clears passenger conversation context after a terminal hold/review state.
+ *
+ * Later Telegram messages should then route as fresh search/selection requests
+ * unless the operator explicitly includes a BK case id.
+ */
+export function clearActivePassengerCase(chatId: number) {
+  contextsByChatId.delete(chatId);
+}
+
+/**
  * Stores candidates currently waiting for an operator decision.
  */
 export function setPendingPassengerProfiles(

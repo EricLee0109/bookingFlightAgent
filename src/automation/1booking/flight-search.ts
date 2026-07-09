@@ -85,11 +85,13 @@ export async function searchFlights(
     throw new FlightResultBucketEmptyError(selectedResult.summary);
   }
 
+  const displayedCardIndexes =
+    selectedResult?.cardIndexes ?? candidates.map((candidate) => candidate.cardIndex);
   const screenshotPaths = await takeFlightResultsBatchScreenshots(
     page,
     '1booking-search-flights',
     undefined,
-    selectedResult?.cardIndexes,
+    displayedCardIndexes,
   );
   const [screenshotPath] = screenshotPaths;
 
@@ -100,7 +102,7 @@ export async function searchFlights(
   return {
     success: true,
     flightCount,
-    displayedFlightCount: selectedResult?.summary.displayedCount ?? flightCount,
+    displayedFlightCount: selectedResult?.summary.displayedCount ?? candidates.length,
     filterSummary: selectedResult?.summary,
     screenshotPath,
     screenshotPaths,

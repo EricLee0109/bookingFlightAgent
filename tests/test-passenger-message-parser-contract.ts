@@ -697,6 +697,7 @@ function testPassengerQuickInputAndAirlineDobRules() {
     departureTime: '08:40',
     arrivalTime: '10:00',
     bookingClass: 'ECO' as const,
+    rawBookingClassCode: 'Z1_ECO',
     priceText: 'VND 1,000,000',
     selectedAt: '2026-06-02T00:00:00.000Z',
   };
@@ -1056,6 +1057,7 @@ function testPassengerHoldTelegramMessages() {
       departureTime: '05:00',
       arrivalTime: '07:10',
       bookingClass: 'ECO',
+      rawBookingClassCode: 'Z1_ECO',
       priceText: 'VND 1,000',
       selectedAt: '2026-06-02T00:00:30.000Z',
     },
@@ -1126,6 +1128,7 @@ function testCompactCombinedTelegramMessages() {
       departureTime: '13:30',
       arrivalTime: '14:50',
       bookingClass: 'DLX',
+      rawBookingClassCode: 'W1_DLX',
       priceText: 'VND 1,504,200',
     },
     {

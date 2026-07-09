@@ -31,7 +31,8 @@ export type FlightSelectionCandidate = {
   flightNumber: string;
   departureTime: string;
   arrivalTime: string | null;
-  bookingClass: BookingClass;
+  bookingClass: BookingClass | null;
+  rawBookingClassCode: string | null;
   priceText: string | null;
 };
 

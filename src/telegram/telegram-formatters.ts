@@ -369,7 +369,7 @@ export function formatFlightSelectionSuccessMessage(
     `Giờ bay: ${selectedFlight.departureTime}${
       selectedFlight.arrivalTime ? ` - ${selectedFlight.arrivalTime}` : ''
     }`,
-    `Hạng đặt chỗ: ${BOOKING_CLASS_LABELS[selectedFlight.bookingClass]} (${selectedFlight.bookingClass})`,
+    `Hạng đặt chỗ: ${formatSelectedFlightFare(selectedFlight)}`,
     selectedFlight.priceText ? `Giá hiển thị: ${selectedFlight.priceText}` : null,
     '',
     'Mình đã bấm Giữ chỗ và dừng ở màn hình thông tin khách hàng để mình cùng review.',
@@ -946,6 +946,10 @@ function formatSelectionBookingClass(
 }
 
 function formatSearchFailureReason(message?: string) {
+  if (message && /SakuraBot đang xử lý|SakuraBot dang xu ly|AutomationLockBusyError/i.test(message)) {
+    return message;
+  }
+
   if (message && /No cheapest flight results matched/i.test(message)) {
     return [
       'Mình chưa thấy chuyến rẻ nhất nào trong khung giờ đã chọn.',
@@ -974,6 +978,10 @@ function formatFlightSelectionFailureReason(
   message: string,
   input?: SelectMatchingFlightInput,
 ) {
+  if (/SakuraBot đang xử lý|SakuraBot dang xu ly|AutomationLockBusyError/i.test(message)) {
+    return message;
+  }
+
   if (/case .*not found|không tìm thấy case/i.test(message)) {
     return 'Mình chưa tìm thấy mã case này trong dữ liệu local.';
   }
@@ -1003,6 +1011,10 @@ function formatFlightSelectionFailureReason(
 }
 
 function formatPassengerHoldFailureReason(message: string) {
+  if (/SakuraBot đang xử lý|SakuraBot dang xu ly|AutomationLockBusyError/i.test(message)) {
+    return message;
+  }
+
   if (/auth session expired|login is required|đăng nhập/i.test(message)) {
     return 'Phiên 1Booking có thể vừa hết hạn trước khi giữ chỗ.';
   }
@@ -1055,6 +1067,34 @@ function formatSelectionBookingClassShort(
   return bookingClass
     ? `${BOOKING_CLASS_LABELS[bookingClass]} (${bookingClass})`
     : 'Chưa chỉ định';
+}
+
+/**
+ * Formats the MVP guard for airlines that need a later dedicated hold flow.
+ */
+export function formatUnsupportedFlightSelectionAirlineMessage(
+  input: SelectMatchingFlightInput,
+) {
+  return [
+    '📝 Mình chưa hỗ trợ giữ chỗ hãng này trong MVP nhé.',
+    '',
+    `Hãng: ${formatSelectionAirline(input)}`,
+    '',
+    'MVP hiện tại hỗ trợ chọn/giữ chỗ các hãng: Vietjet, Bamboo, Vietravel, Sun Phu Quoc Airways.',
+    'Bạn chọn lại một chuyến thuộc các hãng trên giúp mình nhé.',
+  ].join('\n');
+}
+
+function formatSelectedFlightFare(selectedFlight: FlightSelectionCandidate) {
+  if (selectedFlight.bookingClass) {
+    return `${BOOKING_CLASS_LABELS[selectedFlight.bookingClass]} (${selectedFlight.bookingClass})`;
+  }
+
+  if (selectedFlight.rawBookingClassCode) {
+    return `Mã hạng ${selectedFlight.rawBookingClassCode}`;
+  }
+
+  return 'Chưa có mã hạng';
 }
 
 function formatPnrDetailFlightBrand(flightCase: LocalFlightCase) {

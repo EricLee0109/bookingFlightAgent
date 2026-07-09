@@ -26,6 +26,7 @@ import {
   extractLowestVndPriceAmount,
   getFlightTimeBucketForPreferredTime,
   isFlightTimeInBucket,
+  parseFlightCardText,
   rankFlightResultsForSearch,
   selectFlightResultsForSearch,
   type FlightResultCandidate,
@@ -891,6 +892,40 @@ function testFlightResultRanking() {
   );
 }
 
+/**
+ * Verifies 1Booking card parsing keeps non-VJ raw fare codes and excludes VN.
+ */
+function testFlightCardParserSupportsMvpAirlines() {
+  const vietjet = parseFlightCardText(
+    0,
+    'Vietjet Air VJ136 A321 12:00 SGN 14:10 HAN VND 1,642,781 (Z1_ECO)',
+  );
+  const bamboo = parseFlightCardText(
+    1,
+    'Bamboo Airways QH204 A320 07:10 SGN 09:20 HAN VND 2,918,000 (N)',
+  );
+  const vietravel = parseFlightCardText(
+    2,
+    'Vietravel Airlines VU635 A321 06:25 HAN 07:50 DAD VND 1,923,240 (H)',
+  );
+  const sunPhuQuoc = parseFlightCardText(
+    3,
+    'Sun Phu Quoc Airways 9S622 A320 19:00 SGN 20:20 DAD VND 1,480,781 (B)',
+  );
+  const vietnamAirlines = parseFlightCardText(
+    4,
+    'Vietnam Airlines VN212 B787 12:00 SGN 14:10 HAN VND 2,492,181 (N)',
+  );
+
+  assert.equal(vietjet?.bookingClass, 'ECO');
+  assert.equal(vietjet?.rawBookingClassCode, 'Z1_ECO');
+  assert.equal(bamboo?.bookingClass, null);
+  assert.equal(bamboo?.rawBookingClassCode, 'N');
+  assert.equal(vietravel?.rawBookingClassCode, 'H');
+  assert.equal(sunPhuQuoc?.rawBookingClassCode, 'B');
+  assert.equal(vietnamAirlines, null);
+}
+
 function createRankingCandidate(
   cardIndex: number,
   departureTime: string,
@@ -904,6 +939,7 @@ function createRankingCandidate(
     departureTime,
     arrivalTime: null,
     bookingClass: 'ECO',
+    rawBookingClassCode: 'Z1_ECO',
     priceText: `VND ${priceAmount}`,
     priceAmount,
   };
@@ -922,6 +958,7 @@ function testFlightSelectionMatcher() {
       departureTime: '05:00',
       arrivalTime: '07:10',
       bookingClass: 'DLX',
+      rawBookingClassCode: 'W1_DLX',
       priceText: 'VND 2,322,200',
     },
     {
@@ -932,6 +969,7 @@ function testFlightSelectionMatcher() {
       departureTime: '06:05',
       arrivalTime: '08:15',
       bookingClass: 'ECO',
+      rawBookingClassCode: 'U1_ECO',
       priceText: 'VND 2,322,200',
     },
   ] as const;
@@ -970,6 +1008,31 @@ function testFlightSelectionMatcher() {
 
   assert.equal(timeOnlyMatch.ok, true);
 
+  const nonVietjetMatch = matchFlightSelectionCandidate(
+    [
+      {
+        cardIndex: 2,
+        airlineCode: 'QH',
+        airlineName: 'Bamboo Airways',
+        flightNumber: 'QH204',
+        departureTime: '07:10',
+        arrivalTime: '09:20',
+        bookingClass: null,
+        rawBookingClassCode: 'N',
+        priceText: 'VND 2,918,000',
+      },
+    ],
+    {
+      caseId: 'BK-20260520-155949',
+      airlineCode: 'QH',
+      airlineName: 'Bamboo Airways',
+      departureTime: '07:10',
+      bookingClass: null,
+    },
+  );
+
+  assert.equal(nonVietjetMatch.ok, true);
+
   const ambiguousTimeOnlyMatch = matchFlightSelectionCandidate(
     [
       ...candidates,
@@ -980,7 +1043,8 @@ function testFlightSelectionMatcher() {
         flightNumber: 'VN124',
         departureTime: '06:05',
         arrivalTime: '08:15',
-        bookingClass: 'DLX',
+        bookingClass: null,
+        rawBookingClassCode: 'N',
         priceText: 'VND 2,422,200',
       },
     ],
@@ -1292,6 +1356,7 @@ async function main() {
   testNormalFlightFollowUpPatch();
   testOperatorFriendlyFlightFailureMessages();
   testFlightResultRanking();
+  testFlightCardParserSupportsMvpAirlines();
   testFlightSelectionMatcher();
   await testOneBookingAuthExpiredToastDetection();
   await testOneBookingAuthExpiredPasswordModalDetection();

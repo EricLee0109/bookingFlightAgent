@@ -1,11 +1,14 @@
 import { type Locator, type Page } from 'playwright';
-import { resolveAirlineFromText } from '../../agent/airline-catalog';
 import {
-  type BookingClass,
   type FlightResultRanking,
   type FlightSelectionCandidate,
   type PreferredTime,
 } from '../../contracts/flight';
+import {
+  extractLowestVndPriceAmount,
+  formatVndAmount,
+  parseFlightCardText,
+} from './flight-card-parser';
 
 export type FlightTimeBucket =
   | 'early_morning'
@@ -18,7 +21,7 @@ export type FlightResultCandidate = FlightSelectionCandidate & {
 };
 
 export type FlightResultFilterSummary = {
-  ranking: FlightResultRanking;
+  ranking?: FlightResultRanking;
   requestedTimeBucket: FlightTimeBucket | null;
   requestedTimeBucketLabel: string | null;
   totalVisibleCount: number;
@@ -217,87 +220,6 @@ export function isFlightTimeInBucket(time: string, bucket: FlightTimeBucket) {
   );
 }
 
-/**
- * Parses one flight card's visible text into a search/selection candidate.
- */
-export function parseFlightCardText(
-  cardIndex: number,
-  cardText: string,
-): FlightResultCandidate | null {
-  const airline = resolveAirlineFromText(cardText);
-  const flightNumber = extractFlightNumber(cardText);
-  const bookingClass = extractBookingClassFromCard(cardText);
-  const times = extractTimes(cardText);
-
-  if (!airline || !flightNumber || !bookingClass || times.length === 0) {
-    return null;
-  }
-
-  return {
-    cardIndex,
-    airlineCode: airline.code,
-    airlineName: airline.name,
-    flightNumber,
-    departureTime: times[0],
-    arrivalTime: times[1] ?? null,
-    bookingClass,
-    priceText: extractPriceText(cardText),
-    priceAmount: extractLowestVndPriceAmount(cardText),
-  };
-}
-
-/**
- * Extracts the visible 1Booking flight number from card text.
- */
-function extractFlightNumber(cardText: string) {
-  return (
-    cardText.match(/\b(?:VJ|VN|QH|VU|9S)\d+[A-Z]?\b/i)?.[0]?.toUpperCase() ??
-    null
-  );
-}
-
-/**
- * Extracts the visible booking class code from card text.
- */
-function extractBookingClassFromCard(cardText: string): BookingClass | null {
-  const classMatch = cardText.match(/\b(?:[A-Z0-9]+_)?(ECO|DLX|SGB|SBB)\b/i);
-
-  return (classMatch?.[1]?.toUpperCase() as BookingClass | undefined) ?? null;
-}
-
-/**
- * Extracts departure/arrival time candidates from card text.
- */
-function extractTimes(cardText: string) {
-  return Array.from(cardText.matchAll(/\b(?:[01]\d|2[0-3]):[0-5]\d\b/g)).map(
-    (match) => match[0],
-  );
-}
-
-/**
- * Extracts a display price from card text for operator review.
- */
-function extractPriceText(cardText: string) {
-  const lowestPrice = extractLowestVndPriceAmount(cardText);
-
-  return lowestPrice === null ? null : `VND ${formatVndAmount(lowestPrice)}`;
-}
-
-/**
- * Extracts the lowest VND amount from one card.
- *
- * 1Booking can show an old crossed price and a discounted price together. The
- * ranking path uses the lowest visible amount so discounted fares rank
- * correctly.
- */
-export function extractLowestVndPriceAmount(cardText: string) {
-  const prices = Array.from(cardText.matchAll(/VND\s*([\d,.]+)/gi))
-    .map((match) => Number(match[1].replace(/[^\d]/g, '')))
-    .filter((value) => Number.isFinite(value) && value > 0);
-
-  return prices.length > 0 ? Math.min(...prices) : null;
-}
-
 function formatPriceRange(candidates: FlightResultCandidate[]) {
   const prices = candidates
     .map((candidate) => candidate.priceAmount)
@@ -312,12 +234,8 @@ function formatPriceRange(candidates: FlightResultCandidate[]) {
   const highestPrice = prices[prices.length - 1];
 
   return lowestPrice === highestPrice
-    ? `VND ${formatVndAmount(lowestPrice)}`
-    : `VND ${formatVndAmount(lowestPrice)} - ${formatVndAmount(highestPrice)}`;
-}
-
-function formatVndAmount(value: number) {
-  return new Intl.NumberFormat('en-US').format(value);
+    ? `${formatVndAmount(lowestPrice)} VND`
+    : `${formatVndAmount(lowestPrice)} VND - ${formatVndAmount(highestPrice)} VND`;
 }
 
 function toMinuteOfDay(time: string) {
@@ -329,3 +247,5 @@ function toMinuteOfDay(time: string) {
 
   return Number(match[1]) * 60 + Number(match[2]);
 }
+
+export { extractLowestVndPriceAmount, parseFlightCardText };

@@ -38,6 +38,7 @@ import {
   buildPassengerHoldSuccessReplyMarkup,
 } from './telegram-formatters';
 import {
+  clearActivePassengerCase,
   clearPendingPassengerProfiles,
   getTelegramPassengerContext,
   setActivePassengerCase,
@@ -800,6 +801,7 @@ export async function runAutomaticPassengerHold(
 
   if (result.ok) {
     clearPendingPassengerProfiles(chatId);
+    clearActivePassengerCase(chatId);
     const text = formatPassengerHoldSuccessMessage(
       flightCase.caseId,
       result.pnrCode,
@@ -827,6 +829,7 @@ export async function runAutomaticPassengerHold(
   }
 
   if (result.reason === 'needs_review') {
+    clearActivePassengerCase(chatId);
     await bot.sendMessage(
       chatId,
       formatPassengerHoldNeedsReviewMessage(result.message),

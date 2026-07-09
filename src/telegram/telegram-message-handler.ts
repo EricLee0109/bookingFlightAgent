@@ -46,6 +46,7 @@ import {
   formatSearchFailedMessage,
   formatSearchInputMappingFailedMessage,
   formatSearchSuccessMessage,
+  formatUnsupportedFlightSelectionAirlineMessage,
 } from './telegram-formatters';
 import { handleTelegramSettingsCommand } from './telegram-settings-commands';
 import { tryHandleTelegramHoldRecoveryMessage } from './telegram-hold-recovery';
@@ -426,7 +427,7 @@ export async function handleTelegramMessage(
 
   await bot.sendMessage(
     chatId,
-    formatSearchSuccessMessage(result.flightCount, result.filterSummary),
+    formatSearchSuccessMessage(result.displayedFlightCount, result.filterSummary),
   );
 
   if (result.screenshotPaths.length > 0) {
@@ -636,7 +637,7 @@ async function tryHandleCheapestMoreSearchRequest(
 
   await bot.sendMessage(
     chatId,
-    formatSearchSuccessMessage(result.flightCount, result.filterSummary),
+    formatSearchSuccessMessage(result.displayedFlightCount, result.filterSummary),
   );
 
   if (result.screenshotPaths.length > 0) {
@@ -837,7 +838,7 @@ async function tryHandleFlightBucketFollowUpRequest(
 
   await bot.sendMessage(
     chatId,
-    formatSearchSuccessMessage(result.flightCount, result.filterSummary),
+    formatSearchSuccessMessage(result.displayedFlightCount, result.filterSummary),
   );
 
   if (result.screenshotPaths.length > 0) {
@@ -1360,7 +1361,7 @@ async function tryHandleMoreFlightOptionsRequest(
 
     await bot.sendMessage(
       chatId,
-      formatSearchSuccessMessage(result.flightCount, result.filterSummary),
+      formatSearchSuccessMessage(result.displayedFlightCount, result.filterSummary),
     );
 
     if (result.screenshotPaths.length > 0) {
@@ -1446,6 +1447,14 @@ async function handleTelegramFlightSelection(
   rawMessage: string,
   isCombinedSelectionPassengerMessage: boolean,
 ) {
+  if (selectionInput.airlineCode === 'VN') {
+    await bot.sendMessage(
+      chatId,
+      formatUnsupportedFlightSelectionAirlineMessage(selectionInput),
+    );
+    return;
+  }
+
   const existingCase = await readLocalFlightCase(selectionInput.caseId);
 
   if (!existingCase) {

@@ -1,5 +1,12 @@
 let lockedBy: string | null = null;
 
+export class AutomationLockBusyError extends Error {
+  constructor(readonly lockedBy: string) {
+    super(`SakuraBot đang xử lý ${lockedBy}. Bạn gửi lại sau khi tác vụ này hoàn tất giúp mình nhé.`);
+    this.name = 'AutomationLockBusyError';
+  }
+}
+
 /**
  * Checks whether 1Booking automation is already running in this Node process.
  *
@@ -21,7 +28,7 @@ export async function runWithAutomationLock<T>(
   task: () => Promise<T>,
 ) {
   if (lockedBy) {
-    throw new Error(`⏳ Agent đang ${lockedBy}. Vui lòng chờ hoàn tất rồi gửi tiếp`);
+    throw new AutomationLockBusyError(lockedBy);
   }
 
   lockedBy = lockName;
