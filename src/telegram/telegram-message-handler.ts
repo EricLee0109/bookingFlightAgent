@@ -46,7 +46,6 @@ import {
   formatSearchFailedMessage,
   formatSearchInputMappingFailedMessage,
   formatSearchSuccessMessage,
-  formatUnsupportedFlightSelectionAirlineMessage,
 } from './telegram-formatters';
 import { handleTelegramSettingsCommand } from './telegram-settings-commands';
 import { tryHandleTelegramHoldRecoveryMessage } from './telegram-hold-recovery';
@@ -1447,14 +1446,6 @@ async function handleTelegramFlightSelection(
   rawMessage: string,
   isCombinedSelectionPassengerMessage: boolean,
 ) {
-  if (selectionInput.airlineCode === 'VN') {
-    await bot.sendMessage(
-      chatId,
-      formatUnsupportedFlightSelectionAirlineMessage(selectionInput),
-    );
-    return;
-  }
-
   const existingCase = await readLocalFlightCase(selectionInput.caseId);
 
   if (!existingCase) {

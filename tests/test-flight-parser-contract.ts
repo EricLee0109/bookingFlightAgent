@@ -893,7 +893,7 @@ function testFlightResultRanking() {
 }
 
 /**
- * Verifies 1Booking card parsing keeps non-VJ raw fare codes and excludes VN.
+ * Verifies 1Booking card parsing keeps raw fare codes across MVP airlines.
  */
 function testFlightCardParserSupportsMvpAirlines() {
   const vietjet = parseFlightCardText(
@@ -923,7 +923,9 @@ function testFlightCardParserSupportsMvpAirlines() {
   assert.equal(bamboo?.rawBookingClassCode, 'N');
   assert.equal(vietravel?.rawBookingClassCode, 'H');
   assert.equal(sunPhuQuoc?.rawBookingClassCode, 'B');
-  assert.equal(vietnamAirlines, null);
+  assert.equal(vietnamAirlines?.airlineCode, 'VN');
+  assert.equal(vietnamAirlines?.bookingClass, null);
+  assert.equal(vietnamAirlines?.rawBookingClassCode, 'N');
 }
 
 function createRankingCandidate(

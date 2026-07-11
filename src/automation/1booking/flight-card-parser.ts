@@ -8,7 +8,7 @@ export type ParsedFlightCard = FlightSelectionCandidate & {
   priceAmount: number | null;
 };
 
-const MVP_SUPPORTED_AIRLINE_CODES = new Set(['VJ', 'QH', 'VU', '9S']);
+const MVP_SUPPORTED_AIRLINE_CODES = new Set(['VJ', 'VN', 'QH', 'VU', '9S']);
 
 /**
  * Parses one visible 1Booking flight card into a reusable search/selection
@@ -50,10 +50,10 @@ export function parseFlightCardText(
 }
 
 /**
- * Checks whether an airline is enabled for the lean MVP hold flow.
+ * Checks whether an airline is enabled for the lean MVP flow.
  *
- * Vietnam Airlines is intentionally excluded for this release because its hold
- * requirements differ and need a separate supported flow.
+ * Airline-specific hold requirements, such as Vietnam Airlines requiring DOB,
+ * are enforced later by the passenger/hold readiness layer.
  */
 export function isMvpSupportedAirlineCode(airlineCode: string) {
   return MVP_SUPPORTED_AIRLINE_CODES.has(airlineCode.toUpperCase());

@@ -1069,22 +1069,6 @@ function formatSelectionBookingClassShort(
     : 'Chưa chỉ định';
 }
 
-/**
- * Formats the MVP guard for airlines that need a later dedicated hold flow.
- */
-export function formatUnsupportedFlightSelectionAirlineMessage(
-  input: SelectMatchingFlightInput,
-) {
-  return [
-    '📝 Mình chưa hỗ trợ giữ chỗ hãng này trong MVP nhé.',
-    '',
-    `Hãng: ${formatSelectionAirline(input)}`,
-    '',
-    'MVP hiện tại hỗ trợ chọn/giữ chỗ các hãng: Vietjet, Bamboo, Vietravel, Sun Phu Quoc Airways.',
-    'Bạn chọn lại một chuyến thuộc các hãng trên giúp mình nhé.',
-  ].join('\n');
-}
-
 function formatSelectedFlightFare(selectedFlight: FlightSelectionCandidate) {
   if (selectedFlight.bookingClass) {
     return `${BOOKING_CLASS_LABELS[selectedFlight.bookingClass]} (${selectedFlight.bookingClass})`;
