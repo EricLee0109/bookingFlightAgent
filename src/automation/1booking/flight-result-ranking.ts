@@ -9,6 +9,10 @@ import {
 } from './flight-result-candidates';
 import { buildFlightResultFilterSummary } from './flight-result-summary';
 import {
+  isFlightCandidateInTimeFilter,
+  resolveFlightTimeFilter,
+} from './flight-time-filters';
+import {
   type FlightResultCandidate,
   type RankedFlightResult,
 } from './flight-result-types';
@@ -30,20 +34,22 @@ const CHEAPEST_RESULT_LIMIT = 5;
 export function selectFlightResultsForSearch(input: {
   candidates: FlightResultCandidate[];
   preferredTime?: PreferredTime;
+  specificTime?: string | null;
   resultRanking?: FlightResultRanking;
   limit?: number;
 }): RankedFlightResult | null {
-  const requestedTimeBucket = getFlightTimeBucketForPreferredTime(
-    input.preferredTime ?? null,
-  );
+  const timeFilter = resolveFlightTimeFilter({
+    preferredTime: input.preferredTime,
+    specificTime: input.specificTime,
+  });
 
-  if (!requestedTimeBucket && input.resultRanking !== 'cheapest') {
+  if (!timeFilter && input.resultRanking !== 'cheapest') {
     return null;
   }
 
-  const scopedCandidates = selectCandidatesByTimeBucket({
+  const scopedCandidates = selectCandidatesByTimeFilter({
     candidates: input.candidates,
-    requestedTimeBucket,
+    timeFilter,
   });
   const selectedCandidates =
     input.resultRanking === 'cheapest'
@@ -55,7 +61,7 @@ export function selectFlightResultsForSearch(input: {
     cardIndexes: selectedCandidates.map((candidate) => candidate.cardIndex),
     summary: buildFlightResultFilterSummary({
       ranking: input.resultRanking,
-      requestedTimeBucket,
+      timeFilter,
       totalVisibleCount: input.candidates.length,
       scopedCandidates,
       selectedCandidates,
@@ -69,19 +75,20 @@ export function selectFlightResultsForSearch(input: {
 export function rankFlightResultsForSearch(input: {
   candidates: FlightResultCandidate[];
   preferredTime?: PreferredTime;
+  specificTime?: string | null;
   resultRanking?: FlightResultRanking;
   limit?: number;
 }) {
   return selectFlightResultsForSearch(input);
 }
 
-function selectCandidatesByTimeBucket(input: {
+function selectCandidatesByTimeFilter(input: {
   candidates: FlightResultCandidate[];
-  requestedTimeBucket: ReturnType<typeof getFlightTimeBucketForPreferredTime>;
+  timeFilter: ReturnType<typeof resolveFlightTimeFilter>;
 }) {
-  return input.requestedTimeBucket
+  return input.timeFilter
     ? input.candidates.filter((candidate) =>
-        isFlightTimeInBucket(candidate.departureTime, input.requestedTimeBucket!),
+        isFlightCandidateInTimeFilter(candidate, input.timeFilter!),
       )
     : input.candidates;
 }
@@ -108,6 +115,7 @@ export {
   extractFlightResultCandidates,
   extractLowestVndPriceAmount,
   FLIGHT_TIME_BUCKETS,
+  resolveFlightTimeFilter,
   getFlightCards,
   getFlightTimeBucketForPreferredTime,
   isFlightTimeInBucket,

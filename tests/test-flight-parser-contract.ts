@@ -12,6 +12,10 @@ import {
   createFlightRequestParser,
   getFlightParserProvider,
 } from '../src/agent/flight-request-parser-factory';
+import {
+  normalizeParsedSpecificTimeFromRawMessage,
+  parseSpecificTimeFromVietnameseText,
+} from '../src/agent/flight-time-normalizer';
 import { parseFlightSelectionMessage } from '../src/agent/flight-selection-parser';
 import {
   buildFlightParserSystemPrompt,
@@ -28,6 +32,7 @@ import {
   isFlightTimeInBucket,
   parseFlightCardText,
   rankFlightResultsForSearch,
+  resolveFlightTimeFilter,
   selectFlightResultsForSearch,
   type FlightResultCandidate,
 } from '../src/automation/1booking/flight-result-ranking';
@@ -206,6 +211,60 @@ function testFlightTimeBucketAndRankingSchema() {
   assert.match(prompt, /00:00-05:59/);
   assert.match(prompt, /resultRanking to cheapest/);
   assert.match(prompt, /rẻ nhất/);
+}
+
+/**
+ * Verifies deterministic Vietnamese exact-time normalization before automation.
+ */
+function testVietnameseSpecificTimeNormalization() {
+  assert.deepEqual(parseSpecificTimeFromVietnameseText('bay khoang 17h'), {
+    kind: 'time',
+    time: '17:00',
+    rawText: '17h',
+  });
+  assert.deepEqual(parseSpecificTimeFromVietnameseText('bay tam 17g30'), {
+    kind: 'time',
+    time: '17:30',
+    rawText: '17g30',
+  });
+  assert.deepEqual(parseSpecificTimeFromVietnameseText('bay luc 17 gio 30'), {
+    kind: 'time',
+    time: '17:30',
+    rawText: '17 gio 30',
+  });
+  assert.deepEqual(parseSpecificTimeFromVietnameseText('bay 5h sang'), {
+    kind: 'time',
+    time: '05:00',
+    rawText: '5h',
+  });
+  assert.deepEqual(parseSpecificTimeFromVietnameseText('bay 5 gio chieu'), {
+    kind: 'time',
+    time: '17:00',
+    rawText: '5 gio',
+  });
+  assert.deepEqual(parseSpecificTimeFromVietnameseText('bay 5h'), {
+    kind: 'ambiguous',
+    rawText: '5h',
+    hour: 5,
+  });
+
+  const normalized = normalizeParsedSpecificTimeFromRawMessage(
+    {
+      ...validOneWayRequest,
+      preferredTime: 'afternoon',
+      specificTime: null,
+    },
+    'bay buoi chieu khoang 17h',
+  );
+
+  assert.equal(normalized.ok, true);
+
+  if (!normalized.ok) {
+    throw new Error('Expected specific-time normalization to succeed.');
+  }
+
+  assert.equal(normalized.parsed.preferredTime, 'specific_time');
+  assert.equal(normalized.parsed.specificTime, '17:00');
 }
 
 /**
@@ -816,13 +875,72 @@ function testFlightResultRanking() {
     [8, 9],
   );
 
-  const normalSpecificTime = selectFlightResultsForSearch({
+  const normalMissingSpecificTime = selectFlightResultsForSearch({
     candidates,
     preferredTime: 'specific_time',
+    specificTime: null,
     resultRanking: null,
   });
 
-  assert.equal(normalSpecificTime, null);
+  assert.equal(normalMissingSpecificTime, null);
+
+  const specificWindowFilter = resolveFlightTimeFilter({
+    preferredTime: 'specific_time',
+    specificTime: '17:00',
+  });
+
+  assert.equal(specificWindowFilter?.kind, 'specific_window');
+  assert.equal(specificWindowFilter?.label, 'gần 17:00 (15:00-19:00)');
+  assert.equal(
+    resolveFlightTimeFilter({
+      preferredTime: 'specific_time',
+      specificTime: '01:00',
+    })?.label,
+    'gần 01:00 (00:00-03:00)',
+  );
+  assert.equal(
+    resolveFlightTimeFilter({
+      preferredTime: 'specific_time',
+      specificTime: '23:00',
+    })?.label,
+    'gần 23:00 (21:00-23:59)',
+  );
+
+  const specificTimeCandidates: FlightResultCandidate[] = [
+    createRankingCandidate(20, '14:59', 900000),
+    createRankingCandidate(21, '15:00', 700000),
+    createRankingCandidate(22, '17:00', 500000),
+    createRankingCandidate(23, '19:00', 600000),
+    createRankingCandidate(24, '19:01', 800000),
+  ];
+  const normalSpecificTime = selectFlightResultsForSearch({
+    candidates: specificTimeCandidates,
+    preferredTime: 'specific_time',
+    specificTime: '17:00',
+    resultRanking: null,
+  });
+
+  assert.deepEqual(
+    normalSpecificTime?.candidates.map((candidate) => candidate.cardIndex),
+    [21, 22, 23],
+  );
+  assert.equal(normalSpecificTime?.summary.requestedSpecificTime, '17:00');
+  assert.equal(
+    normalSpecificTime?.summary.requestedTimeWindowLabel,
+    'gần 17:00 (15:00-19:00)',
+  );
+
+  const cheapestSpecificTime = rankFlightResultsForSearch({
+    candidates: specificTimeCandidates,
+    preferredTime: 'specific_time',
+    specificTime: '17:00',
+    resultRanking: 'cheapest',
+  });
+
+  assert.deepEqual(
+    cheapestSpecificTime?.candidates.map((candidate) => candidate.cardIndex),
+    [22, 23, 21],
+  );
 
   const morningCheapest = rankFlightResultsForSearch({
     candidates,
@@ -1340,6 +1458,7 @@ async function main() {
   testAirportCatalogAliases();
   testOpenAIParserPromptIncludesAirportCatalog();
   testFlightTimeBucketAndRankingSchema();
+  testVietnameseSpecificTimeNormalization();
   testAirportCatalogCodeLookup();
   testFlightSelectionParserLeavesBookingClassUnspecified();
   testFlightSelectionParserBookingClassAliases();

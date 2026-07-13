@@ -2,6 +2,10 @@ import TelegramBot from 'node-telegram-bot-api';
 import { parseFlightSelectionMessage } from '../agent/flight-selection-parser';
 import { createFlightRequestParser } from '../agent/flight-request-parser-factory';
 import {
+  normalizeParsedSpecificTimeFromRawMessage,
+  parseSpecificTimeFromVietnameseText,
+} from '../agent/flight-time-normalizer';
+import {
   mapParsedRequestToSearchFlightsInput,
   normalizeParsedAirportFieldsForSearch,
 } from '../agent/search-flight-input-mapper';
@@ -30,6 +34,7 @@ import {
   formatCheapestMoreMissingLatestCaseMessage,
   formatCheapestMoreOptionsMessage,
   formatCheapestMoreSearchStartedMessage,
+  formatAmbiguousSpecificTimeMessage,
   formatFlightSelectionFailedMessage,
   formatFlightSelectionParseFailedMessage,
   formatLatestCaseFlightSelectionResolvedMessage,
@@ -50,10 +55,13 @@ import {
 import { handleTelegramSettingsCommand } from './telegram-settings-commands';
 import { tryHandleTelegramHoldRecoveryMessage } from './telegram-hold-recovery';
 import {
+  clearPendingSpecificTimeClarification,
+  getPendingSpecificTimeClarification,
   getLatestFlightOptionsFollowUpContext,
   getLatestFlightSearchCase,
   setLatestFlightSearchCase,
   setLatestFlightOptionsFollowUpContext,
+  setPendingSpecificTimeClarification,
 } from './telegram-flight-selection-context';
 import { setActivePassengerCase } from './telegram-passenger-context';
 import {
@@ -131,6 +139,12 @@ export async function handleTelegramMessage(
   }
 
   if (await tryHandleTelegramHoldRecoveryMessage(bot, chatId, text)) {
+    return;
+  }
+
+  if (
+    await tryHandleSpecificTimeClarificationMessage(bot, chatId, text, settings)
+  ) {
     return;
   }
 
@@ -265,13 +279,55 @@ export async function handleTelegramMessage(
     parsedRequest,
   });
 
-  const normalizedParsedRequest =
+  let normalizedParsedRequest =
     normalizeParsedAirportFieldsForSearch(parsedRequest);
+  const specificTimeNormalization =
+    normalizeParsedSpecificTimeFromRawMessage(normalizedParsedRequest, text);
+
+  if (!specificTimeNormalization.ok) {
+    currentCase = await updateLocalFlightCase(currentCase, {
+      status: 'NEEDS_INPUT',
+      parsedRequest: normalizedParsedRequest,
+      errorMessage: `Ambiguous specific time: ${specificTimeNormalization.ambiguousTime}`,
+    });
+    setPendingSpecificTimeClarification(chatId, {
+      caseId: currentCase.caseId,
+    });
+    await appendLocalLog({
+      level: 'warn',
+      event: 'flight_request_ambiguous_specific_time',
+      caseId: currentCase.caseId,
+      message: 'Flight request has ambiguous specific time.',
+      meta: {
+        ambiguousTime: specificTimeNormalization.ambiguousTime,
+      },
+    });
+    await bot.sendMessage(chatId, formatAmbiguousSpecificTimeMessage());
+    return;
+  }
+
+  normalizedParsedRequest = specificTimeNormalization.parsed;
 
   if (normalizedParsedRequest !== parsedRequest) {
     currentCase = await updateLocalFlightCase(currentCase, {
       parsedRequest: normalizedParsedRequest,
     });
+  }
+
+  if (
+    normalizedParsedRequest.preferredTime === 'specific_time' &&
+    !normalizedParsedRequest.specificTime
+  ) {
+    currentCase = await updateLocalFlightCase(currentCase, {
+      status: 'NEEDS_INPUT',
+      parsedRequest: normalizedParsedRequest,
+      errorMessage: 'Missing specific time clarification.',
+    });
+    setPendingSpecificTimeClarification(chatId, {
+      caseId: currentCase.caseId,
+    });
+    await bot.sendMessage(chatId, formatAmbiguousSpecificTimeMessage());
+    return;
   }
 
   await bot.sendMessage(chatId, formatParsedRequestMessage(normalizedParsedRequest));
@@ -1059,6 +1115,7 @@ export function buildCheapestMoreSearchPatch(
   const searchInput = {
     ...(flightCase.searchInput as SearchFlightsInput),
     preferredTime,
+    specificTime: preferredTime === 'specific_time' ? flightCase.searchInput?.specificTime : null,
     resultRanking: 'cheapest',
     resultLimit: cheapestRequest.resultLimit,
   } satisfies SearchFlightsInput;
@@ -1069,6 +1126,10 @@ export function buildCheapestMoreSearchPatch(
       ? {
           ...flightCase.parsedRequest,
           preferredTime,
+          specificTime:
+            preferredTime === 'specific_time'
+              ? flightCase.parsedRequest.specificTime
+              : null,
           resultRanking: 'cheapest',
         }
       : undefined,
@@ -1135,6 +1196,7 @@ export function buildCheapestBucketSearchPatch(
   const searchInput = {
     ...(flightCase.searchInput as SearchFlightsInput),
     preferredTime: bucketFollowUp.preferredTime,
+    specificTime: null,
     resultRanking: 'cheapest',
     resultLimit: bucketFollowUp.resultLimit ?? flightCase.searchInput?.resultLimit,
   } satisfies SearchFlightsInput;
@@ -1145,6 +1207,7 @@ export function buildCheapestBucketSearchPatch(
       ? {
           ...flightCase.parsedRequest,
           preferredTime: bucketFollowUp.preferredTime,
+          specificTime: null,
           resultRanking: 'cheapest',
         }
       : undefined,
@@ -1159,14 +1222,22 @@ export function buildNormalBucketSearchPatch(
   flightCase: Pick<LocalFlightCase, 'searchInput' | 'parsedRequest'>,
   bucketFollowUp: NormalFlightFollowUpRequest,
 ): Pick<LocalFlightCase, 'searchInput' | 'parsedRequest'> {
+  const preferredTime =
+    'preferredTime' in bucketFollowUp
+      ? bucketFollowUp.preferredTime
+      : (flightCase.searchInput?.preferredTime ??
+        flightCase.parsedRequest?.preferredTime ??
+        null);
+  const specificTime =
+    preferredTime === 'specific_time'
+      ? (flightCase.searchInput?.specificTime ??
+        flightCase.parsedRequest?.specificTime ??
+        null)
+      : null;
   const searchInput = {
     ...(flightCase.searchInput as SearchFlightsInput),
-    preferredTime:
-      'preferredTime' in bucketFollowUp
-        ? bucketFollowUp.preferredTime
-        : (flightCase.searchInput?.preferredTime ??
-          flightCase.parsedRequest?.preferredTime ??
-          null),
+    preferredTime,
+    specificTime,
     resultRanking: null,
     resultLimit: undefined,
   } satisfies SearchFlightsInput;
@@ -1177,6 +1248,7 @@ export function buildNormalBucketSearchPatch(
       ? {
           ...flightCase.parsedRequest,
           preferredTime: searchInput.preferredTime,
+          specificTime,
           resultRanking: null,
         }
       : undefined,
@@ -1337,7 +1409,7 @@ async function tryHandleMoreFlightOptionsRequest(
 
       if (result.errorScreenshotPath) {
         await bot.sendPhoto(chatId, result.errorScreenshotPath, {
-          caption: 'Screenshot Ä‘á»ƒ mÃ¬nh cÃ¹ng Ä‘á»‘i chiáº¿u lá»—i search 1Booking.',
+          caption: 'Screenshot để mình cùng đối chiếu lỗi search 1Booking.',
         });
       }
 
@@ -1368,8 +1440,8 @@ async function tryHandleMoreFlightOptionsRequest(
         await bot.sendPhoto(chatId, result.screenshotPaths[index], {
           caption:
             result.screenshotPaths.length === 1
-              ? 'áº¢nh lá»‹ch trÃ¬nh chuyáº¿n bay tá»« 1Booking nhÃ©.'
-              : `áº¢nh lá»‹ch trÃ¬nh chuyáº¿n bay ${index + 1}/${result.screenshotPaths.length}.`,
+              ? 'Ảnh lịch trình chuyến bay từ 1Booking nhé.'
+              : `Ảnh lịch trình chuyến bay ${index + 1}/${result.screenshotPaths.length}.`,
         });
       }
 
@@ -1394,7 +1466,7 @@ async function tryHandleMoreFlightOptionsRequest(
     }
 
     await bot.sendPhoto(chatId, result.screenshotPath, {
-      caption: 'áº¢nh lá»‹ch trÃ¬nh chuyáº¿n bay tá»« 1Booking nhÃ©.',
+      caption: 'Ảnh lịch trình chuyến bay từ 1Booking nhé.',
     });
 
     await updateLocalFlightCase(currentCase, {
@@ -1412,6 +1484,172 @@ async function tryHandleMoreFlightOptionsRequest(
     chatId,
     formatNormalMoreOptionsMessage(flightCase),
   );
+
+  return true;
+}
+
+/**
+ * Combines a short time clarification such as `5h chieu` into the pending
+ * flight-search case that previously stopped on ambiguous input like `5h`.
+ */
+async function tryHandleSpecificTimeClarificationMessage(
+  bot: TelegramBot,
+  chatId: number,
+  text: string,
+  settings: Awaited<ReturnType<typeof readLocalAgentSettings>>,
+) {
+  const pendingContext = getPendingSpecificTimeClarification(chatId);
+
+  if (!pendingContext) {
+    return false;
+  }
+
+  const timeParseResult = parseSpecificTimeFromVietnameseText(text);
+
+  if (timeParseResult.kind === 'none') {
+    return false;
+  }
+
+  if (timeParseResult.kind === 'ambiguous') {
+    await bot.sendMessage(chatId, formatAmbiguousSpecificTimeMessage());
+    return true;
+  }
+
+  const flightCase = await readLocalFlightCase(pendingContext.caseId);
+
+  if (!flightCase?.parsedRequest) {
+    clearPendingSpecificTimeClarification(chatId);
+    return false;
+  }
+
+  const parsedRequest = {
+    ...flightCase.parsedRequest,
+    preferredTime: 'specific_time' as const,
+    specificTime: timeParseResult.time,
+  };
+  const searchInput = mapParsedRequestToSearchFlightsInput(parsedRequest);
+  let currentCase = await updateLocalFlightCase(flightCase, {
+    status: 'SEARCH_RUNNING',
+    parsedRequest,
+    searchInput,
+    errorMessage: undefined,
+    screenshotPath: undefined,
+    screenshotPaths: undefined,
+    flightResultFilter: undefined,
+  });
+
+  clearPendingSpecificTimeClarification(chatId);
+
+  await appendLocalLog({
+    level: 'info',
+    event: 'specific_time_clarification_received',
+    caseId: currentCase.caseId,
+    message: 'Received specific-time clarification for pending search.',
+    meta: {
+      specificTime: timeParseResult.time,
+    },
+  });
+
+  if (!settings.autoSearchFlights) {
+    await bot.sendMessage(
+      chatId,
+      'autoSearchFlights đang tắt. Mình đã lưu case rồi, nhưng chưa chạy 1Booking nhé.',
+    );
+    return true;
+  }
+
+  await bot.sendMessage(chatId, '⏳ Mình đang tìm chuyến trên 1Booking...');
+
+  const result = await searchOneBookingFlights(searchInput, {
+    onAuthRefresh: () =>
+      Promise.resolve(
+        void bot.sendMessage(chatId, formatOneBookingAuthRefreshStartedMessage()),
+      ),
+  });
+
+  if (!result.ok) {
+    await updateLocalFlightCase(currentCase, {
+      status: 'SEARCH_FAILED',
+      errorMessage: result.message,
+      screenshotPath: result.errorScreenshotPath ?? undefined,
+    });
+    await appendLocalLog({
+      level: 'error',
+      event: 'one_booking_search_failed',
+      caseId: currentCase.caseId,
+      message: result.message,
+      meta: {
+        errorScreenshotPath: result.errorScreenshotPath,
+      },
+    });
+
+    await bot.sendMessage(chatId, formatSearchFailedMessage(result.message));
+
+    if (result.errorScreenshotPath) {
+      await bot.sendPhoto(chatId, result.errorScreenshotPath, {
+        caption: 'Screenshot để mình cùng đối chiếu lỗi search 1Booking.',
+      });
+    }
+
+    return true;
+  }
+
+  currentCase = await updateLocalFlightCase(currentCase, {
+    status: 'SEARCH_DONE',
+    flightCount: result.flightCount,
+    displayedFlightCount: result.displayedFlightCount,
+    flightResultFilter: result.filterSummary,
+    screenshotPath: result.screenshotPath,
+    screenshotPaths: result.screenshotPaths,
+  });
+  setLatestFlightSearchCase(chatId, currentCase.caseId);
+  setLatestFlightOptionsFollowUpContext(chatId, {
+    latestSearchCaseId: currentCase.caseId,
+    mode: 'normal',
+  });
+
+  await bot.sendMessage(
+    chatId,
+    formatSearchSuccessMessage(result.displayedFlightCount, result.filterSummary),
+  );
+
+  if (result.screenshotPaths.length > 0) {
+    for (let index = 0; index < result.screenshotPaths.length; index++) {
+      await bot.sendPhoto(chatId, result.screenshotPaths[index], {
+        caption:
+          result.screenshotPaths.length === 1
+            ? 'Ảnh lịch trình chuyến bay từ 1Booking nhé.'
+            : `Ảnh lịch trình chuyến bay ${index + 1}/${result.screenshotPaths.length}.`,
+      });
+    }
+
+    const archivePath = await createTelegramScreenshotArchive(
+      currentCase.caseId,
+      result.screenshotPaths,
+    );
+
+    await bot.sendDocument(
+      chatId,
+      archivePath,
+      {
+        caption: 'Download All Files',
+      },
+      createTelegramScreenshotArchiveFileOptions(archivePath),
+    );
+
+    await updateLocalFlightCase(currentCase, {
+      status: 'OPTIONS_SENT',
+    });
+    return true;
+  }
+
+  await bot.sendPhoto(chatId, result.screenshotPath, {
+    caption: 'Ảnh lịch trình chuyến bay từ 1Booking nhé.',
+  });
+
+  await updateLocalFlightCase(currentCase, {
+    status: 'OPTIONS_SENT',
+  });
 
   return true;
 }

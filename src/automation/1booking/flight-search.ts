@@ -77,6 +77,7 @@ export async function searchFlights(
   const selectedResult = selectFlightResultsForSearch({
     candidates,
     preferredTime: input.preferredTime,
+    specificTime: input.specificTime,
     resultRanking: input.resultRanking,
     limit: input.resultLimit,
   });

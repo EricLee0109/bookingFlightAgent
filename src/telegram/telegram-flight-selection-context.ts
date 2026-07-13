@@ -1,6 +1,7 @@
 type TelegramFlightSelectionContext = {
   latestSearchCaseId: string;
   latestOptionsFollowUp?: TelegramFlightOptionsFollowUpContext;
+  pendingSpecificTimeClarification?: TelegramSpecificTimeClarificationContext;
 };
 
 const contextsByChatId = new Map<number, TelegramFlightSelectionContext>();
@@ -11,6 +12,10 @@ export type TelegramFlightOptionsFollowUpContext = {
   latestSearchCaseId: string;
   mode: TelegramFlightOptionsFollowUpMode;
   resultLimit?: 5 | 10;
+};
+
+export type TelegramSpecificTimeClarificationContext = {
+  caseId: string;
 };
 
 /**
@@ -30,6 +35,14 @@ export function setLatestFlightSearchCase(chatId: number, caseId: string) {
     existingContext.latestOptionsFollowUp
   ) {
     nextContext.latestOptionsFollowUp = existingContext.latestOptionsFollowUp;
+  }
+
+  if (
+    existingContext?.latestSearchCaseId === caseId &&
+    existingContext.pendingSpecificTimeClarification
+  ) {
+    nextContext.pendingSpecificTimeClarification =
+      existingContext.pendingSpecificTimeClarification;
   }
 
   contextsByChatId.set(chatId, nextContext);
@@ -63,4 +76,43 @@ export function setLatestFlightOptionsFollowUpContext(
  */
 export function getLatestFlightOptionsFollowUpContext(chatId: number) {
   return contextsByChatId.get(chatId)?.latestOptionsFollowUp ?? null;
+}
+
+/**
+ * Stores that the latest parsed flight search is waiting for a clearer time.
+ */
+export function setPendingSpecificTimeClarification(
+  chatId: number,
+  context: TelegramSpecificTimeClarificationContext,
+) {
+  const existingContext = contextsByChatId.get(chatId);
+
+  contextsByChatId.set(chatId, {
+    latestSearchCaseId: existingContext?.latestSearchCaseId ?? context.caseId,
+    latestOptionsFollowUp: existingContext?.latestOptionsFollowUp,
+    pendingSpecificTimeClarification: context,
+  });
+}
+
+/**
+ * Reads the pending specific-time clarification context for one chat.
+ */
+export function getPendingSpecificTimeClarification(chatId: number) {
+  return contextsByChatId.get(chatId)?.pendingSpecificTimeClarification ?? null;
+}
+
+/**
+ * Clears the pending specific-time clarification context for one chat.
+ */
+export function clearPendingSpecificTimeClarification(chatId: number) {
+  const existingContext = contextsByChatId.get(chatId);
+
+  if (!existingContext) {
+    return;
+  }
+
+  contextsByChatId.set(chatId, {
+    latestSearchCaseId: existingContext.latestSearchCaseId,
+    latestOptionsFollowUp: existingContext.latestOptionsFollowUp,
+  });
 }

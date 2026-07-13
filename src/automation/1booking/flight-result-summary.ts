@@ -1,15 +1,14 @@
 import { type FlightResultRanking } from '../../contracts/flight';
 import { formatVndAmount } from './flight-card-parser';
-import { FLIGHT_TIME_BUCKETS } from './flight-time-buckets';
 import {
   type FlightResultCandidate,
   type FlightResultFilterSummary,
-  type FlightTimeBucket,
+  type FlightTimeFilter,
 } from './flight-result-types';
 
 export type FlightResultSummaryInput = {
   ranking?: FlightResultRanking;
-  requestedTimeBucket: FlightTimeBucket | null;
+  timeFilter: FlightTimeFilter | null;
   totalVisibleCount: number;
   scopedCandidates: FlightResultCandidate[];
   selectedCandidates: FlightResultCandidate[];
@@ -26,10 +25,18 @@ export function buildFlightResultFilterSummary(
 ): FlightResultFilterSummary {
   return {
     ranking: input.ranking,
-    requestedTimeBucket: input.requestedTimeBucket,
-    requestedTimeBucketLabel: input.requestedTimeBucket
-      ? FLIGHT_TIME_BUCKETS[input.requestedTimeBucket].label
-      : null,
+    requestedTimeBucket:
+      input.timeFilter?.kind === 'bucket' ? input.timeFilter.bucket : null,
+    requestedTimeBucketLabel:
+      input.timeFilter?.kind === 'bucket' ? input.timeFilter.label : null,
+    requestedSpecificTime:
+      input.timeFilter?.kind === 'specific_window'
+        ? input.timeFilter.specificTime
+        : null,
+    requestedTimeWindowLabel:
+      input.timeFilter?.kind === 'specific_window'
+        ? input.timeFilter.label
+        : null,
     totalVisibleCount: input.totalVisibleCount,
     matchedCount:
       input.ranking === 'cheapest'

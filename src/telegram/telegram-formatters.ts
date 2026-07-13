@@ -73,6 +73,20 @@ export function formatMissingFlightFieldsMessage(missingFields: string[]) {
 }
 
 /**
+ * Asks the operator to clarify ambiguous 12-hour time input before automation.
+ */
+export function formatAmbiguousSpecificTimeMessage() {
+  return [
+    '📝 Mình cần rõ hơn một chút về giờ bay nhé.',
+    '',
+    'Bạn gửi giúp mình theo mẫu:',
+    '5h sáng',
+    '5h chiều',
+    '5h tối',
+  ].join('\n');
+}
+
+/**
  * Formats the message used when the AI parser cannot return valid JSON.
  */
 export function formatParserFailedMessage() {
@@ -93,6 +107,26 @@ export function formatSearchSuccessMessage(
   flightCount: number,
   filterSummary?: FlightResultFilterSummary,
 ) {
+  if (filterSummary?.requestedTimeWindowLabel) {
+    const priceRangeLine =
+      filterSummary.ranking === 'cheapest' && filterSummary.priceRangeText
+        ? `Khoảng giá: ${filterSummary.priceRangeText}.`
+        : null;
+    const rankingText =
+      filterSummary.ranking === 'cheapest' ? ' chuyến rẻ nhất' : ' chuyến';
+
+    return [
+      `✅ Mình đã lọc ${filterSummary.displayedCount}${rankingText} ${filterSummary.requestedTimeWindowLabel}.`,
+      `Tổng kết quả live: ${filterSummary.totalVisibleCount} chuyến.`,
+      priceRangeLine,
+      '',
+      'Mình gửi ảnh lịch trình bên dưới nhé.',
+      'Bạn có thể gửi ảnh này lại cho khách trên Zalo.',
+    ]
+      .filter((line): line is string => line !== null)
+      .join('\n');
+  }
+
   if (filterSummary?.ranking === 'cheapest') {
     const bucketText = filterSummary.requestedTimeBucketLabel
       ? `trong khung ${filterSummary.requestedTimeBucketLabel}`

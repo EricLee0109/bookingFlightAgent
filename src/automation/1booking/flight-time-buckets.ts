@@ -62,7 +62,7 @@ export function isFlightTimeInBucket(time: string, bucket: FlightTimeBucket) {
   );
 }
 
-function toMinuteOfDay(time: string) {
+export function toMinuteOfDay(time: string) {
   const match = time.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
 
   if (!match) {
@@ -70,4 +70,12 @@ function toMinuteOfDay(time: string) {
   }
 
   return Number(match[1]) * 60 + Number(match[2]);
+}
+
+export function formatMinuteOfDay(minuteOfDay: number) {
+  const clampedMinute = Math.max(0, Math.min(1439, minuteOfDay));
+  const hour = Math.floor(clampedMinute / 60);
+  const minute = clampedMinute % 60;
+
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
