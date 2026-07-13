@@ -68,6 +68,8 @@ export const ParsedFlightRequestSchema = z
 
     resultRanking: z.enum(['cheapest']).nullable(),
 
+    preferredAirlineCodes: z.array(z.string()).nullable(),
+
     tripType: z.enum(['one_way', 'round_trip']),
 
     missingFields: z.array(z.string()),

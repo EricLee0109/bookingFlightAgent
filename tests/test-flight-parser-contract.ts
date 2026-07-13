@@ -75,6 +75,7 @@ const validOneWayRequest = {
   preferredTime: 'morning',
   specificTime: null,
   resultRanking: null,
+  preferredAirlineCodes: null,
   tripType: 'one_way',
   missingFields: [],
 } as const;
@@ -132,6 +133,19 @@ function testMapperCanonicalizesAirportText() {
 
   assert.equal(input.fromAirportText, 'Sân bay Nội Bài (HAN)');
   assert.equal(input.toAirportText, 'Sân bay Tân Sơn Nhất (SGN)');
+}
+
+/**
+ * Verifies that mapper normalizes requested airline brands before automation.
+ */
+function testMapperNormalizesPreferredAirlines() {
+  const parsed = ParsedFlightRequestSchema.parse({
+    ...validOneWayRequest,
+    preferredAirlineCodes: ['Vietnam Airlines', 'VJ', 'unknown'],
+  });
+  const input = mapParsedRequestToSearchFlightsInput(parsed);
+
+  assert.deepEqual(input.preferredAirlineCodes, ['VN', 'VJ']);
 }
 
 /**
@@ -211,6 +225,15 @@ function testFlightTimeBucketAndRankingSchema() {
   assert.match(prompt, /00:00-05:59/);
   assert.match(prompt, /resultRanking to cheapest/);
   assert.match(prompt, /rẻ nhất/);
+  assert.match(prompt, /preferredAirlineCodes/);
+  assert.match(prompt, /vietnam airlines.*VN/i);
+
+  const vietnamAirlinesParsed = ParsedFlightRequestSchema.parse({
+    ...validOneWayRequest,
+    preferredAirlineCodes: ['VN'],
+  });
+
+  assert.deepEqual(vietnamAirlinesParsed.preferredAirlineCodes, ['VN']);
 }
 
 /**
@@ -875,6 +898,68 @@ function testFlightResultRanking() {
     [8, 9],
   );
 
+  const airlineCandidates: FlightResultCandidate[] = [
+    createRankingCandidate(30, '12:00', 2400000, {
+      airlineCode: 'VN',
+      airlineName: 'Vietnam Airlines',
+      flightNumber: 'VN212',
+      bookingClass: null,
+      rawBookingClassCode: 'N',
+    }),
+    createRankingCandidate(31, '13:00', 1900000),
+    createRankingCandidate(32, '14:00', 2200000, {
+      airlineCode: 'VN',
+      airlineName: 'Vietnam Airlines',
+      flightNumber: 'VN214',
+      bookingClass: null,
+      rawBookingClassCode: 'N',
+    }),
+    createRankingCandidate(33, '15:00', 2000000, {
+      airlineCode: 'VN',
+      airlineName: 'Vietnam Airlines',
+      flightNumber: 'VN250',
+      bookingClass: null,
+      rawBookingClassCode: 'N',
+    }),
+  ];
+  const normalVietnamAirlines = selectFlightResultsForSearch({
+    candidates: airlineCandidates,
+    preferredAirlineCodes: ['VN'],
+    resultRanking: null,
+  });
+
+  assert.deepEqual(
+    normalVietnamAirlines?.candidates.map((candidate) => candidate.flightNumber),
+    ['VN212', 'VN214', 'VN250'],
+  );
+  assert.deepEqual(normalVietnamAirlines?.summary.requestedAirlineCodes, ['VN']);
+  assert.deepEqual(normalVietnamAirlines?.summary.requestedAirlineNames, [
+    'Vietnam Airlines',
+  ]);
+
+  const cheapestVietnamAirlines = selectFlightResultsForSearch({
+    candidates: airlineCandidates,
+    preferredAirlineCodes: ['VN'],
+    resultRanking: 'cheapest',
+  });
+
+  assert.deepEqual(
+    cheapestVietnamAirlines?.candidates.map((candidate) => candidate.flightNumber),
+    ['VN250', 'VN214', 'VN212'],
+  );
+
+  const afternoonVietnamAirlines = selectFlightResultsForSearch({
+    candidates: airlineCandidates,
+    preferredAirlineCodes: ['VN'],
+    preferredTime: 'afternoon',
+    resultRanking: null,
+  });
+
+  assert.deepEqual(
+    afternoonVietnamAirlines?.candidates.map((candidate) => candidate.flightNumber),
+    ['VN212', 'VN214', 'VN250'],
+  );
+
   const normalMissingSpecificTime = selectFlightResultsForSearch({
     candidates,
     preferredTime: 'specific_time',
@@ -942,6 +1027,19 @@ function testFlightResultRanking() {
     [22, 23, 21],
   );
 
+  const specificTimeVietnamAirlines = selectFlightResultsForSearch({
+    candidates: airlineCandidates,
+    preferredAirlineCodes: ['VN'],
+    preferredTime: 'specific_time',
+    specificTime: '13:00',
+    resultRanking: null,
+  });
+
+  assert.deepEqual(
+    specificTimeVietnamAirlines?.candidates.map((candidate) => candidate.flightNumber),
+    ['VN212', 'VN214', 'VN250'],
+  );
+
   const morningCheapest = rankFlightResultsForSearch({
     candidates,
     preferredTime: 'morning',
@@ -997,6 +1095,15 @@ function testFlightResultRanking() {
   assert.equal(emptyNormalBucket?.summary.displayedCount, 0);
   assert.equal(emptyNormalBucket?.summary.matchedCount, 0);
 
+  const emptyAirlineFilter = selectFlightResultsForSearch({
+    candidates: [createRankingCandidate(10, '14:10', 450000)],
+    preferredAirlineCodes: ['VN'],
+    resultRanking: null,
+  });
+
+  assert.equal(emptyAirlineFilter?.summary.displayedCount, 0);
+  assert.deepEqual(emptyAirlineFilter?.summary.requestedAirlineCodes, ['VN']);
+
   const normalBucketMessage = formatSearchSuccessMessage(
     10,
     normalMorning?.summary,
@@ -1004,6 +1111,13 @@ function testFlightResultRanking() {
 
   assert.match(normalBucketMessage, /5 chuyến trong khung/i);
   assert.match(normalBucketMessage, /Tổng kết quả live: 10 chuyến/i);
+  assert.match(
+    formatSearchSuccessMessage(
+      normalVietnamAirlines?.summary.displayedCount ?? 0,
+      normalVietnamAirlines?.summary,
+    ),
+    /Vietnam Airlines/,
+  );
   assert.equal(
     extractLowestVndPriceAmount('VND 1,832,520\nVND 1,616,520'),
     1616520,
@@ -1050,6 +1164,7 @@ function createRankingCandidate(
   cardIndex: number,
   departureTime: string,
   priceAmount: number,
+  overrides: Partial<FlightResultCandidate> = {},
 ): FlightResultCandidate {
   return {
     cardIndex,
@@ -1062,6 +1177,7 @@ function createRankingCandidate(
     rawBookingClassCode: 'Z1_ECO',
     priceText: `VND ${priceAmount}`,
     priceAmount,
+    ...overrides,
   };
 }
 
@@ -1453,6 +1569,7 @@ async function main() {
   testRoundTripRequiresReturnDate();
   testMapperRejectsMissingFields();
   testMapperCanonicalizesAirportText();
+  testMapperNormalizesPreferredAirlines();
   testMapperResolvesAirportTextFallback();
   testParsedAirportNormalizationBeforeMissingFieldCheck();
   testAirportCatalogAliases();

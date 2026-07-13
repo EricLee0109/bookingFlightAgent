@@ -29,6 +29,8 @@ export type FlightResultCandidate = FlightSelectionCandidate & {
 
 export type FlightResultFilterSummary = {
   ranking?: FlightResultRanking;
+  requestedAirlineCodes: string[] | null;
+  requestedAirlineNames: string[] | null;
   requestedTimeBucket: FlightTimeBucket | null;
   requestedTimeBucketLabel: string | null;
   requestedSpecificTime: string | null;

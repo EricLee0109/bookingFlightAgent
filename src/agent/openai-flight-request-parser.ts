@@ -5,6 +5,7 @@ import {
   type ParsedFlightRequest,
 } from '../contracts/flight';
 import { AIRPORT_CATALOG } from './airport-catalog';
+import { AIRLINE_CATALOG } from './airline-catalog';
 import { type FlightRequestParser } from './flight-request-parser';
 
 /**
@@ -146,6 +147,13 @@ export function buildFlightParserSystemPrompt(today: string, timeZone: string) {
     '- If the message has an ambiguous 12-hour time such as "5h" without sáng/chiều/tối, set preferredTime to specific_time, specificTime to null, and add specificTimeSession to missingFields.',
     '- If no exact time exists, specificTime must be null.',
     '- Set resultRanking to cheapest only when the message asks for the cheapest or cheap flights, such as "rẻ nhất", "giá rẻ nhất", "chuyến rẻ", or "vé rẻ". Otherwise set resultRanking to null.',
+    '',
+    'Airline brand rules:',
+    '- preferredAirlineCodes must be an array of airline codes when the message clearly requests one or more airline brands. Otherwise set preferredAirlineCodes to null.',
+    ...AIRLINE_CATALOG.map(
+      (airline) => `- ${airline.aliases.join(', ')} => ${airline.code}.`,
+    ),
+    '- If an airline brand is unclear, do not invent it; set preferredAirlineCodes to null.',
     '',
     'Trip rules:',
     '- Use one_way unless the message clearly asks for round trip or a return date.',

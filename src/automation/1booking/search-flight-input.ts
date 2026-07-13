@@ -5,6 +5,7 @@ import {
   validateAutomationSupport,
   validateSearchFlightInput,
 } from '../../contracts/flight';
+import { normalizePreferredAirlineCodes } from '../../agent/airline-catalog';
 import { formatIsoDateForOneBooking } from './dates';
 
 /**
@@ -23,6 +24,7 @@ export type SearchFlightsInput = {
   specificTime?: string | null;
   resultRanking?: FlightResultRanking;
   resultLimit?: 5 | 10;
+  preferredAirlineCodes?: string[] | null;
 };
 
 export type SearchFlightsInputValidation = {
@@ -130,6 +132,9 @@ export function mapParsedFlightRequestToSearchFlightsInput(
       preferredTime: parsed.preferredTime,
       specificTime: parsed.specificTime,
       resultRanking: parsed.resultRanking,
+      preferredAirlineCodes: normalizePreferredAirlineCodes(
+        parsed.preferredAirlineCodes,
+      ),
     },
   };
 }

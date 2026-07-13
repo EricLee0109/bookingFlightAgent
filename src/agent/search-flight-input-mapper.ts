@@ -9,6 +9,7 @@ import {
   resolveAirportFromText,
   type ResolvedAirport,
 } from './airport-resolver';
+import { normalizePreferredAirlineCodes } from './airline-catalog';
 
 /**
  * Agent boundary for converting validated parser output into automation input.
@@ -94,6 +95,9 @@ export function mapParsedRequestToSearchFlightsInput(
     preferredTime: normalizedParsed.preferredTime,
     specificTime: normalizedParsed.specificTime,
     resultRanking: normalizedParsed.resultRanking,
+    preferredAirlineCodes: normalizePreferredAirlineCodes(
+      normalizedParsed.preferredAirlineCodes,
+    ),
   };
 }
 

@@ -9,6 +9,10 @@ import {
 } from './flight-result-candidates';
 import { buildFlightResultFilterSummary } from './flight-result-summary';
 import {
+  resolveFlightAirlineFilter,
+  selectCandidatesByAirlineFilter,
+} from './flight-airline-filters';
+import {
   isFlightCandidateInTimeFilter,
   resolveFlightTimeFilter,
 } from './flight-time-filters';
@@ -37,18 +41,24 @@ export function selectFlightResultsForSearch(input: {
   specificTime?: string | null;
   resultRanking?: FlightResultRanking;
   limit?: number;
+  preferredAirlineCodes?: string[] | null;
 }): RankedFlightResult | null {
+  const airlineFilter = resolveFlightAirlineFilter(input.preferredAirlineCodes);
   const timeFilter = resolveFlightTimeFilter({
     preferredTime: input.preferredTime,
     specificTime: input.specificTime,
   });
 
-  if (!timeFilter && input.resultRanking !== 'cheapest') {
+  if (!airlineFilter && !timeFilter && input.resultRanking !== 'cheapest') {
     return null;
   }
 
-  const scopedCandidates = selectCandidatesByTimeFilter({
+  const airlineScopedCandidates = selectCandidatesByAirlineFilter({
     candidates: input.candidates,
+    airlineFilter,
+  });
+  const scopedCandidates = selectCandidatesByTimeFilter({
+    candidates: airlineScopedCandidates,
     timeFilter,
   });
   const selectedCandidates =
@@ -61,6 +71,7 @@ export function selectFlightResultsForSearch(input: {
     cardIndexes: selectedCandidates.map((candidate) => candidate.cardIndex),
     summary: buildFlightResultFilterSummary({
       ranking: input.resultRanking,
+      airlineFilter,
       timeFilter,
       totalVisibleCount: input.candidates.length,
       scopedCandidates,
@@ -78,6 +89,7 @@ export function rankFlightResultsForSearch(input: {
   specificTime?: string | null;
   resultRanking?: FlightResultRanking;
   limit?: number;
+  preferredAirlineCodes?: string[] | null;
 }) {
   return selectFlightResultsForSearch(input);
 }

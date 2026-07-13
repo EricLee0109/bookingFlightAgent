@@ -6,6 +6,10 @@ import {
   type ParsedFlightRequest,
   type SelectMatchingFlightInput,
 } from '../contracts/flight';
+import {
+  getAirlineNamesByCodes,
+  normalizePreferredAirlineCodes,
+} from '../agent/airline-catalog';
 import { type PassengerMention } from '../contracts/passenger';
 import { type PassengerProfile } from '../passengers/passenger-types';
 import { type LocalFlightCase } from '../storage/local-case-store';
@@ -34,6 +38,7 @@ import type TelegramBot from 'node-telegram-bot-api';
 export function formatParsedRequestMessage(parsed: ParsedFlightRequest) {
   const tripTypeLabel =
     parsed.tripType === 'round_trip' ? 'Khứ hồi' : 'Một chiều';
+  const airlineLine = formatParsedAirlineLine(parsed);
 
   return [
     '✅ Mình đã phân tích yêu cầu:',
@@ -45,11 +50,14 @@ export function formatParsedRequestMessage(parsed: ParsedFlightRequest) {
     `Ngày về: ${parsed.returnDate ?? 'Không có'}`,
     `Loại chuyến: ${tripTypeLabel}`,
     `Khung giờ: ${parsed.preferredTime ?? 'Không rõ'}`,
+    airlineLine,
     '',
     parsed.missingFields.length > 0
       ? `📝 Mình cần bổ sung: ${parsed.missingFields.join(', ')}`
       : 'Thông tin cơ bản đã sẵn sàng để tìm chuyến.',
-  ].join('\n');
+  ]
+    .filter((line): line is string => line !== null)
+    .join('\n');
 }
 
 /**
@@ -70,6 +78,21 @@ export function formatMissingFlightFieldsMessage(missingFields: string[]) {
     'bay từ SGN ra HAN ngày 30/07',
     'bay từ Hà Nội vào Sài Gòn ngày mai buổi sáng',
   ].join('\n');
+}
+
+/**
+ * Formats requested airline brands in the parsed-request summary.
+ */
+function formatParsedAirlineLine(parsed: ParsedFlightRequest) {
+  const airlineCodes = normalizePreferredAirlineCodes(parsed.preferredAirlineCodes);
+
+  if (!airlineCodes) {
+    return null;
+  }
+
+  const airlineNames = getAirlineNamesByCodes(airlineCodes);
+
+  return `Hãng: ${airlineNames.join(', ')}`;
 }
 
 /**
@@ -107,6 +130,8 @@ export function formatSearchSuccessMessage(
   flightCount: number,
   filterSummary?: FlightResultFilterSummary,
 ) {
+  const airlineText = formatAirlineFilterText(filterSummary);
+
   if (filterSummary?.requestedTimeWindowLabel) {
     const priceRangeLine =
       filterSummary.ranking === 'cheapest' && filterSummary.priceRangeText
@@ -116,7 +141,7 @@ export function formatSearchSuccessMessage(
       filterSummary.ranking === 'cheapest' ? ' chuyến rẻ nhất' : ' chuyến';
 
     return [
-      `✅ Mình đã lọc ${filterSummary.displayedCount}${rankingText} ${filterSummary.requestedTimeWindowLabel}.`,
+      `✅ Mình đã lọc ${filterSummary.displayedCount}${rankingText}${airlineText} ${filterSummary.requestedTimeWindowLabel}.`,
       `Tổng kết quả live: ${filterSummary.totalVisibleCount} chuyến.`,
       priceRangeLine,
       '',
@@ -136,7 +161,7 @@ export function formatSearchSuccessMessage(
       : null;
 
     return [
-      `✅ Mình đã lọc ${filterSummary.displayedCount} chuyến rẻ nhất ${bucketText}.`,
+      `✅ Mình đã lọc ${filterSummary.displayedCount} chuyến rẻ nhất${airlineText} ${bucketText}.`,
       `Tổng kết quả live: ${filterSummary.totalVisibleCount} chuyến.`,
       priceRangeLine,
       '',
@@ -149,7 +174,17 @@ export function formatSearchSuccessMessage(
 
   if (filterSummary?.requestedTimeBucketLabel) {
     return [
-      `✅ Mình đã lọc ${filterSummary.displayedCount} chuyến trong khung ${filterSummary.requestedTimeBucketLabel}.`,
+      `✅ Mình đã lọc ${filterSummary.displayedCount} chuyến${airlineText} trong khung ${filterSummary.requestedTimeBucketLabel}.`,
+      `Tổng kết quả live: ${filterSummary.totalVisibleCount} chuyến.`,
+      '',
+      'Mình gửi ảnh lịch trình bên dưới nhé.',
+      'Bạn có thể gửi ảnh này lại cho khách trên Zalo.',
+    ].join('\n');
+  }
+
+  if (filterSummary?.requestedAirlineNames?.length) {
+    return [
+      `✅ Mình đã lọc ${filterSummary.displayedCount} chuyến${airlineText}.`,
       `Tổng kết quả live: ${filterSummary.totalVisibleCount} chuyến.`,
       '',
       'Mình gửi ảnh lịch trình bên dưới nhé.',
@@ -163,6 +198,17 @@ export function formatSearchSuccessMessage(
     'Mình gửi ảnh lịch trình bên dưới nhé.',
     'Bạn có thể gửi ảnh này lại cho khách trên Zalo.',
   ].join('\n');
+}
+
+/**
+ * Formats the optional airline filter phrase for search result summaries.
+ */
+function formatAirlineFilterText(filterSummary?: FlightResultFilterSummary) {
+  const airlineNames = filterSummary?.requestedAirlineNames;
+
+  return airlineNames && airlineNames.length > 0
+    ? ` ${airlineNames.join(', ')}`
+    : '';
 }
 
 /**
@@ -994,6 +1040,19 @@ function formatSearchFailureReason(message?: string) {
       'chiều',
       'tối',
       'tất cả chuyến rẻ nhất',
+    ].join('\n');
+  }
+
+  if (message && /No flight results matched the requested filters/i.test(message)) {
+    const airlineMatch = message.match(/airline ([^,.]+(?:, [^,.]+)*)/i);
+    const airlineText = airlineMatch?.[1];
+
+    return [
+      airlineText
+        ? `Mình chưa thấy chuyến ${airlineText} khớp yêu cầu này.`
+        : 'Mình chưa thấy chuyến khớp bộ lọc đã chọn.',
+      '',
+      'Bạn có thể thử hãng khác, đổi khung giờ, hoặc bỏ hãng khỏi yêu cầu nhé.',
     ].join('\n');
   }
 

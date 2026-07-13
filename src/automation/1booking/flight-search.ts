@@ -80,6 +80,7 @@ export async function searchFlights(
     specificTime: input.specificTime,
     resultRanking: input.resultRanking,
     limit: input.resultLimit,
+    preferredAirlineCodes: input.preferredAirlineCodes,
   });
 
   if (selectedResult && selectedResult.summary.displayedCount === 0) {
@@ -117,9 +118,24 @@ export async function searchFlights(
  */
 export class FlightResultBucketEmptyError extends Error {
   constructor(readonly summary: FlightResultFilterSummary) {
-    super('No flight results matched the requested time bucket.');
+    super(buildFlightResultEmptyMessage(summary));
     this.name = 'FlightResultBucketEmptyError';
   }
+}
+
+function buildFlightResultEmptyMessage(summary: FlightResultFilterSummary) {
+  const filters = [
+    summary.requestedAirlineNames?.length
+      ? `airline ${summary.requestedAirlineNames.join(', ')}`
+      : null,
+    summary.requestedTimeWindowLabel,
+    summary.requestedTimeBucketLabel,
+    summary.ranking === 'cheapest' ? 'cheapest ranking' : null,
+  ].filter(Boolean);
+
+  return filters.length > 0
+    ? `No flight results matched the requested filters: ${filters.join(', ')}.`
+    : 'No flight results matched the requested filters.';
 }
 
 /**

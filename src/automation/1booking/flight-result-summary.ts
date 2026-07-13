@@ -1,5 +1,6 @@
 import { type FlightResultRanking } from '../../contracts/flight';
 import { formatVndAmount } from './flight-card-parser';
+import { type FlightAirlineFilter } from './flight-airline-filters';
 import {
   type FlightResultCandidate,
   type FlightResultFilterSummary,
@@ -8,6 +9,7 @@ import {
 
 export type FlightResultSummaryInput = {
   ranking?: FlightResultRanking;
+  airlineFilter: FlightAirlineFilter | null;
   timeFilter: FlightTimeFilter | null;
   totalVisibleCount: number;
   scopedCandidates: FlightResultCandidate[];
@@ -25,6 +27,8 @@ export function buildFlightResultFilterSummary(
 ): FlightResultFilterSummary {
   return {
     ranking: input.ranking,
+    requestedAirlineCodes: input.airlineFilter?.codes ?? null,
+    requestedAirlineNames: input.airlineFilter?.names ?? null,
     requestedTimeBucket:
       input.timeFilter?.kind === 'bucket' ? input.timeFilter.bucket : null,
     requestedTimeBucketLabel:
