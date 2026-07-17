@@ -5,6 +5,9 @@ import {
   buildPassengerParserSystemPrompt,
   createOpenAIPassengerMessageParser,
 } from '../src/agent/openai-passenger-message-parser';
+import {
+  parseDeterministicPassengerMessage,
+} from '../src/agent/deterministic-passenger-message-parser';
 import { parseFlightSelectionMessage } from '../src/agent/flight-selection-parser';
 import {
   assertSafeFinalHoldCtaText,
@@ -220,6 +223,72 @@ function testPassengerQuickInputParserContract() {
 }
 
 /**
+ * Verifies common operator passenger messages do not depend on OpenAI latency.
+ */
+function testDeterministicPassengerMessageParser() {
+  assert.deepEqual(
+    parseDeterministicPassengerMessage(
+      'mình chọn chuyến 15h Vietnam Airlines cho chị Lành',
+    ),
+    {
+      intent: 'attach_passenger',
+      caseCode: null,
+      passengerMentions: [
+        {
+          fullName: 'chị Lành',
+          gender: 'female',
+          dob: null,
+        },
+      ],
+      missingFields: [],
+      confidence: 1,
+    },
+  );
+  assert.deepEqual(
+    parseDeterministicPassengerMessage('Nữ, Nguyễn Thị Lành'),
+    {
+      intent: 'provide_new_passenger',
+      caseCode: null,
+      passengerMentions: [
+        {
+          fullName: 'Nguyễn Thị Lành',
+          gender: 'female',
+          dob: null,
+        },
+      ],
+      missingFields: [],
+      confidence: 1,
+    },
+  );
+  assert.deepEqual(
+    parseDeterministicPassengerMessage(
+      'BK-20260717-141328 lấy Nguyễn Thị Lành, sinh 02/01/1995',
+    ),
+    {
+      intent: 'attach_passenger',
+      caseCode: 'BK-20260717-141328',
+      passengerMentions: [
+        {
+          fullName: 'Nguyễn Thị Lành',
+          gender: null,
+          dob: '1995-01-02',
+        },
+      ],
+      missingFields: [],
+      confidence: 1,
+    },
+  );
+  assert.deepEqual(
+    parseDeterministicPassengerMessage('sinh 31/02/1995'),
+    null,
+  );
+  assert.deepEqual(
+    parseDeterministicPassengerMessage('không phải khách này'),
+    null,
+  );
+}
+
+/**
  * Verifies resolver states for ambiguous, exact, and unknown names.
  */
 function testPassengerResolverStates() {
@@ -322,6 +391,50 @@ function testHonorificMentionResolvesCachedPassenger() {
 
     if (missingFullName.status === 'new_passenger_missing_fields') {
       assert.deepEqual(missingFullName.missingFields, ['fullName']);
+    }
+  } finally {
+    store.close();
+  }
+}
+
+/**
+ * Verifies deterministic extraction still delegates final identity to SQLite.
+ */
+function testDeterministicPassengerMessageResolvesCachedProfile() {
+  const store = new PassengerStore(
+    path.join(TEST_DIR, 'deterministic-passengers.sqlite'),
+  );
+
+  try {
+    const expectedProfile = store.upsertPassengerProfile({
+      passengerType: 0,
+      lastName: 'NGUYEN',
+      firstName: 'THI LANH',
+      title: 'MS',
+      gender: false,
+      source: 'onebooking_suggest',
+    });
+    store.upsertPassengerProfile({
+      passengerType: 0,
+      lastName: 'CHI',
+      firstName: 'LANH',
+      title: 'MS',
+      gender: false,
+      source: 'onebooking_suggest',
+    });
+    const parsed = parseDeterministicPassengerMessage('Nữ, Nguyễn Thị Lành');
+
+    assert.ok(parsed);
+
+    const result = new PassengerResolutionService(store).resolveMention(
+      parsed.passengerMentions[0],
+    );
+
+    assert.equal(result.status, 'matched');
+
+    if (result.status === 'matched') {
+      assert.equal(result.profile.id, expectedProfile.id);
+      assert.equal(result.profile.normalizedFullName, 'NGUYEN THI LANH');
     }
   } finally {
     store.close();
@@ -1181,6 +1294,12 @@ function testTelegramPassengerContextAndRouting() {
     true,
   );
   assert.equal(
+    messageLooksLikePassengerInfo(
+      'mình chọn chuyến 15h Vietnam Airlines cho Nguyễn Thị Lành',
+    ),
+    true,
+  );
+  assert.equal(
     messageLooksLikePassengerInfo('case này lấy chuyến 13h30 Vietjet'),
     false,
   );
@@ -1251,8 +1370,10 @@ async function main() {
   testPassengerMessageSchema();
   await testOpenAIPassengerMessageParser();
   testPassengerQuickInputParserContract();
+  testDeterministicPassengerMessageParser();
   testPassengerResolverStates();
   testHonorificMentionResolvesCachedPassenger();
+  testDeterministicPassengerMessageResolvesCachedProfile();
   testResolverPrefersTrustedCachedPassengerOverManualDuplicate();
   testPassengerProfileEnrichment();
   testNewPassengerUpsertAndCaseAttachment();

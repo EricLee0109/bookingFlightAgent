@@ -1,4 +1,7 @@
 import TelegramBot from 'node-telegram-bot-api';
+import {
+  parseDeterministicPassengerMessage,
+} from '../agent/deterministic-passenger-message-parser';
 import { createOpenAIPassengerMessageParser } from '../agent/openai-passenger-message-parser';
 import { BOOKING_CASE_REGEX } from '../automation/1booking/constants';
 import { PassengerStore } from '../passengers/passenger-store';
@@ -429,6 +432,12 @@ export async function resolvePassengerMessageForCase(
  * Parses passenger text with a bounded wait so Telegram never appears silent.
  */
 async function parsePassengerMessageWithTimeout(rawMessage: string) {
+  const deterministicResult = parseDeterministicPassengerMessage(rawMessage);
+
+  if (deterministicResult) {
+    return deterministicResult;
+  }
+
   const parser = createOpenAIPassengerMessageParser();
   const parsePromise = parser.parse(rawMessage);
   let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -886,6 +895,17 @@ export function messageLooksLikePassengerInfo(
     allowStandaloneFollowUp?: boolean;
   } = {},
 ) {
+  const deterministicResult = parseDeterministicPassengerMessage(rawMessage);
+  const hasPassengerAction =
+    /(?:^|\s)(?:cho|lấy|lay|dùng|dung)\s+/iu.test(rawMessage);
+
+  if (
+    deterministicResult?.intent === 'attach_passenger' &&
+    hasPassengerAction
+  ) {
+    return true;
+  }
+
   const honorific =
     '(?:chị|chi|anh|cô|co|chú|chu|bác|bac|em|bé|be|khách|khach)(?=\\s|$)';
 
@@ -917,6 +937,7 @@ export function messageLooksLikePassengerInfo(
   }
 
   return (
+    Boolean(deterministicResult) ||
     looksLikeStandalonePassengerGender(rawMessage) ||
     looksLikeStandalonePassengerName(rawMessage)
   );
