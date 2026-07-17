@@ -637,7 +637,9 @@ export function formatPassengerHoldMissingDobMessage(profile: PassengerProfile) 
   return [
     `📝 Chuyến Vietnam Airlines cần ngày sinh của ${profile.normalizedFullName} trước khi giữ chỗ.`,
     '',
-    'Bạn bổ sung giúp mình theo mẫu: sinh 02/01/1995',
+    'Bạn có thể gửi theo một trong hai cách:',
+    '02/01/1995',
+    'sinh 02/01/1995',
   ].join('\n');
 }
 

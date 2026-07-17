@@ -210,9 +210,13 @@ function normalizePassengerToken(value: string) {
 }
 
 function extractPassengerDob(rawMessage: string) {
-  const match = rawMessage.match(
+  const prefixedMatch = rawMessage.match(
     /(?:ngày\s+sinh|ngay\s+sinh|sinh)\s+(\d{1,2})[/.=-](\d{1,2})[/.=-](\d{4})/iu,
   );
+  const standaloneMatch = rawMessage.match(
+    /^\s*(\d{1,2})[/.=-](\d{1,2})[/.=-](\d{4})\s*$/u,
+  );
+  const match = prefixedMatch ?? standaloneMatch;
 
   if (!match) {
     return null;

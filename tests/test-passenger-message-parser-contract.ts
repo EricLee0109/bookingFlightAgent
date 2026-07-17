@@ -58,6 +58,7 @@ import {
   formatNewPassengerMissingFieldsMessage,
   formatPassengerCaseRequiredMessage,
   formatPassengerHoldFailedMessage,
+  formatPassengerHoldMissingDobMessage,
   formatPassengerHoldNeedsReviewMessage,
   formatPassengerHoldSuccessMessage,
   formatPnrDetailMessage,
@@ -280,6 +281,32 @@ function testDeterministicPassengerMessageParser() {
   );
   assert.deepEqual(
     parseDeterministicPassengerMessage('sinh 31/02/1995'),
+    null,
+  );
+  const expectedDobUpdate = {
+    intent: 'update_passenger_fields',
+    caseCode: null,
+    passengerMentions: [
+      {
+        fullName: null,
+        gender: null,
+        dob: '1990-10-10',
+      },
+    ],
+    missingFields: [],
+    confidence: 1,
+  };
+
+  assert.deepEqual(
+    parseDeterministicPassengerMessage('10/10/1990'),
+    expectedDobUpdate,
+  );
+  assert.deepEqual(
+    parseDeterministicPassengerMessage('sinh 10/10/1990'),
+    expectedDobUpdate,
+  );
+  assert.deepEqual(
+    parseDeterministicPassengerMessage('31/02/1995'),
     null,
   );
   assert.deepEqual(
@@ -856,6 +883,26 @@ function testPassengerQuickInputAndAirlineDobRules() {
     }),
     ['dob'],
   );
+
+  const missingDobMessage = formatPassengerHoldMissingDobMessage({
+    id: 1,
+    passengerType: 0,
+    lastName: 'NGUYEN',
+    firstName: 'THI LANH',
+    title: 'MS',
+    gender: false,
+    dateOfBirth: null,
+    source: 'onebooking_suggest',
+    normalizedLastName: 'NGUYEN',
+    normalizedFirstName: 'THI LANH',
+    normalizedFullName: 'NGUYEN THI LANH',
+    seenCount: 1,
+    createdAt: '2026-07-17T00:00:00.000Z',
+    updatedAt: '2026-07-17T00:00:00.000Z',
+  });
+
+  assert.match(missingDobMessage, /^02\/01\/1995$/m);
+  assert.match(missingDobMessage, /^sinh 02\/01\/1995$/m);
 }
 
 /**
@@ -1313,6 +1360,13 @@ function testTelegramPassengerContextAndRouting() {
   );
   assert.equal(
     messageLooksLikePassengerInfo('Nam', {
+      allowStandaloneFollowUp: true,
+    }),
+    true,
+  );
+  assert.equal(messageLooksLikePassengerInfo('10/10/1990'), false);
+  assert.equal(
+    messageLooksLikePassengerInfo('10/10/1990', {
       allowStandaloneFollowUp: true,
     }),
     true,
