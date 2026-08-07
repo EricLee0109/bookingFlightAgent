@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { chromium } from 'playwright';
+import { getPlaywrightLaunchOptions } from '../src/automation/browser-config';
 import { refreshOneBookingAuthState } from '../src/automation/1booking/auth';
 import {
   ONE_BOOKING_STORAGE_STATE_PATH,
@@ -21,7 +22,7 @@ async function main() {
     return;
   }
 
-  const browser = await chromium.launch({ headless: false }); //open chrome browser with headless mode false
+  const browser = await chromium.launch(getPlaywrightLaunchOptions());
 
   const context = await browser.newContext({
     viewport: ONE_BOOKING_VIEWPORT,

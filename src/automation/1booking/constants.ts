@@ -1,3 +1,5 @@
+export { ONE_BOOKING_VIEWPORT } from '../browser-config';
+
 /**
  * 1Booking dashboard URL used by all automation flows.
  *
@@ -13,12 +15,6 @@ export const ONE_BOOKING_STORAGE_STATE_PATH = 'auth/1booking-storage-state.json'
 
 // Screenshot folder
 export const SCREENSHOT_DIR = 'screenshots';
-
-// Default viewport Playwright Browser Automation
-export const ONE_BOOKING_VIEWPORT = {
-  width: 1440,
-  height: 900,
-};
 
 // Default timeouts to stop automation if exceed
 export const DEFAULT_TIMEOUT = 30000;

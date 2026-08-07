@@ -1,4 +1,5 @@
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
+import { getPlaywrightLaunchOptions } from '../browser-config';
 import {
   ONE_BOOKING_STORAGE_STATE_PATH,
   ONE_BOOKING_VIEWPORT,
@@ -21,9 +22,7 @@ export type OneBookingBrowserSession = {
  */
 
 export async function createOneBookingBrowserSession(): Promise<OneBookingBrowserSession> {
-  const browser = await chromium.launch({
-    headless: false,
-  });
+  const browser = await chromium.launch(getPlaywrightLaunchOptions());
 
   const context = await browser.newContext({
     storageState: ONE_BOOKING_STORAGE_STATE_PATH,

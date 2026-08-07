@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium, type Page } from 'playwright';
+import { getPlaywrightLaunchOptions } from '../browser-config';
 import {
   ONE_BOOKING_STORAGE_STATE_PATH,
   ONE_BOOKING_URL,
@@ -80,9 +81,9 @@ export async function refreshOneBookingAuthState(
   const storageStatePath =
     options.storageStatePath ?? ONE_BOOKING_STORAGE_STATE_PATH;
   const credentials = options.credentials ?? readOneBookingCredentialsFromEnv();
-  const browser = await chromium.launch({
-    headless: options.headless ?? false,
-  });
+  const browser = await chromium.launch(
+    getPlaywrightLaunchOptions(options.headless),
+  );
 
   try {
     const context = await browser.newContext({

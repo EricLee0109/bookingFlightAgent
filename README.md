@@ -201,6 +201,22 @@ npx tsx scripts/test-1booking-auth.ts
 
 ---
 
+## Cấu hình Playwright headless
+
+Playwright mặc định chạy headless để phù hợp với WSL, VMware, VPS và cloud. Có
+thể đổi nhanh chế độ chạy trong `.env`:
+
+```env
+PLAYWRIGHT_HEADLESS=true
+```
+
+- Không khai báo biến hoặc đặt `true`: chạy headless.
+- Đặt `false`: mở cửa sổ browser để debug ở máy local.
+- Trước khi chạy `scripts/save-auth.ts --manual`, cần đặt `false` vì đăng nhập
+  thủ công yêu cầu browser có cửa sổ.
+
+---
+
 Phần mở rộng (Phase sau MVP)
 Tích hợp Zalo OA để Agent gửi screenshot/lịch trình trực tiếp cho khách.
 Auto Mode: Agent tự search, match, hold mà không cần nhân viên bấm tay (có toggle bật/tắt).
