@@ -10,8 +10,10 @@ These rules are mandatory for future implementation in this project.
 6. Always capture an error screenshot when Playwright fails.
 7. Do not hardcode routes in production flow. Routes must come from validated input.
 8. All automation must use the shared 1Booking viewport.
-9. Long polling is only for local MVP Telegram Bot integration and for passing values into `searchFlights()`.
-10. Future webhook migration must only change the transport layer. Do not rewrite parser, validation, mapper, or automation business logic.
+9. Capture case-scoped, timestamped screenshots at material 1Booking UI checkpoints so website UI drift can be compared later. Additional hold-audit screenshot failures are warnings and must never block or retry a hold booking.
+10. Before interacting with the search form, wait for the optional `LƯU Ý QUAN TRỌNG` drawer and verify its pointer-blocking mask is hidden. Never force-click through overlays.
+11. Long polling is only for local MVP Telegram Bot integration and for passing values into `searchFlights()`.
+12. Future webhook migration must only change the transport layer. Do not rewrite parser, validation, mapper, or automation business logic.
 
 ## Lean Internal-Agent Scope
 

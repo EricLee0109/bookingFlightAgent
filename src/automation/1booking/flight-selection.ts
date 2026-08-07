@@ -8,7 +8,7 @@ import {
   getFlightCards,
 } from './flight-result-ranking';
 import { type SearchFlightsInput, searchFlights } from './flight-search';
-import { takeFullPageScreenshot } from './screenshots';
+import { takeCaseUiScreenshot } from './screenshots';
 import { throwIfOneBookingLoginModalVisible } from './waiters';
 
 export type FlightSelectionMatchResult =
@@ -45,9 +45,10 @@ export async function selectMatchingFlight(
     selectionInput,
   );
 
-  const screenshotPath = await takeFullPageScreenshot(
+  const screenshotPath = await takeCaseUiScreenshot(
     page,
-    `${selectionInput.caseId}-selected-flight.png`,
+    selectionInput.caseId,
+    'selected-flight',
   );
 
   return {

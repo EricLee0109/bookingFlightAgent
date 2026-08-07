@@ -1410,6 +1410,9 @@ async function testOneBookingImportantNoticeDrawerClose() {
     filter() {
       return this;
     },
+    first() {
+      return this;
+    },
     last() {
       return this;
     },
@@ -1419,14 +1422,25 @@ async function testOneBookingImportantNoticeDrawerClose() {
     getByRole() {
       return fakeCloseTarget;
     },
+    async waitFor() {
+      return null;
+    },
+  };
+  const fakeMask = {
+    first() {
+      return this;
+    },
+    async waitFor() {
+      return null;
+    },
   };
   const fakePage = {
     getByText() {
       return fakeHeading;
     },
     locator(selector: string) {
-      if (selector.includes('ant-drawer-close')) {
-        return fakeCloseTarget;
+      if (selector.includes('drawer-mask')) {
+        return fakeMask;
       }
 
       return fakeDrawer;
@@ -1446,6 +1460,91 @@ async function testOneBookingImportantNoticeDrawerClose() {
   assert.equal(didClose, true);
   assert.equal(closeClicked, true);
   assert.equal(escapePressed, false);
+}
+
+/**
+ * Verifies the closer waits for a notice drawer that appears after navigation.
+ */
+async function testOneBookingImportantNoticeDrawerLateAppearance() {
+  let waitedForVisible = false;
+  let closeClicked = false;
+  let headingHiddenVerified = false;
+  let maskHiddenVerified = false;
+
+  const fakeHeading = {
+    first() {
+      return this;
+    },
+    async isVisible() {
+      return false;
+    },
+    async waitFor(options: { state: string }) {
+      if (options.state === 'visible') {
+        waitedForVisible = true;
+      } else if (options.state === 'hidden') {
+        headingHiddenVerified = true;
+      }
+    },
+  };
+  const fakeCloseTarget = {
+    first() {
+      return this;
+    },
+    async isVisible() {
+      return true;
+    },
+    async click() {
+      closeClicked = true;
+    },
+  };
+  const fakeDrawer = {
+    filter() {
+      return this;
+    },
+    first() {
+      return this;
+    },
+    locator() {
+      return fakeCloseTarget;
+    },
+    getByRole() {
+      return fakeCloseTarget;
+    },
+  };
+  const fakeMask = {
+    first() {
+      return this;
+    },
+    async waitFor(options: { state: string }) {
+      if (options.state === 'hidden') {
+        maskHiddenVerified = true;
+      }
+    },
+  };
+  const fakePage = {
+    getByText() {
+      return fakeHeading;
+    },
+    locator(selector: string) {
+      return selector.includes('drawer-mask') ? fakeMask : fakeDrawer;
+    },
+    keyboard: {
+      async press() {
+        return null;
+      },
+    },
+  };
+
+  const didClose = await closeOneBookingImportantNoticeDrawer(
+    fakePage as never,
+    2000,
+  );
+
+  assert.equal(didClose, true);
+  assert.equal(waitedForVisible, true);
+  assert.equal(closeClicked, true);
+  assert.equal(headingHiddenVerified, true);
+  assert.equal(maskHiddenVerified, true);
 }
 
 /**
@@ -1599,6 +1698,7 @@ async function main() {
   await testOneBookingAuthExpiredToastDetection();
   await testOneBookingAuthExpiredPasswordModalDetection();
   await testOneBookingImportantNoticeDrawerClose();
+  await testOneBookingImportantNoticeDrawerLateAppearance();
   testOneBookingCredentialValidation();
   testParserFactoryProviderSelection();
   testOpenAIParserRequiresApiKey();

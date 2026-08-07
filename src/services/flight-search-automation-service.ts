@@ -2,7 +2,11 @@ import { createOneBookingBrowserSession } from '../automation/1booking/browser';
 import { type FlightResultFilterSummary } from '../automation/1booking/flight-result-ranking';
 import { searchFlights } from '../automation/1booking/flight-search';
 import { type SearchFlightsInput } from '../automation/1booking/search-flight-input';
-import { takeFullPageScreenshot } from '../automation/1booking/screenshots';
+import {
+  buildCaseUiScreenshotFileNamePrefix,
+  takeCaseUiScreenshot,
+  takeFullPageScreenshot,
+} from '../automation/1booking/screenshots';
 import { isRetryableOneBookingSearchError } from '../automation/1booking/waiters';
 import { runWithAutomationLock } from '../utils/automation-lock';
 import { OneBookingAuthRefreshRetryController } from './onebooking-auth-refresh-retry';
@@ -27,6 +31,7 @@ export type FlightSearchAutomationResult =
 const MAX_ONE_BOOKING_SEARCH_ATTEMPTS = 2;
 
 export type FlightSearchAutomationOptions = {
+  caseId?: string;
   onAuthRefresh?: () => Promise<void>;
 };
 
@@ -71,7 +76,14 @@ async function searchOneBookingFlightsUnlocked(
     const { browser, page } = await createOneBookingBrowserSession();
 
     try {
-      const result = await searchFlights(page, input);
+      const result = await searchFlights(page, input, {
+        screenshotFileNamePrefix: options.caseId
+          ? buildCaseUiScreenshotFileNamePrefix(
+              options.caseId,
+              'search-results',
+            )
+          : undefined,
+      });
 
       return {
         ok: true,
@@ -86,10 +98,12 @@ async function searchOneBookingFlightsUnlocked(
       lastError = error;
 
       try {
-        lastErrorScreenshotPath = await takeFullPageScreenshot(
-          page,
-          `1booking-telegram-search-failed-attempt-${attempt}.png`,
-        );
+        lastErrorScreenshotPath = options.caseId
+          ? await takeCaseUiScreenshot(page, options.caseId, 'search-failed')
+          : await takeFullPageScreenshot(
+              page,
+              `1booking-telegram-search-failed-attempt-${attempt}.png`,
+            );
       } catch {
         lastErrorScreenshotPath = null;
       }

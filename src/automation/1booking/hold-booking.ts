@@ -94,6 +94,7 @@ export type PassengerHoldReviewExpectation = {
 };
 
 export type ConfirmPassengerHoldOptions = {
+  onReviewReady?: () => Promise<void>;
   onSubmitted?: () => Promise<void>;
   onLoadingObserved?: (observedAt: string) => Promise<void>;
   onSuccessModalObserved?: (observedAt: string) => Promise<void>;
@@ -214,6 +215,7 @@ export async function confirmPassengerHold(
   options: ConfirmPassengerHoldOptions = {},
 ) {
   const reviewDrawer = await openPassengerHoldReview(page, expectation);
+  await options.onReviewReady?.();
   observeTransientHoldMarker(
     page,
     /Vui lòng đợi trong giây lát!|Vui long doi trong giay lat!/i,
@@ -435,12 +437,10 @@ function observeTransientHoldMarker(
  * Waits for the held-order detail page and its expected live flight card.
  */
 async function waitForHeldOrderPage(page: Page, flightNumber: string) {
-  const orderId = page.getByText(/^#HS\d+$/i).first();
   const heldFlightCard = getHeldOrderFlightCards(page, flightNumber).first();
 
   const orderPageProof = await waitForOrderDetailHeldState(
     page,
-    orderId,
     heldFlightCard,
   ).catch(async (error) => {
     const dashboardProof = await waitForDashboardHeldBookingProof(
@@ -463,19 +463,25 @@ async function waitForHeldOrderPage(page: Page, flightNumber: string) {
  */
 async function waitForOrderDetailHeldState(
   page: Page,
-  orderId: Locator,
   heldFlightCard: Locator,
 ) {
-  await orderId.waitFor({
-    state: 'visible',
-    timeout: 120000,
-  });
+  await page.waitForURL(
+    (url) => extractHeldOrderIdFromOrderDetailUrl(url.toString()) !== null,
+    {
+      timeout: 120000,
+    },
+  );
   await heldFlightCard.waitFor({
     state: 'visible',
     timeout: 30000,
   });
 
-  const orderIdText = (await orderId.innerText()).trim();
+  const orderDetailUrl = page.url();
+  const orderIdText = extractHeldOrderIdFromOrderDetailUrl(orderDetailUrl);
+
+  if (!orderIdText) {
+    throw new Error('1Booking order page URL did not expose a valid order id.');
+  }
 
   if (
     !isDurableHeldOrderTerminalState({
@@ -488,8 +494,25 @@ async function waitForOrderDetailHeldState(
 
   return {
     orderId: orderIdText,
-    orderDetailUrl: page.url(),
+    orderDetailUrl,
   };
+}
+
+/**
+ * Extracts the held-order id from the durable order-detail URL.
+ *
+ * The current 1Booking UI embeds `#HS...` in a larger heading instead of
+ * rendering it as a standalone text node, while the URL remains stable.
+ */
+export function extractHeldOrderIdFromOrderDetailUrl(orderDetailUrl: string) {
+  try {
+    const pathname = new URL(orderDetailUrl).pathname;
+    const match = pathname.match(/^\/order\/(HS\d+)\/?$/i);
+
+    return match ? `#${match[1].toUpperCase()}` : null;
+  } catch {
+    return null;
+  }
 }
 
 /**

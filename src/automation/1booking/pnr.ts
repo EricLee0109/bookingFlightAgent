@@ -15,16 +15,35 @@ export async function extractHeldBookingPnr(
   page: Page,
   expectedFlightNumber: string,
 ) {
-  const candidateTexts = await getHeldOrderFlightCards(
-    page,
-    expectedFlightNumber,
-  ).allInnerTexts();
+  const heldFlightCards = getHeldOrderFlightCards(page, expectedFlightNumber);
+  const candidateCards = await Promise.all(
+    Array.from({ length: await heldFlightCards.count() }, async (_, index) => {
+      const card = heldFlightCards.nth(index);
 
-  for (const candidateText of candidateTexts.sort(
-    (left, right) => left.length - right.length,
+      return {
+        card,
+        text: await card.innerText(),
+      };
+    }),
+  );
+
+  for (const candidate of candidateCards.sort(
+    (left, right) => left.text.length - right.text.length,
   )) {
+    const bookingFieldTexts = await candidate.card
+      .getByText(/^Booking$/i)
+      .locator('..')
+      .allInnerTexts();
+    const labeledPnrCodes = Array.from(
+      new Set(bookingFieldTexts.flatMap(extractPnrCodesFromBookingFieldText)),
+    );
+
+    if (labeledPnrCodes.length === 1) {
+      return labeledPnrCodes[0];
+    }
+
     const pnrCodes = extractPnrCodesFromHeldOrderText(
-      candidateText,
+      candidate.text,
       expectedFlightNumber,
     );
 
@@ -85,6 +104,22 @@ export function extractPnrCodesFromHeldOrderText(
           (candidate) =>
             isValidPnrCode(candidate) && !excludedValues.has(candidate),
         ),
+    ),
+  );
+}
+
+/**
+ * Reads PNR candidates that immediately follow the new order-card `Booking`
+ * label.
+ */
+export function extractPnrCodesFromBookingFieldText(bookingFieldText: string) {
+  return Array.from(
+    new Set(
+      Array.from(
+        bookingFieldText.toUpperCase().matchAll(/\bBOOKING\s+([A-Z0-9]{6})\b/g),
+      )
+        .map((match) => match[1])
+        .filter(isValidPnrCode),
     ),
   );
 }

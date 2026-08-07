@@ -12,6 +12,7 @@ import { parseFlightSelectionMessage } from '../src/agent/flight-selection-parse
 import {
   assertSafeFinalHoldCtaText,
   buildPassengerQuickInput,
+  extractHeldOrderIdFromOrderDetailUrl,
   HoldBookingNotSupportedError,
   isDurableHeldOrderTerminalState,
   PostSubmitHoldError,
@@ -20,9 +21,11 @@ import { readOneBookingHoldContactInfoFromEnv } from '../src/automation/1booking
 import { OneBookingAuthExpiredError } from '../src/automation/1booking/waiters';
 import {
   buildExactFlightNumberPattern,
+  extractPnrCodesFromBookingFieldText,
   extractPnrCodesFromHeldOrderText,
   isValidPnrCode,
 } from '../src/automation/1booking/pnr';
+import { buildCaseUiScreenshotFileNamePrefix } from '../src/automation/1booking/screenshots';
 import {
   ParsedPassengerMessageSchema,
   type ParsedPassengerMessage,
@@ -979,6 +982,28 @@ function testHeldBookingPnrExtraction() {
     ),
     ['VNT56E'],
   );
+  assert.deepEqual(
+    extractPnrCodesFromBookingFieldText(['Booking', '', '4BW6ED'].join('\n')),
+    ['4BW6ED'],
+  );
+  assert.deepEqual(
+    extractPnrCodesFromBookingFieldText('1 BOOKING\n1,772,381'),
+    [],
+  );
+}
+
+/**
+ * Verifies UI evidence filenames remain case-scoped and chronological.
+ */
+function testCaseUiScreenshotFileNames() {
+  assert.equal(
+    buildCaseUiScreenshotFileNamePrefix(
+      'BK-20260727-161755',
+      'hold-success',
+      new Date('2026-07-27T09:35:11.053Z'),
+    ),
+    'BK-20260727-161755-hold-success-20260727093511053',
+  );
 }
 
 /**
@@ -1010,6 +1035,22 @@ function testSubmittedHoldFailureSafety() {
   assert.equal(postSubmitError.checkpoint, 'terminal_order_page');
   assert.equal(postSubmitError.originalCauseMessage, 'Order page timed out.');
   assert.equal(postSubmitError.currentUrl, 'https://pro.1booking.vn/order/123');
+  assert.equal(
+    extractHeldOrderIdFromOrderDetailUrl(
+      'https://pro.1booking.vn/order/HS2200389000197',
+    ),
+    '#HS2200389000197',
+  );
+  assert.equal(
+    extractHeldOrderIdFromOrderDetailUrl(
+      'https://pro.1booking.vn/order/HS2200389000197?tab=overview',
+    ),
+    '#HS2200389000197',
+  );
+  assert.equal(
+    extractHeldOrderIdFromOrderDetailUrl('https://pro.1booking.vn/order'),
+    null,
+  );
   assert.equal(
     isDurableHeldOrderTerminalState({
       orderId: '#HS2200389000085',
@@ -1439,6 +1480,7 @@ async function main() {
   testOneBookingHoldContactInfoValidation();
   testSafeFinalHoldCtaGuard();
   testHeldBookingPnrExtraction();
+  testCaseUiScreenshotFileNames();
   testSubmittedHoldFailureSafety();
   await testOneBookingAuthRefreshRetryPolicy();
   await testPassengerHoldRecovery();

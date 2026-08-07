@@ -3,7 +3,7 @@ import {
   selectMatchingFlight,
   type SelectMatchingFlightResult,
 } from '../automation/1booking/flight-selection';
-import { takeFullPageScreenshot } from '../automation/1booking/screenshots';
+import { takeCaseUiScreenshot } from '../automation/1booking/screenshots';
 import { isRetryableOneBookingSearchError } from '../automation/1booking/waiters';
 import { type SelectMatchingFlightInput } from '../contracts/flight';
 import { readLocalFlightCase } from '../storage/local-case-store';
@@ -106,9 +106,10 @@ async function selectMatchingOneBookingFlightUnlocked(
       lastError = error;
 
       try {
-        lastErrorScreenshotPath = await takeFullPageScreenshot(
+        lastErrorScreenshotPath = await takeCaseUiScreenshot(
           page,
-          `1booking-selection-failed-attempt-${attempt}.png`,
+          input.caseId,
+          'selection-failed',
         );
       } catch {
         lastErrorScreenshotPath = null;

@@ -28,6 +28,10 @@ export type SearchFlightsResult = {
   screenshotPaths: string[];
 };
 
+export type SearchFlightsOptions = {
+  screenshotFileNamePrefix?: string;
+};
+
 export type { SearchFlightsInput } from './search-flight-input';
 
 /**
@@ -44,6 +48,7 @@ export type { SearchFlightsInput } from './search-flight-input';
 export async function searchFlights(
   page: Page,
   input: SearchFlightsInput,
+  options: SearchFlightsOptions = {},
 ): Promise<SearchFlightsResult> {
   assertSearchFlightsAutomationInput(input);
 
@@ -91,7 +96,7 @@ export async function searchFlights(
     selectedResult?.cardIndexes ?? candidates.map((candidate) => candidate.cardIndex);
   const screenshotPaths = await takeFlightResultsBatchScreenshots(
     page,
-    '1booking-search-flights',
+    options.screenshotFileNamePrefix ?? '1booking-search-flights',
     undefined,
     displayedCardIndexes,
   );

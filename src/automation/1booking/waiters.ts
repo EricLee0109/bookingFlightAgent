@@ -72,66 +72,93 @@ export async function closeOneBookingImportantNoticeDrawer(
   timeoutMs = 2000,
 ) {
   const heading = page.getByText(ONE_BOOKING_IMPORTANT_NOTICE_HEADING).first();
-  const isNoticeVisible = await heading
-    .isVisible({
+  const didAppear = await heading
+    .waitFor({
+      state: 'visible',
       timeout: timeoutMs,
     })
+    .then(() => true)
     .catch(() => false);
 
-  if (!isNoticeVisible) {
+  if (!didAppear) {
     return false;
   }
 
   const drawer = page
-    .locator('.ant-drawer:visible, [class*="drawer"]:visible')
+    .locator('.ant-drawer:visible, [role="dialog"]:visible')
     .filter({
       hasText: ONE_BOOKING_IMPORTANT_NOTICE_HEADING,
     })
-    .last();
+    .first();
+  const drawerMask = page.locator('.ant-drawer-mask:visible').first();
 
   const closeTargets = [
-    page.locator('.ant-drawer-close:visible').last(),
     drawer.locator('.ant-drawer-close').first(),
-    drawer.locator('[aria-label="Close"], [aria-label="close"]').first(),
+    drawer
+      .locator(
+        '[aria-label="Close"], [aria-label="close"], [aria-label="Đóng"]',
+      )
+      .first(),
     drawer.getByRole('button', { name: /close|đóng|dong/i }).first(),
-    drawer.locator('button').first(),
   ];
 
   for (const closeTarget of closeTargets) {
     const canClick = await closeTarget
-      .isVisible({
-        timeout: 500,
-      })
+      .isVisible()
       .catch(() => false);
 
     if (!canClick) {
       continue;
     }
 
-    await closeTarget
+    const didClick = await closeTarget
       .click({
         timeout: 2000,
       })
-      .catch(() => null);
-    await heading
-      .waitFor({
-        state: 'hidden',
-        timeout: 3000,
-      })
-      .catch(() => null);
+      .then(() => true)
+      .catch(() => false);
 
-    return true;
+    if (
+      didClick &&
+      (await waitForImportantNoticeDrawerToClose(heading, drawerMask))
+    ) {
+      return true;
+    }
   }
 
   await page.keyboard.press('Escape').catch(() => null);
-  await heading
-    .waitFor({
+
+  if (await waitForImportantNoticeDrawerToClose(heading, drawerMask)) {
+    return true;
+  }
+
+  throw new Error(
+    '1Booking important-notice drawer remained open and blocked the search form.',
+  );
+}
+
+/**
+ * Confirms the notice content and its pointer-intercepting mask are gone.
+ *
+ * Ant Design keeps the drawer root mounted and Playwright can still consider
+ * that off-screen root visible after the close animation finishes.
+ */
+async function waitForImportantNoticeDrawerToClose(
+  heading: Locator,
+  drawerMask: Locator,
+) {
+  return Promise.all([
+    heading.waitFor({
       state: 'hidden',
       timeout: 3000,
-    })
-    .catch(() => null);
-
-  return true;
+    }),
+    drawerMask.waitFor({
+      state: 'hidden',
+      timeout: 3000,
+    }),
+  ])
+    .then(() => true)
+    .catch(() => false);
 }
 
 /**

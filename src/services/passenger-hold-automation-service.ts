@@ -1,3 +1,4 @@
+import { type Page } from 'playwright';
 import { createOneBookingBrowserSession } from '../automation/1booking/browser';
 import { openMatchingFlightPassengerForm } from '../automation/1booking/flight-selection';
 import {
@@ -10,7 +11,10 @@ import {
   readOneBookingHoldContactInfoFromEnv,
 } from '../automation/1booking/hold-contact';
 import { extractHeldBookingPnr } from '../automation/1booking/pnr';
-import { takeFullPageScreenshot } from '../automation/1booking/screenshots';
+import {
+  takeCaseUiScreenshot,
+  type OneBookingUiScreenshotCheckpoint,
+} from '../automation/1booking/screenshots';
 import { type SelectMatchingFlightInput } from '../contracts/flight';
 import { PassengerStore } from '../passengers/passenger-store';
 import {
@@ -173,6 +177,7 @@ async function fillPassengerAndHoldOneBookingCaseUnlocked(
         flightCase.attachedPassengerInfo!,
       );
       await fillAndAssertHoldContactInformation(page, holdContactInfo);
+      await captureHoldUiScreenshot(page, caseId, 'passenger-form-filled');
 
       flightCase = await updateLocalFlightCase(flightCase, {
         status: 'FILL_PASSENGER_DONE',
@@ -192,6 +197,9 @@ async function fillPassengerAndHoldOneBookingCaseUnlocked(
           flightNumber: flightCase.selectedFlight!.flightNumber,
         },
         {
+          async onReviewReady() {
+            await captureHoldUiScreenshot(page, caseId, 'hold-review');
+          },
           async onSubmitted() {
             holdSubmitted = true;
             flightCase = await patchPersistedFlightCase(caseId, {
@@ -229,6 +237,7 @@ async function fillPassengerAndHoldOneBookingCaseUnlocked(
         },
       );
 
+      await captureHoldUiScreenshot(page, caseId, 'hold-success');
       flightCase = await patchPersistedFlightCase(caseId, {
         status: 'HOLD_SUCCESS',
         holdSucceededAt: new Date().toISOString(),
@@ -323,9 +332,10 @@ async function fillPassengerAndHoldOneBookingCaseUnlocked(
       let errorScreenshotPath: string | null = null;
 
       try {
-        errorScreenshotPath = await takeFullPageScreenshot(
+        errorScreenshotPath = await takeCaseUiScreenshot(
           page,
-          `${caseId}-hold-failed.png`,
+          caseId,
+          'hold-failed',
         );
       } catch {
         errorScreenshotPath = null;
@@ -415,6 +425,63 @@ async function patchPersistedFlightCase(
   }
 
   return updateLocalFlightCase(currentCase, patch);
+}
+
+type HoldUiScreenshotCheckpoint = Extract<
+  OneBookingUiScreenshotCheckpoint,
+  'passenger-form-filled' | 'hold-review' | 'hold-success'
+>;
+
+/**
+ * Persists UI evidence without allowing screenshot failures to block a booking.
+ */
+async function captureHoldUiScreenshot(
+  page: Page,
+  caseId: string,
+  checkpoint: HoldUiScreenshotCheckpoint,
+) {
+  const currentUrl = page.url();
+
+  try {
+    const screenshotPath = await takeCaseUiScreenshot(page, caseId, checkpoint);
+    const patch: Partial<LocalFlightCase> =
+      checkpoint === 'passenger-form-filled'
+        ? { passengerFormScreenshotPath: screenshotPath }
+        : checkpoint === 'hold-review'
+          ? { holdReviewScreenshotPath: screenshotPath }
+          : { holdSuccessScreenshotPath: screenshotPath };
+
+    await patchPersistedFlightCase(caseId, patch);
+    await appendLocalLog({
+      level: 'info',
+      event: 'one_booking_ui_screenshot_captured',
+      caseId,
+      message: `Captured 1Booking UI checkpoint "${checkpoint}".`,
+      meta: {
+        checkpoint,
+        screenshotPath,
+        url: currentUrl,
+      },
+    });
+
+    return screenshotPath;
+  } catch (error) {
+    await appendLocalLog({
+      level: 'warn',
+      event: 'one_booking_ui_screenshot_failed',
+      caseId,
+      message:
+        error instanceof Error
+          ? error.message
+          : `Could not capture 1Booking UI checkpoint "${checkpoint}".`,
+      meta: {
+        checkpoint,
+        url: currentUrl,
+      },
+    }).catch(() => null);
+
+    return null;
+  }
 }
 
 /**

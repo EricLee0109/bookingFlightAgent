@@ -4,6 +4,29 @@ import { DEFAULT_TIMEOUT, ONE_BOOKING_VIEWPORT, SCREENSHOT_DIR } from './constan
 
 const DEFAULT_FLIGHT_RESULTS_BATCH_SIZE = 10;
 
+export type OneBookingUiScreenshotCheckpoint =
+  | 'search-results'
+  | 'search-failed'
+  | 'selected-flight'
+  | 'selection-failed'
+  | 'passenger-form-filled'
+  | 'hold-review'
+  | 'hold-success'
+  | 'hold-failed';
+
+/**
+ * Builds one case-scoped, chronological screenshot prefix for UI drift audits.
+ */
+export function buildCaseUiScreenshotFileNamePrefix(
+  caseId: string,
+  checkpoint: OneBookingUiScreenshotCheckpoint,
+  capturedAt = new Date(),
+) {
+  const timestamp = capturedAt.toISOString().replace(/\D/g, '');
+
+  return `${caseId}-${checkpoint}-${timestamp}`;
+}
+
 /**
  * Ensures the local screenshot output directory exists.
  *
@@ -34,6 +57,20 @@ export async function takeFullPageScreenshot(page: Page, fileName: string) {
   });
 
   return path;
+}
+
+/**
+ * Captures one timestamped full-page UI checkpoint without overwriting history.
+ */
+export async function takeCaseUiScreenshot(
+  page: Page,
+  caseId: string,
+  checkpoint: OneBookingUiScreenshotCheckpoint,
+) {
+  return takeFullPageScreenshot(
+    page,
+    `${buildCaseUiScreenshotFileNamePrefix(caseId, checkpoint)}.png`,
+  );
 }
 
 /**

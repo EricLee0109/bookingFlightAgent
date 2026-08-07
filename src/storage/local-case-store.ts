@@ -66,6 +66,9 @@ export type LocalFlightCase = {
   attachedPassenger?: PassengerProfile;
   attachedPassengerInfo?: PassengerInfo;
   selectionScreenshotPath?: string;
+  passengerFormScreenshotPath?: string;
+  holdReviewScreenshotPath?: string;
+  holdSuccessScreenshotPath?: string;
   selectionErrorMessage?: string;
   passengerErrorMessage?: string;
   holdErrorScreenshotPath?: string;

@@ -418,6 +418,7 @@ export async function handleTelegramMessage(
   await bot.sendMessage(chatId, '⏳ Mình đang tìm chuyến trên 1Booking...');
 
   const result = await searchOneBookingFlights(searchInput, {
+    caseId: currentCase.caseId,
     onAuthRefresh: () =>
       Promise.resolve(void bot.sendMessage(chatId, formatOneBookingAuthRefreshStartedMessage())),
   });
@@ -629,6 +630,7 @@ async function tryHandleCheapestMoreSearchRequest(
   );
 
   const result = await searchOneBookingFlights(patch.searchInput, {
+    caseId: currentCase.caseId,
     onAuthRefresh: () =>
       Promise.resolve(
         void bot.sendMessage(chatId, formatOneBookingAuthRefreshStartedMessage()),
@@ -835,6 +837,7 @@ async function tryHandleFlightBucketFollowUpRequest(
   );
 
   const result = await searchOneBookingFlights(patch.searchInput, {
+    caseId: currentCase.caseId,
     onAuthRefresh: () =>
       Promise.resolve(
         void bot.sendMessage(chatId, formatOneBookingAuthRefreshStartedMessage()),
@@ -1380,6 +1383,7 @@ async function tryHandleMoreFlightOptionsRequest(
     );
 
     const result = await searchOneBookingFlights(patch.searchInput, {
+      caseId: currentCase.caseId,
       onAuthRefresh: () =>
         Promise.resolve(
           void bot.sendMessage(
@@ -1561,6 +1565,7 @@ async function tryHandleSpecificTimeClarificationMessage(
   await bot.sendMessage(chatId, '⏳ Mình đang tìm chuyến trên 1Booking...');
 
   const result = await searchOneBookingFlights(searchInput, {
+    caseId: currentCase.caseId,
     onAuthRefresh: () =>
       Promise.resolve(
         void bot.sendMessage(chatId, formatOneBookingAuthRefreshStartedMessage()),
