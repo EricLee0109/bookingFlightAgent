@@ -27,18 +27,27 @@ export async function startTelegramAgent() {
   });
 
   bot.on('polling_error', (error) => {
-    console.error('Telegram long polling error:', error);
+    console.error(
+      'Telegram long polling error:',
+      toSafeTelegramError(error, token),
+    );
   });
 
   bot.on('error', (error) => {
-    console.error('Telegram bot runtime error:', error);
+    console.error(
+      'Telegram bot runtime error:',
+      toSafeTelegramError(error, token),
+    );
   });
 
   bot.on('message', async (message) => {
     try {
       await handleTelegramMessage(bot, message);
     } catch (error) {
-      console.error('Telegram message handler crashed:', error);
+      console.error(
+        'Telegram message handler crashed:',
+        toSafeTelegramError(error, token),
+      );
 
       if (message.chat?.id) {
         await bot.sendMessage(
@@ -53,7 +62,10 @@ export async function startTelegramAgent() {
     try {
       await handleTelegramCallbackQuery(bot, callbackQuery);
     } catch (error) {
-      console.error('Telegram callback handler crashed:', error);
+      console.error(
+        'Telegram callback handler crashed:',
+        toSafeTelegramError(error, token),
+      );
 
       if (callbackQuery.message?.chat.id) {
         await bot.sendMessage(
@@ -65,4 +77,55 @@ export async function startTelegramAgent() {
   });
 
   console.log('Telegram Agent is running in long polling mode...');
+}
+
+/**
+ * Keeps Telegram errors useful without logging request options, headers, full
+ * stack objects or API URLs that may contain the bot token.
+ */
+export function toSafeTelegramError(error: unknown, botToken?: string) {
+  const errorRecord = toUnknownRecord(error);
+  const causeRecord = toUnknownRecord(errorRecord?.cause);
+
+  return {
+    name:
+      error instanceof Error
+        ? error.name
+        : readSafeErrorField(errorRecord, 'name') ?? 'UnknownError',
+    code: readSafeErrorField(errorRecord, 'code'),
+    message: redactTelegramToken(
+      error instanceof Error ? error.message : String(error),
+      botToken,
+    ),
+    causeCode: readSafeErrorField(causeRecord, 'code'),
+  };
+}
+
+function toUnknownRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object'
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function readSafeErrorField(
+  value: Record<string, unknown> | undefined,
+  field: string,
+) {
+  const fieldValue = value?.[field];
+  return typeof fieldValue === 'string' || typeof fieldValue === 'number'
+    ? fieldValue
+    : undefined;
+}
+
+function redactTelegramToken(value: string, botToken?: string) {
+  let redactedValue = value;
+
+  if (botToken) {
+    redactedValue = redactedValue.replaceAll(botToken, '[REDACTED]');
+  }
+
+  return redactedValue
+    .replace(/\/bot\d+:[A-Za-z0-9_-]+/g, '/bot[REDACTED]')
+    .replace(/\b\d+:[A-Za-z0-9_-]{20,}\b/g, '[REDACTED]')
+    .slice(0, 1000);
 }

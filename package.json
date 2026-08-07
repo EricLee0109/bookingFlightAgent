@@ -10,9 +10,11 @@
     "passengers:bootstrap:full": "tsx scripts/bootstrap-passengers-full.ts",
     "passengers:stats": "tsx scripts/passenger-db-stats.ts",
     "test:browser-config": "tsx tests/test-browser-config-contract.ts",
+    "test:native-dependencies": "tsx tests/test-native-dependency-policy.ts",
     "test:parser": "tsx tests/test-flight-parser-contract.ts",
     "test:passengers": "tsx tests/test-passenger-cache-contract.ts",
     "test:passenger-parser": "tsx tests/test-passenger-message-parser-contract.ts",
+    "test:telegram-errors": "tsx tests/test-telegram-error-sanitizer.ts",
     "test:e2e:1booking": "playwright test tests/1booking-search.e2e.spec.ts",
     "test:e2e:1booking:headed": "playwright test tests/1booking-search.e2e.spec.ts --headed"
   },
@@ -20,6 +22,7 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "packageManager": "pnpm@10.27.0",
   "devDependencies": {
     "@playwright/test": "^1.59.1",
     "@types/node": "^25.6.2",
