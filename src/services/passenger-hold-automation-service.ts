@@ -156,7 +156,9 @@ async function fillPassengerAndHoldOneBookingCaseUnlocked(
   });
 
   for (let attempt = 1; attempt <= MAX_ONE_BOOKING_HOLD_ATTEMPTS; attempt++) {
-    const { browser, page } = await createOneBookingBrowserSession();
+    const { browser, page } = await createOneBookingBrowserSession({
+      purpose: `passenger-hold:${caseId}:attempt-${attempt}`,
+    });
     let holdStarted = false;
     let holdSubmitted = false;
 

@@ -91,7 +91,9 @@ async function selectMatchingOneBookingFlightUnlocked(
   });
 
   for (let attempt = 1; attempt <= MAX_ONE_BOOKING_SELECTION_ATTEMPTS; attempt++) {
-    const { browser, page } = await createOneBookingBrowserSession();
+    const { browser, page } = await createOneBookingBrowserSession({
+      purpose: `flight-selection:${input.caseId}:attempt-${attempt}`,
+    });
 
     try {
       const result = await selectMatchingFlight(page, flightCase.searchInput, input);

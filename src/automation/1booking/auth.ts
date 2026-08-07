@@ -1,7 +1,10 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { chromium, type Page } from 'playwright';
-import { getPlaywrightLaunchOptions } from '../browser-config';
+import { type Page } from 'playwright';
+import {
+  attachPlaywrightPageDiagnostics,
+  launchConfiguredChromium,
+} from '../browser-config';
 import {
   ONE_BOOKING_STORAGE_STATE_PATH,
   ONE_BOOKING_URL,
@@ -81,15 +84,21 @@ export async function refreshOneBookingAuthState(
   const storageStatePath =
     options.storageStatePath ?? ONE_BOOKING_STORAGE_STATE_PATH;
   const credentials = options.credentials ?? readOneBookingCredentialsFromEnv();
-  const browser = await chromium.launch(
-    getPlaywrightLaunchOptions(options.headless),
-  );
+  const purpose = '1booking-auth-refresh';
+  const { browser, launchId } = await launchConfiguredChromium({
+    purpose,
+    headlessOverride: options.headless,
+  });
 
   try {
     const context = await browser.newContext({
       viewport: ONE_BOOKING_VIEWPORT,
     });
     const page = await context.newPage();
+    attachPlaywrightPageDiagnostics(page, {
+      launchId,
+      purpose,
+    });
 
     await page.goto(ONE_BOOKING_URL, {
       waitUntil: 'domcontentloaded',

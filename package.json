@@ -9,6 +9,7 @@
     "passengers:bootstrap:sample": "tsx scripts/bootstrap-passengers-sample.ts",
     "passengers:bootstrap:full": "tsx scripts/bootstrap-passengers-full.ts",
     "passengers:stats": "tsx scripts/passenger-db-stats.ts",
+    "test:browser-config": "tsx tests/test-browser-config-contract.ts",
     "test:parser": "tsx tests/test-flight-parser-contract.ts",
     "test:passengers": "tsx tests/test-passenger-cache-contract.ts",
     "test:passenger-parser": "tsx tests/test-passenger-message-parser-contract.ts",

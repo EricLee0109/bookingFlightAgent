@@ -73,7 +73,9 @@ async function searchOneBookingFlightsUnlocked(
   });
 
   for (let attempt = 1; attempt <= MAX_ONE_BOOKING_SEARCH_ATTEMPTS; attempt++) {
-    const { browser, page } = await createOneBookingBrowserSession();
+    const { browser, page } = await createOneBookingBrowserSession({
+      purpose: `flight-search:${options.caseId ?? 'no-case'}:attempt-${attempt}`,
+    });
 
     try {
       const result = await searchFlights(page, input, {

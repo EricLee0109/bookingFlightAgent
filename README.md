@@ -235,6 +235,7 @@ thể đổi nhanh chế độ chạy trong `.env`:
 
 ```env
 PLAYWRIGHT_HEADLESS=true
+PLAYWRIGHT_DIAGNOSTICS=false
 ```
 
 - Không khai báo biến hoặc đặt `true`: chạy headless.
@@ -244,6 +245,28 @@ PLAYWRIGHT_HEADLESS=true
 - Chỉ dùng `pnpm run save-auth:dev -- --manual` trên máy có giao diện đồ
   họa và đặt `PLAYWRIGHT_HEADLESS=false`, vì chế độ này yêu cầu đăng nhập trong
   cửa sổ Chromium rồi nhấn Enter ở terminal.
+
+### Chẩn đoán lỗi Playwright
+
+Khi Telegram agent gặp lỗi browser hoặc 1Booking không phản hồi như mong đợi,
+bật diagnostics trong `.env` rồi khởi động lại agent:
+
+```env
+PLAYWRIGHT_DIAGNOSTICS=true
+```
+
+Log sẽ có một `launchId` riêng cho từng browser, mục đích nghiệp vụ và số lần thử,
+runtime Windows/WSL/Linux, Chromium executable, thời gian launch, navigation,
+page error/crash, request thất bại và HTTP 5xx. Diagnostics không log credentials,
+cookies, headers, request body hoặc query string của URL.
+
+Nếu Chromium không launch được và cần log nội bộ sâu hơn của Playwright, đặt thêm:
+
+```env
+DEBUG=pw:browser
+```
+
+Sau khi debug xong, đổi `PLAYWRIGHT_DIAGNOSTICS=false` và bỏ `DEBUG` để log gọn lại.
 
 ---
 
