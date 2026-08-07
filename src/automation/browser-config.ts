@@ -15,14 +15,16 @@ export function getPlaywrightLaunchOptions(
 ): LaunchOptions {
   const headless =
     headlessOverride ?? process.env.PLAYWRIGHT_HEADLESS !== 'false';
+  const channel = 'chromium';
 
   console.log('[Playwright] Launch configuration:', {
     platform: process.platform,
-    executablePath: chromium.executablePath(),
     headless,
+    channel: "chromium",
   });
 
   return {
     headless,
+    channel
   };
 }
