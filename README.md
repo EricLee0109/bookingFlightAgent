@@ -196,8 +196,35 @@ npm run start:telegram
 ---
 
 Test Playwright với site demo / 1Booking (cần session login):
-npx tsx scripts/save-auth.ts
-npx tsx scripts/test-1booking-auth.ts
+pnpm run save-auth:dev
+pnpm exec tsx scripts/test-1booking-auth.ts
+
+```
+
+### Khởi tạo Linux / WSL / VMware mới
+
+Trong `.env`, giữ `PLAYWRIGHT_HEADLESS=true` và khai báo đầy đủ
+`ONE_BOOKING_AGENT_ID`, `ONE_BOOKING_USERNAME`, `ONE_BOOKING_PASSWORD`.
+
+Sau mỗi lần clone mới, chạy một lần để tạo auth-state:
+
+```bash
+pnpm run save-auth:dev
+```
+
+Lệnh này đăng nhập tự động bằng credentials trong `.env`, không yêu cầu nhập tay,
+tự tạo thư mục `auth/` nếu chưa có và lưu đúng file
+`auth/1booking-storage-state.json`. Thư mục `auth/` nằm trong `.gitignore`, vì vậy
+mỗi Linux/VMware clone phải tự tạo lại auth-state.
+
+Sau đó khởi động Telegram agent:
+
+```bash
+pnpm run telegram:dev
+```
+
+Không đặt file ở root với tên `1booking-session-storage.json`, vì agent chỉ đọc
+đúng đường dẫn `auth/1booking-storage-state.json`.
 
 ---
 
@@ -212,8 +239,11 @@ PLAYWRIGHT_HEADLESS=true
 
 - Không khai báo biến hoặc đặt `true`: chạy headless.
 - Đặt `false`: mở cửa sổ browser để debug ở máy local.
-- Trước khi chạy `scripts/save-auth.ts --manual`, cần đặt `false` vì đăng nhập
-  thủ công yêu cầu browser có cửa sổ.
+- Với `PLAYWRIGHT_HEADLESS=true`, chạy `pnpm run save-auth:dev` để
+  đăng nhập tự động từ `.env`; không cần thao tác trong Chromium.
+- Chỉ dùng `pnpm run save-auth:dev -- --manual` trên máy có giao diện đồ
+  họa và đặt `PLAYWRIGHT_HEADLESS=false`, vì chế độ này yêu cầu đăng nhập trong
+  cửa sổ Chromium rồi nhấn Enter ở terminal.
 
 ---
 
@@ -231,4 +261,4 @@ Ghi chú quan trọng
 MVP chỉ dùng Telegram làm kênh nội bộ.
 Zalo cá nhân vẫn giữ cho khách cũ, Agent không auto gửi cho khách trong MVP.
 1Booking không có public API, Playwright là cách duy nhất để automation trong MVP.
-Session/state Playwright lưu auth-state sau login thủ công để tránh login lại nhiều lần. (npx tsx scripts/save-auth.ts)
+Session/state Playwright lưu auth-state sau login để tránh đăng nhập lại nhiều lần. Chạy `pnpm run save-auth:dev` để tạo hoặc làm mới auth-state.

@@ -1,4 +1,6 @@
 import 'dotenv/config';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { chromium } from 'playwright';
 import { getPlaywrightLaunchOptions } from '../src/automation/browser-config';
 import { refreshOneBookingAuthState } from '../src/automation/1booking/auth';
@@ -42,6 +44,9 @@ async function main() {
     process.stdin.once('data', () => resolve());
   });
 
+  await fs.mkdir(path.dirname(ONE_BOOKING_STORAGE_STATE_PATH), {
+    recursive: true,
+  });
   await context.storageState({
     path: ONE_BOOKING_STORAGE_STATE_PATH,
   });
