@@ -1,11 +1,15 @@
 import { createOneBookingBrowserSession } from '../automation/1booking/browser';
 import {
+  FlightSelectionMatchError,
   selectMatchingFlight,
   type SelectMatchingFlightResult,
 } from '../automation/1booking/flight-selection';
 import { takeCaseUiScreenshot } from '../automation/1booking/screenshots';
 import { isRetryableOneBookingSearchError } from '../automation/1booking/waiters';
-import { type SelectMatchingFlightInput } from '../contracts/flight';
+import {
+  type FlightSelectionFailureReason,
+  type SelectMatchingFlightInput,
+} from '../contracts/flight';
 import { readLocalFlightCase } from '../storage/local-case-store';
 import { runWithAutomationLock } from '../utils/automation-lock';
 import { OneBookingAuthRefreshRetryController } from './onebooking-auth-refresh-retry';
@@ -20,6 +24,7 @@ export type FlightSelectionAutomationResult =
   | {
       ok: false;
       caseId: string;
+      reason: FlightSelectionFailureReason;
       message: string;
       errorScreenshotPath: string | null;
       authRefreshed?: boolean;
@@ -50,6 +55,7 @@ export async function selectMatchingOneBookingFlight(
     return {
       ok: false,
       caseId: input.caseId,
+      reason: 'automation_failed',
       message: error instanceof Error ? error.message : 'Unknown automation lock error.',
       errorScreenshotPath: null,
     };
@@ -69,6 +75,7 @@ async function selectMatchingOneBookingFlightUnlocked(
     return {
       ok: false,
       caseId: input.caseId,
+      reason: 'case_not_found',
       message: `Cannot select flight. Case ${input.caseId} was not found.`,
       errorScreenshotPath: null,
     };
@@ -78,12 +85,14 @@ async function selectMatchingOneBookingFlightUnlocked(
     return {
       ok: false,
       caseId: input.caseId,
+      reason: 'missing_search_input',
       message: `Cannot select flight. Case ${input.caseId} has no saved search input. Please search flights first.`,
       errorScreenshotPath: null,
     };
   }
 
   let lastError: unknown = null;
+  let lastFailureReason: FlightSelectionFailureReason = 'automation_failed';
   let lastErrorScreenshotPath: string | null = null;
   const authRetry = new OneBookingAuthRefreshRetryController({
     caseId: input.caseId,
@@ -106,18 +115,24 @@ async function selectMatchingOneBookingFlightUnlocked(
       };
     } catch (error) {
       lastError = error;
+      lastFailureReason = classifyFlightSelectionFailure(error);
 
-      try {
-        lastErrorScreenshotPath = await takeCaseUiScreenshot(
-          page,
-          input.caseId,
-          'selection-failed',
-        );
-      } catch {
+      if (shouldCaptureFlightSelectionFailureScreenshot(lastFailureReason)) {
+        try {
+          lastErrorScreenshotPath = await takeCaseUiScreenshot(
+            page,
+            input.caseId,
+            'selection-failed',
+          );
+        } catch {
+          lastErrorScreenshotPath = null;
+        }
+      } else {
         lastErrorScreenshotPath = null;
       }
 
       const shouldRetry =
+        lastFailureReason === 'automation_failed' &&
         (isRetryableOneBookingSearchError(error) ||
           (await authRetry.refreshIfAuthExpired(error, {
             irreversible: false,
@@ -135,6 +150,7 @@ async function selectMatchingOneBookingFlightUnlocked(
   return {
     ok: false,
     caseId: input.caseId,
+    reason: lastFailureReason,
     message:
       lastError instanceof Error
         ? lastError.message
@@ -142,4 +158,27 @@ async function selectMatchingOneBookingFlightUnlocked(
     errorScreenshotPath: lastErrorScreenshotPath,
     authRefreshed: authRetry.authRefreshed || undefined,
   };
+}
+
+/**
+ * Converts thrown automation errors into stable operator-facing categories.
+ */
+export function classifyFlightSelectionFailure(
+  error: unknown,
+): FlightSelectionFailureReason {
+  if (error instanceof FlightSelectionMatchError) {
+    return error.reason;
+  }
+
+  return 'automation_failed';
+}
+
+/**
+ * Match misses are valid live-result outcomes, so a later UI screenshot is
+ * misleading. Screenshots remain enabled for unexpected browser failures.
+ */
+export function shouldCaptureFlightSelectionFailureScreenshot(
+  reason: FlightSelectionFailureReason,
+) {
+  return reason === 'automation_failed';
 }

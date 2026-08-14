@@ -21,6 +21,7 @@ import { readOneBookingHoldContactInfoFromEnv } from '../src/automation/1booking
 import { OneBookingAuthExpiredError } from '../src/automation/1booking/waiters';
 import {
   buildExactFlightNumberPattern,
+  extractHeldBookingPnr,
   extractPnrCodesFromBookingFieldText,
   extractPnrCodesFromHeldOrderText,
   isValidPnrCode,
@@ -76,7 +77,12 @@ import {
   messageLooksLikePassengerInfo,
 } from '../src/telegram/telegram-passenger-message-handler';
 import { hasReadyPassengerForCombinedHold } from '../src/telegram/telegram-message-handler';
-import { type LocalFlightCase } from '../src/storage/local-case-store';
+import {
+  readLocalFlightCase,
+  saveLocalFlightCase,
+  type LocalFlightCase,
+  updateLocalFlightCase,
+} from '../src/storage/local-case-store';
 
 const TEST_DIR = path.resolve(
   process.cwd(),
@@ -987,9 +993,88 @@ function testHeldBookingPnrExtraction() {
     ['4BW6ED'],
   );
   assert.deepEqual(
+    extractPnrCodesFromBookingFieldText('Booking #E5N497'),
+    ['E5N497'],
+  );
+  assert.deepEqual(
+    extractPnrCodesFromBookingFieldText('PNR Code: VNT56E'),
+    ['VNT56E'],
+  );
+  assert.deepEqual(
+    extractPnrCodesFromBookingFieldText(
+      ['Booking', 'E5N497', 'VJ636', 'J1_ECO', 'SGNDAD'].join('\n'),
+    ),
+    ['E5N497'],
+  );
+  assert.deepEqual(
     extractPnrCodesFromBookingFieldText('1 BOOKING\n1,772,381'),
     [],
   );
+}
+
+/**
+ * Reproduces the current order heading without creating a live booking.
+ */
+async function testHeldBookingPnrHeadingExtraction() {
+  const fakePage = {
+    getByText(pattern: RegExp) {
+      assert.equal(pattern.test('Booking #E5N497'), true);
+
+      return {
+        async allInnerTexts() {
+          return ['Booking #E5N497'];
+        },
+      };
+    },
+  };
+
+  assert.equal(
+    await extractHeldBookingPnr(fakePage as never, 'VJ636'),
+    'E5N497',
+  );
+}
+
+/**
+ * Verifies concurrent hold callbacks merge case patches without corrupting JSON.
+ */
+async function testConcurrentLocalCaseUpdates() {
+  const caseId = 'BK-20990101-000001';
+  const casePath = path.resolve(process.cwd(), 'data/cases', `${caseId}.json`);
+  const flightCase: LocalFlightCase = {
+    caseId,
+    status: 'HOLD_RUNNING',
+    rawMessage: 'contract test',
+    createdAt: '2099-01-01T00:00:00.000Z',
+    updatedAt: '2099-01-01T00:00:00.000Z',
+  };
+
+  fs.rmSync(casePath, { force: true });
+
+  try {
+    await saveLocalFlightCase(flightCase);
+    await Promise.all([
+      updateLocalFlightCase(flightCase, {
+        holdSubmittedAt: '2099-01-01T00:00:01.000Z',
+      }),
+      updateLocalFlightCase(flightCase, {
+        holdLoadingObservedAt: '2099-01-01T00:00:02.000Z',
+      }),
+    ]);
+
+    const persistedCase = await readLocalFlightCase(caseId);
+
+    assert.equal(
+      persistedCase?.holdSubmittedAt,
+      '2099-01-01T00:00:01.000Z',
+    );
+    assert.equal(
+      persistedCase?.holdLoadingObservedAt,
+      '2099-01-01T00:00:02.000Z',
+    );
+    assert.doesNotThrow(() => JSON.parse(fs.readFileSync(casePath, 'utf8')));
+  } finally {
+    fs.rmSync(casePath, { force: true });
+  }
 }
 
 /**
@@ -1480,6 +1565,8 @@ async function main() {
   testOneBookingHoldContactInfoValidation();
   testSafeFinalHoldCtaGuard();
   testHeldBookingPnrExtraction();
+  await testHeldBookingPnrHeadingExtraction();
+  await testConcurrentLocalCaseUpdates();
   testCaseUiScreenshotFileNames();
   testSubmittedHoldFailureSafety();
   await testOneBookingAuthRefreshRetryPolicy();

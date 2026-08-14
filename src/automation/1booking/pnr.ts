@@ -15,6 +15,17 @@ export async function extractHeldBookingPnr(
   page: Page,
   expectedFlightNumber: string,
 ) {
+  const bookingHeadingTexts = await page
+    .getByText(/^Booking\s*#?\s*[A-Z0-9]{6}$/i)
+    .allInnerTexts();
+  const headingPnrCodes = Array.from(
+    new Set(bookingHeadingTexts.flatMap(extractPnrCodesFromBookingFieldText)),
+  );
+
+  if (headingPnrCodes.length === 1) {
+    return headingPnrCodes[0];
+  }
+
   const heldFlightCards = getHeldOrderFlightCards(page, expectedFlightNumber);
   const candidateCards = await Promise.all(
     Array.from({ length: await heldFlightCards.count() }, async (_, index) => {
@@ -30,13 +41,7 @@ export async function extractHeldBookingPnr(
   for (const candidate of candidateCards.sort(
     (left, right) => left.text.length - right.text.length,
   )) {
-    const bookingFieldTexts = await candidate.card
-      .getByText(/^Booking$/i)
-      .locator('..')
-      .allInnerTexts();
-    const labeledPnrCodes = Array.from(
-      new Set(bookingFieldTexts.flatMap(extractPnrCodesFromBookingFieldText)),
-    );
+    const labeledPnrCodes = extractPnrCodesFromBookingFieldText(candidate.text);
 
     if (labeledPnrCodes.length === 1) {
       return labeledPnrCodes[0];
@@ -116,7 +121,11 @@ export function extractPnrCodesFromBookingFieldText(bookingFieldText: string) {
   return Array.from(
     new Set(
       Array.from(
-        bookingFieldText.toUpperCase().matchAll(/\bBOOKING\s+([A-Z0-9]{6})\b/g),
+        bookingFieldText
+          .toUpperCase()
+          .matchAll(
+            /\b(?:BOOKING|PNR(?:\s+CODE)?)\s*(?:#|:|-)?\s*([A-Z0-9]{6})\b/g,
+          ),
       )
         .map((match) => match[1])
         .filter(isValidPnrCode),

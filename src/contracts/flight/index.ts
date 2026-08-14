@@ -23,6 +23,7 @@ export {
   SelectMatchingFlightInputSchema,
   type BookingClass,
   type FlightSelectionCandidate,
+  type FlightSelectionFailureReason,
   type SelectedFlight,
   type SelectMatchingFlightInput,
 } from './flight-selection';

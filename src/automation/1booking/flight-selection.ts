@@ -1,6 +1,7 @@
 import { type Locator, type Page } from 'playwright';
 import {
   type FlightSelectionCandidate,
+  type FlightSelectionFailureReason,
   type SelectMatchingFlightInput,
 } from '../../contracts/flight';
 import {
@@ -22,6 +23,29 @@ export type FlightSelectionMatchResult =
       candidates: FlightSelectionCandidate[];
       message: string;
     };
+
+type FlightSelectionMatchFailure = Extract<
+  FlightSelectionMatchResult,
+  { ok: false }
+>;
+
+/**
+ * Preserves a deterministic flight-match failure across service boundaries.
+ */
+export class FlightSelectionMatchError extends Error {
+  readonly reason: Extract<
+    FlightSelectionFailureReason,
+    'no_match' | 'multiple_matches'
+  >;
+  readonly candidates: FlightSelectionCandidate[];
+
+  constructor(result: FlightSelectionMatchFailure) {
+    super(result.message);
+    this.name = 'FlightSelectionMatchError';
+    this.reason = result.reason;
+    this.candidates = result.candidates;
+  }
+}
 
 export type SelectMatchingFlightResult = {
   selectedFlight: FlightSelectionCandidate;
@@ -74,7 +98,7 @@ export async function openMatchingFlightPassengerForm(
   const matchResult = matchFlightSelectionCandidate(candidates, selectionInput);
 
   if (!matchResult.ok) {
-    throw new Error(matchResult.message);
+    throw new FlightSelectionMatchError(matchResult);
   }
 
   const flightCards = getFlightCards(page);

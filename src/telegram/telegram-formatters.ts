@@ -3,6 +3,7 @@ import { type FlightResultFilterSummary } from '../automation/1booking/flight-re
 import {
   BOOKING_CLASS_LABELS,
   type FlightSelectionCandidate,
+  type FlightSelectionFailureReason,
   type ParsedFlightRequest,
   type SelectMatchingFlightInput,
 } from '../contracts/flight';
@@ -464,17 +465,45 @@ export function formatFlightSelectionSuccessMessage(
 export function formatFlightSelectionFailedMessage(
   message: string,
   input?: SelectMatchingFlightInput,
+  options: {
+    reason?: FlightSelectionFailureReason;
+    hasErrorScreenshot?: boolean;
+  } = {},
 ) {
+  const reason = options.reason ?? inferFlightSelectionFailureReason(message);
+
+  if (reason === 'no_match') {
+    return [
+      '⚠️ Chuyến bay không được tìm thấy, vui lòng kiểm tra lại giờ bay.',
+      'Flight is not found. Please check the departure time and try again.',
+      '',
+      ...(input
+        ? [
+            'Thông tin đã nhận:',
+            `Hãng: ${formatSelectionAirline(input)}`,
+            `Giờ bay: ${input.departureTime}`,
+            `Hạng: ${formatSelectionBookingClassShort(input.bookingClass)}`,
+            '',
+          ]
+        : []),
+      'Bạn kiểm tra giờ bay trong ảnh kết quả tìm chuyến trước đó rồi gửi lại theo mẫu:',
+      buildFlightSelectionRetryExample(input),
+    ].join('\n');
+  }
+
   return [
     '⚠️ Mình chưa chọn được chuyến này.',
     '',
-    formatFlightSelectionFailureReason(message, input),
+    formatFlightSelectionFailureReason(message, input, reason),
     '',
-    'Bạn đối chiếu screenshot rồi gửi lại theo mẫu này giúp mình nhé:',
+    'Bạn kiểm tra lại thông tin rồi gửi theo mẫu này giúp mình nhé:',
     buildFlightSelectionRetryExample(input),
-    '',
-    'Mình gửi screenshot bên dưới để bạn dễ kiểm tra.',
-  ].join('\n');
+    options.hasErrorScreenshot
+      ? ['', 'Mình gửi screenshot lỗi bên dưới để bạn dễ kiểm tra.']
+      : null,
+  ]
+    .flatMap((line) => line ?? [])
+    .join('\n');
 }
 
 /**
@@ -1072,20 +1101,30 @@ function formatSearchFailureReason(message?: string) {
 function formatFlightSelectionFailureReason(
   message: string,
   input?: SelectMatchingFlightInput,
+  reason?: FlightSelectionFailureReason,
 ) {
   if (/SakuraBot đang xử lý|SakuraBot dang xu ly|AutomationLockBusyError/i.test(message)) {
     return message;
   }
 
-  if (/case .*not found|không tìm thấy case/i.test(message)) {
+  if (
+    reason === 'case_not_found' ||
+    /case .*not found|không tìm thấy case/i.test(message)
+  ) {
     return 'Mình chưa tìm thấy mã case này trong dữ liệu local.';
   }
 
-  if (/no saved search input|chưa có searchInput/i.test(message)) {
+  if (
+    reason === 'missing_search_input' ||
+    /no saved search input|chưa có searchInput/i.test(message)
+  ) {
     return 'Case này chưa có kết quả tìm chuyến đã lưu. Bạn search chuyến trước giúp mình nhé.';
   }
 
-  if (/multiple matching|Found \d+ matching/i.test(message)) {
+  if (
+    reason === 'multiple_matches' ||
+    /multiple matching|Found \d+ matching/i.test(message)
+  ) {
     return [
       'Có nhiều chuyến cùng khớp thông tin đã gửi.',
       '',
@@ -1093,7 +1132,10 @@ function formatFlightSelectionFailureReason(
     ].join('\n');
   }
 
-  if (input && /No available flight matched/i.test(message)) {
+  if (
+    input &&
+    (reason === 'no_match' || /No available flight matched/i.test(message))
+  ) {
     return [
       'Mình chưa thấy chuyến khớp:',
       `Hãng: ${formatSelectionAirline(input)}`,
@@ -1103,6 +1145,28 @@ function formatFlightSelectionFailureReason(
   }
 
   return 'Danh sách chuyến live trên 1Booking chưa khớp với thông tin vừa gửi.';
+}
+
+function inferFlightSelectionFailureReason(
+  message: string,
+): FlightSelectionFailureReason | undefined {
+  if (/No available flight matched/i.test(message)) {
+    return 'no_match';
+  }
+
+  if (/multiple matching|Found \d+ matching/i.test(message)) {
+    return 'multiple_matches';
+  }
+
+  if (/case .*not found|không tìm thấy case/i.test(message)) {
+    return 'case_not_found';
+  }
+
+  if (/no saved search input|chưa có searchInput/i.test(message)) {
+    return 'missing_search_input';
+  }
+
+  return undefined;
 }
 
 function formatPassengerHoldFailureReason(message: string) {

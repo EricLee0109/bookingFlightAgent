@@ -1697,6 +1697,7 @@ async function handleTelegramFlightSelection(
       formatFlightSelectionFailedMessage(
         `Không tìm thấy case ${selectionInput.caseId}. Vui lòng kiểm tra lại caseId.`,
         selectionInput,
+        { reason: 'case_not_found' },
       ),
     );
     return;
@@ -1708,6 +1709,7 @@ async function handleTelegramFlightSelection(
       formatFlightSelectionFailedMessage(
         `Case ${selectionInput.caseId} chưa có searchInput. Vui lòng search chuyến trước rồi mới chọn.`,
         selectionInput,
+        { reason: 'missing_search_input' },
       ),
     );
     return;
@@ -1766,13 +1768,17 @@ async function handleTelegramFlightSelection(
       caseId: selectionInput.caseId,
       message: result.message,
       meta: {
+        reason: result.reason,
         errorScreenshotPath: result.errorScreenshotPath,
       },
     });
 
     await bot.sendMessage(
       chatId,
-      formatFlightSelectionFailedMessage(result.message, selectionInput),
+      formatFlightSelectionFailedMessage(result.message, selectionInput, {
+        reason: result.reason,
+        hasErrorScreenshot: Boolean(result.errorScreenshotPath),
+      }),
     );
 
     if (passengerOutcome?.status === 'ready') {

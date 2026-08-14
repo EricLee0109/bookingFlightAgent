@@ -25,7 +25,10 @@ import {
   OneBookingAuthRefreshError,
   readOneBookingCredentialsFromEnv,
 } from '../src/automation/1booking/auth';
-import { matchFlightSelectionCandidate } from '../src/automation/1booking/flight-selection';
+import {
+  FlightSelectionMatchError,
+  matchFlightSelectionCandidate,
+} from '../src/automation/1booking/flight-selection';
 import {
   extractLowestVndPriceAmount,
   getFlightTimeBucketForPreferredTime,
@@ -56,6 +59,10 @@ import {
   parseCheapestMoreSearchRequest,
   parseNormalFlightFollowUpRequest,
 } from '../src/telegram/telegram-message-handler';
+import {
+  classifyFlightSelectionFailure,
+  shouldCaptureFlightSelectionFailureScreenshot,
+} from '../src/services/flight-selection-automation-service';
 import {
   formatFlightSelectionFailedMessage,
   formatFlightSelectionParseFailedMessage,
@@ -821,6 +828,24 @@ function testOperatorFriendlyFlightFailureMessages() {
       departureTime: '05:00',
       bookingClass: 'ECO',
     },
+    {
+      reason: 'no_match',
+      hasErrorScreenshot: false,
+    },
+  );
+  const selectionAutomationFailureMessage = formatFlightSelectionFailedMessage(
+    'page.waitForFunction: Timeout 10000ms exceeded.',
+    {
+      caseId: 'BK-20260605-095859',
+      airlineCode: 'VJ',
+      airlineName: 'Vietjet Air',
+      departureTime: '05:00',
+      bookingClass: null,
+    },
+    {
+      reason: 'automation_failed',
+      hasErrorScreenshot: true,
+    },
   );
   const searchFailedMessage = formatSearchFailedMessage(
     'page.waitForFunction: Timeout 10000ms exceeded.',
@@ -830,6 +855,7 @@ function testOperatorFriendlyFlightFailureMessages() {
     missingSearchMessage,
     selectionParseMessage,
     selectionNoMatchMessage,
+    selectionAutomationFailureMessage,
     searchFailedMessage,
     mappingFailedMessage,
   ].join('\n');
@@ -841,7 +867,20 @@ function testOperatorFriendlyFlightFailureMessages() {
   assert.match(selectionNoMatchMessage, /Hãng: Vietjet Air \(VJ\)/);
   assert.match(selectionNoMatchMessage, /Giờ bay: 05:00/);
   assert.match(selectionNoMatchMessage, /Hạng: Eco \(ECO\)/);
-  assert.match(selectionNoMatchMessage, /chọn chuyến Vietjet Air 05:00 hạng Deluxe/);
+  assert.match(
+    selectionNoMatchMessage,
+    /Chuyến bay không được tìm thấy, vui lòng kiểm tra lại giờ bay\./,
+  );
+  assert.match(
+    selectionNoMatchMessage,
+    /Flight is not found\. Please check the departure time and try again\./,
+  );
+  assert.match(
+    selectionNoMatchMessage,
+    /chọn chuyến Vietjet Air 05:00 hạng Deluxe/,
+  );
+  assert.doesNotMatch(selectionNoMatchMessage, /screenshot/i);
+  assert.match(selectionAutomationFailureMessage, /screenshot lỗi/i);
   assert.doesNotMatch(
     combinedText,
     /No available flight matched|Missing fields:|fromAirportCode|toAirportCode|departureDate\b|departureTime|page\.waitForFunction|OPENAI_API_KEY/i,
@@ -1233,6 +1272,21 @@ function testFlightSelectionMatcher() {
   });
 
   assert.equal(noMatch.ok, false);
+
+  if (noMatch.ok) {
+    throw new Error('Expected a no-match result.');
+  }
+
+  assert.equal(noMatch.reason, 'no_match');
+
+  const noMatchError = new FlightSelectionMatchError(noMatch);
+
+  assert.equal(classifyFlightSelectionFailure(noMatchError), 'no_match');
+  assert.equal(shouldCaptureFlightSelectionFailureScreenshot('no_match'), false);
+  assert.equal(
+    shouldCaptureFlightSelectionFailureScreenshot('automation_failed'),
+    true,
+  );
 
   const timeOnlyMatch = matchFlightSelectionCandidate([...candidates], {
     caseId: 'BK-20260520-155949',

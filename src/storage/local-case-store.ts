@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { type FlightResultFilterSummary } from '../automation/1booking/flight-result-ranking';
@@ -88,6 +89,7 @@ export type LocalFlightCase = {
 };
 
 const CASE_DIR = path.resolve(process.cwd(), 'data/cases');
+const caseUpdateQueues = new Map<string, Promise<unknown>>();
 
 /**
  * Generates a readable local case id for internal MVP case memory.
@@ -141,10 +143,18 @@ export async function saveLocalFlightCase(flightCase: LocalFlightCase) {
     recursive: true,
   });
 
-  await fs.writeFile(
-    getCasePath(flightCase.caseId),
-    `${JSON.stringify(flightCase, null, 2)}\n`,
-  );
+  const casePath = getCasePath(flightCase.caseId);
+  const temporaryPath = `${casePath}.${process.pid}.${randomUUID()}.tmp`;
+
+  try {
+    await fs.writeFile(
+      temporaryPath,
+      `${JSON.stringify(flightCase, null, 2)}\n`,
+    );
+    await fs.rename(temporaryPath, casePath);
+  } finally {
+    await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
+  }
 }
 
 /**
@@ -186,15 +196,32 @@ export async function updateLocalFlightCase(
   flightCase: LocalFlightCase,
   patch: Partial<LocalFlightCase>,
 ) {
-  const nextCase: LocalFlightCase = {
-    ...flightCase,
-    ...patch,
-    updatedAt: new Date().toISOString(),
-  };
+  const caseId = flightCase.caseId;
+  const previousUpdate = caseUpdateQueues.get(caseId) ?? Promise.resolve();
+  const currentUpdate = previousUpdate
+    .catch(() => undefined)
+    .then(async () => {
+      const persistedCase = await readLocalFlightCase(caseId);
+      const nextCase: LocalFlightCase = {
+        ...(persistedCase ?? flightCase),
+        ...patch,
+        updatedAt: new Date().toISOString(),
+      };
 
-  await saveLocalFlightCase(nextCase);
+      await saveLocalFlightCase(nextCase);
 
-  return nextCase;
+      return nextCase;
+    });
+
+  caseUpdateQueues.set(caseId, currentUpdate);
+
+  try {
+    return await currentUpdate;
+  } finally {
+    if (caseUpdateQueues.get(caseId) === currentUpdate) {
+      caseUpdateQueues.delete(caseId);
+    }
+  }
 }
 
 function getCasePath(caseId: string) {

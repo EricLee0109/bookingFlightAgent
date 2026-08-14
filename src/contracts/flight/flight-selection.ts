@@ -5,6 +5,13 @@ export const BookingClassSchema = z.enum(['ECO', 'DLX', 'SGB', 'SBB']);
 
 export type BookingClass = z.infer<typeof BookingClassSchema>;
 
+export type FlightSelectionFailureReason =
+  | 'no_match'
+  | 'multiple_matches'
+  | 'case_not_found'
+  | 'missing_search_input'
+  | 'automation_failed';
+
 export const BOOKING_CLASS_LABELS: Record<BookingClass, string> = {
   ECO: 'Eco',
   DLX: 'Deluxe',
