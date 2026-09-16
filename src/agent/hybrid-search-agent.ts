@@ -1,3 +1,4 @@
+import { invalidateCustomerSelectionAfterSearch } from '../services/hybrid-customer-selection';
 import {
   Agent,
   Runner,
@@ -189,6 +190,7 @@ export type HybridSearchTurnResult = {
   toolName?: string;
   duplicate?: boolean;
   pagination?: { token: string; page: number; pageCount: number; total: number };
+  flightChoices?: Array<{ text: string; callbackData: string }>;
   usage?: HybridSearchLogEntry['usage'];
 };
 
@@ -374,7 +376,14 @@ export async function runHybridSearchTurn(
   options: HybridSearchAgentOptions = {},
 ): Promise<HybridSearchTurnResult> {
   const store = options.sessionStore ?? new HybridSearchSessionStore();
-  const run = () => runHybridSearchTurnLocked(chatId, text, options, store);
+  const run = async () => {
+    const result = await runHybridSearchTurnLocked(chatId, text, options, store);
+    if (!result.duplicate) {
+      const session = await store.read(chatId);
+      if (session) await invalidateCustomerSelectionAfterSearch(session, options.now ?? new Date());
+    }
+    return result;
+  };
   return store.runExclusive ? store.runExclusive(chatId, run) : run();
 }
 
@@ -429,6 +438,7 @@ export async function runHybridSearchPage(
         screenshotBatches: screenshotsForSelected(snapshot, filter.selectedCandidates),
         pagination: { token, page, pageCount: Math.ceil(view.candidateIds.length / view.pageSize), total: view.candidateIds.length },
         toolName: 'view_results_page',
+        flightChoices: session.caseId ? filter.selectedCandidates.map(candidate => ({ text: `Chọn ${candidate.flightNumber} · ${candidate.departureTime}`, callbackData: `hc:select:${token}:${view.candidateIds.indexOf(candidate.candidateId)}` })) : undefined,
       });
       if (messageId) {
         session.processedMessageIds.push(messageId);
@@ -619,7 +629,8 @@ async function runHybridSearchTurnLocked(
       }
       result = createTurnResult(outcome.status, outcome.response, {
         pagination,
-        caseId: outcome.caseId,
+        flightChoices: pagination && filter && context.session.caseId ? filter.selectedCandidates.map(candidate => ({ text: `Chọn ${candidate.flightNumber} · ${candidate.departureTime}`, callbackData: `hc:select:${pagination.token}:${filter.rankedCandidateIds.indexOf(candidate.candidateId)}` })) : undefined,
+        caseId: outcome.caseId ?? context.session.caseId,
         snapshotId: outcome.snapshotId,
         snapshot: outcome.snapshot,
         screenshotPaths: outcome.screenshotPaths,
@@ -753,7 +764,7 @@ function renderClarificationResponse(
     return 'Bạn có thể gửi theo mẫu: “Từ [điểm đi] đến [điểm đến] ngày DD/MM/YYYY; thêm khung giờ hoặc tiêu chí nếu muốn.”';
   }
   if (purpose === 'unsupported') {
-    return 'Pilot này chỉ hỗ trợ tìm và so sánh chuyến bay một chiều; mình chưa thực hiện chọn chuyến, nhập hành khách, giữ chỗ hoặc lấy PNR nhé.';
+    return 'Bạn dùng nút Chọn chuyến dưới kết quả trong chat riêng để nhập và xác nhận thông tin hành khách nhé. Mình chưa thực hiện giữ chỗ, thanh toán hoặc lấy PNR.';
   }
 
   const route = resolveCanonicalRoute(draft);
@@ -1631,7 +1642,7 @@ export function buildHybridInstructions(
   return [
     'Bạn là agent tìm chuyến bay bằng tiếng Việt cho operator nội bộ.',
     'Mỗi lượt chỉ gọi đúng một tool trong bốn tool được cấp: ask_operator_for_clarification, inspect_case, search_flights, compare_flights.',
-    'Không gọi, đề xuất hoặc mô phỏng chọn chuyến, lấy thông tin hành khách, giữ chỗ, PNR, thanh toán hay công cụ legacy.',
+    'Agent tìm chuyến không tự chọn chuyến hoặc xử lý hành khách. Luồng giao diện riêng có nút chọn chuyến và xác nhận khách trong chat riêng. Không gọi hay mô phỏng giữ chỗ, PNR, thanh toán hoặc công cụ legacy.',
     'Không bịa mã sân bay, mã hãng, ngày, giá, số hiệu, giờ bay, caseId hoặc snapshotId. Mọi dữ liệu chuyến phải lấy từ tool output.',
     `Danh mục sân bay chính thức là nguồn duy nhất để hiểu điểm đi/điểm đến và mã IATA. Chỉ dùng mã, tên hiển thị và alias trong danh mục này, rồi gửi mã cùng tên canonical vào tool: ${JSON.stringify(airportCatalog)}`,
     'Khi gọi ask_operator_for_clarification, bắt buộc gửi purpose là greeting, help, clarify hoặc unsupported và target là route, date, time, threshold, ranking hoặc none. Chỉ gửi purpose, target và draftRequest khi có dữ kiện; question là trường cũ tùy chọn, ứng dụng bỏ qua nó và tự dựng câu customer, nên không đưa tên/mã sân bay, ngày, giá, chuyến hoặc PNR vào question. Không trả lời bằng văn bản tự do ngoài tool.',

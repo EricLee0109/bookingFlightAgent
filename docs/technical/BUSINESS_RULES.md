@@ -25,7 +25,8 @@ before hold recovery, hold selection, passenger parsing, and their callbacks,
 and it runs only for an authorized allowlisted chat when the saved settings
 enable the agent and automatic flight search. Its SDK tool catalog contains
 clarification, case inspection, validated search, and deterministic snapshot
-filter/compare operations. It cannot select a flight, resolve passengers, or
+filter/compare operations. Flight selection and personal passenger confirmation
+are handled by the separate customer flow below; this search agent cannot
 execute a booking action.
 
 The legacy parser schema remains unchanged. Pilot requests use a separate
@@ -166,3 +167,24 @@ Legacy / not in current scope:
 - Navigation uses saved observations and preserves capturedAt. It does not refresh prices, create a booking case, choose a flight, modify passengers or hold a booking. Existing legacy callback guards remain active.
 - Previously sent Telegram messages do not gain buttons retroactively. Ask to view results again to receive new controls; no data reset is needed. Existing missing/exact-screenshot fallback still applies.
 - Offline verification covers 57 results across 12 pages, matching evidence, ranking, restart, replay, stale/foreign/invalid callbacks and unchanged legacy boundaries. Live Telegram/1Booking verification is separate and has not been performed for this change.
+
+## Customer-owned hybrid passenger flow (2026-09-16)
+
+- The hybrid customer flow supports one passenger in a private Telegram chat. The existing allowlist remains the rollout gate; account administration and public enrollment are not implemented. Group chats may search, but passenger entry directs users to a private chat without copying group data or profiles.
+- Select a flight only through controls bound to the current result-view token and verified case/snapshot/candidate IDs. Recheck route/date, request fingerprint, pending fields, time eligibility and exact candidate values before selection and confirmation. UI tokens are not new business identifiers.
+- Personal profiles live in a separate customer_passenger_profiles table in the existing SQLite file. Never import, link or merge legacy shared profiles based on names/DOB. All lookup/list/update SQL includes the authenticated Telegram owner ID. Names alone are never a uniqueness key.
+- Full name, explicit gender and full-year DOB are mandatory. Show surname and remaining names separately for customer correction. The SDK proposes fields supported by the current message; code validates evidence, calendar dates and unresolved edits. Do not infer gender from a person's name. Do not put a full profile directory, raw provider output or passenger messages into operational logs.
+- The case owns the durable draft, missing/unresolved fields, selected IDs, UI revision and confirmed copy; the search session retains only its case pointer. Restart does not erase passenger progress. Greeting messages preserve data.
+- Draft edits apply to this case only. Confirmation freezes a separate copy in the case. Saving a new personal profile is a distinct opt-in after confirmation; no reply or “Chỉ dùng lần này” creates no directory record. Updating an existing profile requires a before/after preview and a second explicit action with optimistic profile version checking.
+- New flight/request/snapshot, passenger edits or pending search clarification invalidate prior confirmation. Preserve the draft for re-selection; reject old controls, cross-owner IDs and replayed callback IDs. Browsing/searching personal profiles never accesses another owner's records.
+- HYBRID_PASSENGER_DRAFT and HYBRID_DETAILS_CONFIRMED are deliberately separate from legacy passenger-ready/hold states. Do not populate legacy attachedPassengerInfo/selectedFlight or create holdApproval. Even when legacy automatic hold settings are enabled, these customer handlers never open passenger forms, submit holds or request a PNR.
+- Confirmation text must explicitly say “Thông tin đã được xác nhận, chưa giữ chỗ.” Display the observed price and capturedAt, not a promise of a current or held fare.
+- Regression tests use temporary databases/cases/sessions and fake SDK/browser/Telegram adapters. Live Telegram and 1Booking validation are reported separately.
+
+- Approved age policy (2026-09-16): every passenger in the hybrid customer flow must be at least 18 on the departure date. The 18th birthday is eligible; one day before is not. HYBRID_PASSENGER_MINIMUM_AGE defaults to 18 and only 18 is supported; invalid or lower configuration blocks confirmation. Local and example configuration are set to 18. This does not expand the flow into hold booking.
+
+### DOB normalization boundary (2026-09-16)
+
+- The passenger SDK requests YYYY-MM-DD, but code accepts equivalent full-year Vietnamese day/month/year proposals and canonicalizes them before validation. Do not rely on provider formatting or JavaScript locale date parsing.
+- Proposal and current-message evidence use the same date grammar/calendar checks. Exactly one matching real date is required; invalid competing dates, swapped day/month, future DOB and unsupported/missing years are rejected. Existing draft is never current-message evidence.
+- A valid DOB is retained and clears its unresolved field even if deployment age configuration is invalid. The approved default is 18; invalid overrides still prevent confirmation. Asking repeatedly for an already-valid DOB is not a remedy for configuration errors.

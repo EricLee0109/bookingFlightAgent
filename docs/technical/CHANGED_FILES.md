@@ -1,8 +1,8 @@
 # Các file đang thay đổi
 
-Cập nhật: 2026-09-16 (Asia/Saigon). Tổng cộng 70 file trong working tree.
+Cập nhật: 2026-09-16 (Asia/Saigon). Tổng cộng 20 file trong working tree.
 
-Danh sách này lấy từ Git hiện tại, bao gồm cả thay đổi có sẵn trước đợt triển khai pilot và phần chuyển 9Router. Không phải mọi dòng diff đều được tạo trong lượt mới nhất.
+Checkout sạch khi bắt đầu đợt customer UX này; các đợt trước đã nằm trong lịch sử Git. Inventory hiện tại là thay đổi của đợt này; nhật ký cũ được giữ để truy vết.
 
 `M` = file đã theo dõi có thay đổi. `??` = file mới, chưa được Git theo dõi; `git diff` thông thường không hiển thị nội dung của nhóm này. Bấm tên file để mở nội dung. Chưa commit hoặc push.
 
@@ -15,6 +15,77 @@ Danh sách này lấy từ Git hiện tại, bao gồm cả thay đổi có sẵ
 Sau mỗi đợt thay đổi, cập nhật nhật ký bên dưới cùng danh sách Git: ngày, yêu cầu, từng file, thay đổi cụ thể, kiểm chứng và phần chưa kiểm chứng. Giữ các mục cũ để truy vết; không coi toàn bộ working tree là thay đổi của đợt mới nhất. Không ghi secrets hoặc API key.
 
 ## Nhật ký thay đổi gần đây
+
+### 2026-09-16 — Chốt hành khách từ đủ 18 tuổi vào ngày bay
+
+**Quyết định của chủ dự án:** hành khách phải từ 18 tuổi trở lên. Áp dụng đủ 18 vào ngày khởi hành; đúng sinh nhật 18 được xác nhận, trước sinh nhật một ngày bị chặn. Quyết định này thay thế trạng thái chờ chốt 12/18 trong nhật ký bên dưới.
+
+| File | Thay đổi trong lượt này |
+| --- | --- |
+| `src/services/hybrid-customer-passenger-service.ts` | Mặc định 18; chỉ chấp nhận cấu hình 18, không cho giá trị 12 hạ giới hạn; thông báo riêng cho cấu hình không hợp lệ. |
+| `.env` (local, Git ignored) | Đặt duy nhất HYBRID_PASSENGER_MINIMUM_AGE=18; không thay provider, model hoặc credentials. |
+| `.env.example` | Giá trị 18 và hướng dẫn mặc định/ràng buộc. |
+| `tests/test-hybrid-customer-flow.ts` | Kiểm tra sinh nhật 18 và trước một ngày; cấu hình 12/NaN không cho xác nhận. |
+| `docs/technical/BUSINESS_RULES.md` | Chuyển từ quyết định đang chờ sang quy tắc được phê duyệt. |
+| `docs/technical/CHANGED_FILES.md` | Ghi quyết định, phạm vi và kiểm chứng. |
+
+**Kiểm chứng:** test:hybrid-customer-flow và production build qua; diff/new-file whitespace check qua. Không chạy Telegram/provider/1Booking thật. Cần restart bot để nạp code và cấu hình mới; draft cũ được giữ. Chưa mở form hoặc giữ chỗ. Inventory vẫn 20 file Git của cả đợt UX, cộng .env local bị bỏ qua.
+
+
+### 2026-09-16 — Sửa vòng lặp ngày sinh khách mới
+
+**Nguyên nhân đã tái hiện bằng model giả:** tool cho phép chuỗi DOB nhưng validator chỉ nhận YYYY-MM-DD. Với tin nhắn 07/09/2002 và proposal cùng định dạng, parser trả patch rỗng/invalidFields dob. ISO của cùng ngày lại được chấp nhận. Prompt cũ không chỉ rõ format output; test cũ đều trả ISO nên bỏ sót mismatch. Không có raw response provider thật để khẳng định chính xác proposal của lượt trong ảnh.
+
+| File | Thay đổi trong lượt này |
+| --- | --- |
+| [src/agent/hybrid-passenger-agent.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/agent/hybrid-passenger-agent.ts>) | Nêu rõ DOB ISO trong tool schema/prompt; chuẩn hóa dạng ngày Việt Nam trước khi kiểm tra calendar, future và đối chiếu một ngày duy nhất từ tin nhắn. |
+| [tests/test-hybrid-passenger-agent.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-hybrid-passenger-agent.ts>) | Tái hiện fail trước sửa khi model trả 07/09/2002; hồi quy ISO, DD/MM, dấu chấm/gạch, số 0, ngày bằng chữ, leap day, đảo ngày/tháng và ngày mâu thuẫn. |
+| [tests/test-hybrid-customer-flow.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-hybrid-customer-flow.ts>) | DOB đã bị từ chối → restart → nhập lại dạng Việt Nam: giữ tên/giới tính, xóa unresolved DOB, lưu ISO; tách missing-age gate và xác nhận với ngưỡng test rõ ràng. |
+| [docs/technical/BUSINESS_RULES.md](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/docs/technical/BUSINESS_RULES.md>) | Quy tắc DOB canonical và phân biệt lỗi ngày với thiếu chính sách tuổi. |
+| [docs/technical/CHANGED_FILES.md](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/docs/technical/CHANGED_FILES.md>) | Ghi nguyên nhân tái hiện, 5 file sửa trong lượt này và bằng chứng kiểm thử. |
+
+**Hành vi sau sửa:** model có thể trả ngày dạng ISO hoặc DD/MM/YYYY tương đương; code luôn lưu YYYY-MM-DD sau kiểm tra. Không đoán năm thiếu, không đảo DD/MM, không chọn một trong nhiều ngày và không lấy DOB cũ làm căn cứ cho edit mới. DOB sai lịch, tương lai, không có trong tin nhắn hoặc mâu thuẫn vẫn bị chặn.
+
+**Hai vấn đề tách biệt:** .env local chưa có ngưỡng tuổi được hỗ trợ. Fix này không đặt ngưỡng tuổi và không sửa .env. Khi thiếu chính sách, DOB hợp lệ vẫn được lưu và không còn nằm trong pending/unresolved; xác nhận tiếp tục bị chặn theo business gate đã ghi ở đợt trước.
+
+**Bằng chứng:** regression mới thất bại trước sửa (patch {} thay vì DOB ISO) và qua sau sửa. test:hybrid-passenger-agent, test:hybrid-customer-flow, test:passenger-parser, test:customer-passengers, test:passengers, test:hybrid-search-telegram và waiting-feedback đều qua; pnpm build và diff/new-file whitespace check qua. Model/DB/Telegram dùng giả lập hoặc dữ liệu tạm; chưa chạy provider/Telegram/1Booking thật. Không thay model/provider, danh bạ, luồng legacy hay hold. Sau restart bot, nhập lại DOB để phục hồi draft đang chờ; không cần xóa dữ liệu.
+
+
+### 2026-09-16 — Chọn chuyến và xác nhận khách cá nhân trong hybrid
+
+**Phạm vi:** chat riêng, một hành khách; chọn chuyến từ snapshot → nhập hoặc chọn khách đã lưu → kiểm tra họ/tên, giới tính, DOB → xác nhận thông tin. Không mở form 1Booking, không tạo holdApproval, không giữ chỗ. Provider/model và legacy giữ nguyên. Danh bạ thuộc Telegram user, không tự ghép với passenger_profiles dùng chung.
+
+| File | Thay đổi |
+| --- | --- |
+| [.env.example](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/.env.example>) | Khai báo ngưỡng tuổi chưa có mặc định; thiếu cấu hình sẽ chặn xác nhận. Cập nhật mô tả hybrid; không sửa .env thật. |
+| [docs/technical/BUSINESS_RULES.md](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/docs/technical/BUSINESS_RULES.md>) | Quy tắc danh bạ riêng, consent, bản sao case, trạng thái không hold và chính sách tuổi đang chờ chốt. |
+| [docs/technical/CHANGED_FILES.md](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/docs/technical/CHANGED_FILES.md>) | Nhật ký triển khai, bằng chứng kiểm thử, giới hạn và inventory Git hiện tại. |
+| [docs/technical/HYBRID_AGENT_ARCHITECTURE.md](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/docs/technical/HYBRID_AGENT_ARCHITECTURE.md>) | Ghi phạm vi customer flow mới tách khỏi search tools và hold legacy. |
+| [package.json](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/package.json>) | Thêm ba lệnh kiểm thử customer store, passenger interpreter và customer flow. |
+| [src/agent/hybrid-passenger-agent.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/agent/hybrid-passenger-agent.ts>) | SDK chỉ đề xuất dữ liệu có căn cứ trong tin hiện tại; giới hạn một lượt, kiểm tra tên/giới tính/DOB, lookup riêng và lỗi an toàn. |
+| [src/agent/hybrid-search-agent.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/agent/hybrid-search-agent.ts>) | Sinh nút chọn theo ID từng trang; vô hiệu xác nhận khách khi search thay đổi. |
+| [src/passengers/customer-passenger-store.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/passengers/customer-passenger-store.ts>) | Bảng SQLite riêng; owner-scoped read/list/create/update, phân trang, idempotency và optimistic version. |
+| [src/passengers/customer-passenger-types.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/passengers/customer-passenger-types.ts>) | Hợp đồng hồ sơ khách cá nhân tách khỏi dữ liệu legacy. |
+| [src/passengers/hybrid-passenger-state.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/passengers/hybrid-passenger-state.ts>) | Schema draft/trường chờ/revision/xác nhận; binding case/snapshot/candidate và dấu vân tay yêu cầu. |
+| [src/services/hybrid-customer-passenger-service.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/services/hybrid-customer-passenger-service.ts>) | State machine chọn chuyến, nhập/chọn khách, xác nhận, opt-in lưu và preview cập nhật; không gọi hold. |
+| [src/services/hybrid-customer-selection.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/services/hybrid-customer-selection.ts>) | Kiểm tra nguồn chuyến, tuyến/ngày, bộ lọc, freshness và vô hiệu xác nhận khi yêu cầu thay đổi. |
+| [src/storage/hybrid-search-session-store.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/storage/hybrid-search-session-store.ts>) | Con trỏ passengerCaseId tùy chọn, tương thích session cũ. |
+| [src/storage/local-case-store.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/storage/local-case-store.ts>) | Lưu flow/bản sao xác nhận theo case và hai trạng thái hybrid riêng. |
+| [src/telegram/telegram-hybrid-search.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/telegram/telegram-hybrid-search.ts>) | Routing customer chat/callback, nút chọn dưới ảnh, một thông báo chờ dùng chung và cập nhật help. |
+| [src/telegram/telegram-passenger-message-handler.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/telegram/telegram-passenger-message-handler.ts>) | Cho phép callback customer mới trong hybrid; giữ chặn callback hold legacy. |
+| [tests/test-customer-passenger-store.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-customer-passenger-store.ts>) | SQLite tạm: owner isolation, trùng tên, phân trang, consent idempotency, version và migration không đổi legacy. |
+| [tests/test-hybrid-customer-flow.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-hybrid-customer-flow.ts>) | Case/session/DB tạm: nhiều lượt, SDK giả, restart, sửa/cancel/consent, nút cũ, no-hold và thiếu chính sách tuổi. |
+| [tests/test-hybrid-passenger-agent.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-hybrid-passenger-agent.ts>) | Model SDK giả: literal evidence, DOB mâu thuẫn, tên trùng từ giới tính, browse và timeout/429 không retry. |
+| [tests/test-hybrid-search-pagination.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-hybrid-search-pagination.ts>) | Kiểm tra nút chọn trên 57 chuyến/12 trang, đúng ảnh; subprocess đóng worker trước cleanup để tránh EBUSY trên Windows. |
+
+**Trạng thái nghiệp vụ còn chờ:** cần chủ dự án chọn ngưỡng tuổi 12 hay 18 tính vào ngày bay. HYBRID_PASSENGER_MINIMUM_AGE chưa được đặt trong môi trường thật. Thiếu/không hợp lệ sẽ giữ draft và chặn xác nhận; không âm thầm bỏ kiểm tra tuổi. Fixture test dùng 18 không phải quyết định production.
+
+**Kiểm chứng tự động:** ba suite mới (test:customer-passengers, test:hybrid-passenger-agent, test:hybrid-customer-flow) qua. Các suite hybrid search contract/agent/reliability/intent/Telegram/pagination, airports (193 aliases), parser và passengers legacy, passenger-parser và waiting-feedback qua. Ba test screenshot Chromium dùng HTML local qua. Production build TypeScript và kiểm tra diff/whitespace qua. Kiểm thử dùng SDK model/Telegram/browser giả lập và SQLite/case/session tạm; không dùng API key, danh bạ thật hoặc thao tác booking thật.
+
+**Review:** sub-agent Luna MAX triển khai store/interpreter; manager review và sửa integration/validation, reviewer độc lập kiểm tra lại ownership, stale buttons và no-hold. Đã sửa lệch trang 0/1 và so sánh candidate phụ thuộc thứ tự key JSON. Đã thêm regression tên Nam/Nữ/Bé và DOB bị từ chối không được tái chấp nhận nhờ một edit không liên quan.
+
+**Chưa kiểm chứng:** Telegram/9Router/1Booking thật. Bot đang chạy cần restart để nhận code mới; tin Telegram cũ không tự có nút chọn, cần xem/tìm lại kết quả. Allowlist Telegram hiện có vẫn áp dụng; chưa mở đăng ký tài khoản công khai. Chưa thể coi cấu hình production hoàn tất khi chưa chốt ngưỡng tuổi.
+
 
 ### 2026-09-16 — Xem đầy đủ danh sách chuyến bằng phân trang Telegram
 
@@ -198,102 +269,25 @@ Phạm vi theo yêu cầu đã làm rõ: làm phong phú cách gọi trong catal
 
 ## Danh sách working tree hiện tại
 
-### AI, SDK và provider
-
-| Trạng thái | File |
+| File | Thay đổi |
 | --- | --- |
-| M | [src/agent/airline-catalog.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/agent/airline-catalog.ts>) |
-| M | [src/agent/airport-catalog.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/agent/airport-catalog.ts>) |
-| M | [src/agent/airport-resolver.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/agent/airport-resolver.ts>) |
-| M | [src/agent/openai-flight-request-parser.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/agent/openai-flight-request-parser.ts>) |
-| M | [src/agent/openai-passenger-message-parser.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/agent/openai-passenger-message-parser.ts>) |
-| ?? | [src/agent/ai-provider.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/agent/ai-provider.ts>) |
-| ?? | [src/agent/booking-agent-policy.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/agent/booking-agent-policy.ts>) |
-| ?? | [src/agent/booking-agent.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/agent/booking-agent.ts>) |
-| ?? | [src/agent/hybrid-flight-request.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/agent/hybrid-flight-request.ts>) |
-| ?? | [src/agent/hybrid-search-agent.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/agent/hybrid-search-agent.ts>) |
-| ?? | [src/agent/hybrid-search-proposal.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/agent/hybrid-search-proposal.ts>) |
-
-### Tự động hóa 1Booking
-
-| Trạng thái | File |
-| --- | --- |
-| M | [src/automation/1booking/auth.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/automation/1booking/auth.ts>) |
-| M | [src/automation/1booking/flight-card-parser.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/automation/1booking/flight-card-parser.ts>) |
-| M | [src/automation/1booking/flight-result-ranking.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/automation/1booking/flight-result-ranking.ts>) |
-| M | [src/automation/1booking/flight-result-summary.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/automation/1booking/flight-result-summary.ts>) |
-| M | [src/automation/1booking/flight-result-types.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/automation/1booking/flight-result-types.ts>) |
-| M | [src/automation/1booking/flight-search.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/automation/1booking/flight-search.ts>) |
-| M | [src/automation/1booking/flight-time-filters.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/automation/1booking/flight-time-filters.ts>) |
-| M | [src/automation/1booking/hold-booking.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/automation/1booking/hold-booking.ts>) |
-| M | [src/automation/1booking/search-flight-input.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/automation/1booking/search-flight-input.ts>) |
-| M | [src/automation/1booking/screenshots.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/automation/1booking/screenshots.ts>) |
-| M | [src/automation/1booking/waiters.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/automation/1booking/waiters.ts>) |
-| ?? | [src/automation/1booking/flight-search-snapshot.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/automation/1booking/flight-search-snapshot.ts>) |
-
-### Hợp đồng dữ liệu, service và lưu trạng thái
-
-| Trạng thái | File |
-| --- | --- |
-| M | [src/contracts/flight/index.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/contracts/flight/index.ts>) |
-| M | [src/contracts/flight/parsed-flight-request.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/contracts/flight/parsed-flight-request.ts>) |
-| M | [src/services/flight-search-automation-service.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/services/flight-search-automation-service.ts>) |
-| M | [src/services/passenger-hold-automation-service.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/services/passenger-hold-automation-service.ts>) |
-| M | [src/storage/local-case-store.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/storage/local-case-store.ts>) |
-| ?? | [src/services/hold-approval-service.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/services/hold-approval-service.ts>) |
-| ?? | [src/storage/agent-session-store.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/storage/agent-session-store.ts>) |
-| ?? | [src/storage/hybrid-search-session-store.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/storage/hybrid-search-session-store.ts>) |
-
-### Telegram
-
-| Trạng thái | File |
-| --- | --- |
-| M | [src/telegram/telegram-bot.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/telegram/telegram-bot.ts>) |
-| M | [src/telegram/telegram-formatters.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/telegram/telegram-formatters.ts>) |
-| M | [src/telegram/telegram-message-handler.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/telegram/telegram-message-handler.ts>) |
-| M | [src/telegram/telegram-passenger-message-handler.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/telegram/telegram-passenger-message-handler.ts>) |
-| ?? | [src/telegram/telegram-agent-shadow.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/telegram/telegram-agent-shadow.ts>) |
-| ?? | [src/telegram/telegram-hold-approval.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/telegram/telegram-hold-approval.ts>) |
-| ?? | [src/telegram/telegram-hybrid-search.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/telegram/telegram-hybrid-search.ts>) |
-
-### Tests và scripts
-
-| Trạng thái | File |
-| --- | --- |
-| M | [scripts/start-telegram-agent.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/scripts/start-telegram-agent.ts>) |
-| M | [tests/test-passenger-message-parser-contract.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-passenger-message-parser-contract.ts>) |
-| ?? | [scripts/evaluate-agent-shadow.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/scripts/evaluate-agent-shadow.ts>) |
-| ?? | [scripts/evaluate-hybrid-search.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/scripts/evaluate-hybrid-search.ts>) |
-| ?? | [tests/1booking-promotion-popup.spec.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/1booking-promotion-popup.spec.ts>) |
-| ?? | [tests/hybrid-search-screenshots.spec.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/hybrid-search-screenshots.spec.ts>) |
-| ?? | [tests/hybrid-search-empty-results.spec.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/hybrid-search-empty-results.spec.ts>) |
-| ?? | [tests/test-ai-provider.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-ai-provider.ts>) |
-| ?? | [tests/test-airport-resolver.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-airport-resolver.ts>) |
-| ?? | [tests/test-hybrid-agent-contract.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-hybrid-agent-contract.ts>) |
-| ?? | [tests/test-hybrid-search-agent.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-hybrid-search-agent.ts>) |
-| ?? | [tests/test-hybrid-search-contract.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-hybrid-search-contract.ts>) |
-| ?? | [tests/test-hybrid-search-telegram.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-hybrid-search-telegram.ts>) |
-| ?? | [tests/test-onebooking-airline-card.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-onebooking-airline-card.ts>) |
-| ?? | [tests/test-telegram-bot-errors.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-telegram-bot-errors.ts>) |
-| ?? | [tests/test-telegram-file-uploads.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-telegram-file-uploads.ts>) |
-| ?? | [tests/test-telegram-waiting-feedback.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-telegram-waiting-feedback.ts>) |
-| ?? | [tests/test-hybrid-search-intent.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-hybrid-search-intent.ts>) |
-| ?? | [tests/test-hybrid-search-pagination.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-hybrid-search-pagination.ts>) |
-| ?? | [tests/test-hybrid-search-reliability.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-hybrid-search-reliability.ts>) |
-
-### Tài liệu và cấu hình
-
-| Trạng thái | File |
-| --- | --- |
-| M | [.env.example](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/.env.example>) |
-| M | [.gitignore](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/.gitignore>) |
-| M | [README.md](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/README.md>) |
-| M | [docs/technical/BUSINESS_RULES.md](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/docs/technical/BUSINESS_RULES.md>) |
-| M | [package-lock.json](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/package-lock.json>) |
-| M | [package.json](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/package.json>) |
-| M | [pnpm-lock.yaml](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/pnpm-lock.yaml>) |
-| ?? | [docs/technical/CHANGED_FILES.md](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/docs/technical/CHANGED_FILES.md>) |
-| ?? | [docs/technical/HYBRID_AGENT_ARCHITECTURE.md](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/docs/technical/HYBRID_AGENT_ARCHITECTURE.md>) |
-| ?? | [docs/technical/HYBRID_SEARCH_VERIFICATION.md](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/docs/technical/HYBRID_SEARCH_VERIFICATION.md>) |
-| ?? | [docs/technical/NINE_ROUTER_SETUP.md](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/docs/technical/NINE_ROUTER_SETUP.md>) |
-| ?? | [tsconfig.json](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tsconfig.json>) |
+| [.env.example](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/.env.example>) | Khai báo ngưỡng tuổi chưa có mặc định; thiếu cấu hình sẽ chặn xác nhận. Cập nhật mô tả hybrid; không sửa .env thật. |
+| [docs/technical/BUSINESS_RULES.md](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/docs/technical/BUSINESS_RULES.md>) | Quy tắc danh bạ riêng, consent, bản sao case, trạng thái không hold và chính sách tuổi đang chờ chốt. |
+| [docs/technical/CHANGED_FILES.md](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/docs/technical/CHANGED_FILES.md>) | Nhật ký triển khai, bằng chứng kiểm thử, giới hạn và inventory Git hiện tại. |
+| [docs/technical/HYBRID_AGENT_ARCHITECTURE.md](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/docs/technical/HYBRID_AGENT_ARCHITECTURE.md>) | Ghi phạm vi customer flow mới tách khỏi search tools và hold legacy. |
+| [package.json](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/package.json>) | Thêm ba lệnh kiểm thử customer store, passenger interpreter và customer flow. |
+| [src/agent/hybrid-passenger-agent.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/agent/hybrid-passenger-agent.ts>) | SDK chỉ đề xuất dữ liệu có căn cứ trong tin hiện tại; giới hạn một lượt, kiểm tra tên/giới tính/DOB, lookup riêng và lỗi an toàn. |
+| [src/agent/hybrid-search-agent.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/agent/hybrid-search-agent.ts>) | Sinh nút chọn theo ID từng trang; vô hiệu xác nhận khách khi search thay đổi. |
+| [src/passengers/customer-passenger-store.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/passengers/customer-passenger-store.ts>) | Bảng SQLite riêng; owner-scoped read/list/create/update, phân trang, idempotency và optimistic version. |
+| [src/passengers/customer-passenger-types.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/passengers/customer-passenger-types.ts>) | Hợp đồng hồ sơ khách cá nhân tách khỏi dữ liệu legacy. |
+| [src/passengers/hybrid-passenger-state.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/passengers/hybrid-passenger-state.ts>) | Schema draft/trường chờ/revision/xác nhận; binding case/snapshot/candidate và dấu vân tay yêu cầu. |
+| [src/services/hybrid-customer-passenger-service.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/services/hybrid-customer-passenger-service.ts>) | State machine chọn chuyến, nhập/chọn khách, xác nhận, opt-in lưu và preview cập nhật; không gọi hold. |
+| [src/services/hybrid-customer-selection.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/services/hybrid-customer-selection.ts>) | Kiểm tra nguồn chuyến, tuyến/ngày, bộ lọc, freshness và vô hiệu xác nhận khi yêu cầu thay đổi. |
+| [src/storage/hybrid-search-session-store.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/storage/hybrid-search-session-store.ts>) | Con trỏ passengerCaseId tùy chọn, tương thích session cũ. |
+| [src/storage/local-case-store.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/storage/local-case-store.ts>) | Lưu flow/bản sao xác nhận theo case và hai trạng thái hybrid riêng. |
+| [src/telegram/telegram-hybrid-search.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/telegram/telegram-hybrid-search.ts>) | Routing customer chat/callback, nút chọn dưới ảnh, một thông báo chờ dùng chung và cập nhật help. |
+| [src/telegram/telegram-passenger-message-handler.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/src/telegram/telegram-passenger-message-handler.ts>) | Cho phép callback customer mới trong hybrid; giữ chặn callback hold legacy. |
+| [tests/test-customer-passenger-store.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-customer-passenger-store.ts>) | SQLite tạm: owner isolation, trùng tên, phân trang, consent idempotency, version và migration không đổi legacy. |
+| [tests/test-hybrid-customer-flow.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-hybrid-customer-flow.ts>) | Case/session/DB tạm: nhiều lượt, SDK giả, restart, sửa/cancel/consent, nút cũ, no-hold và thiếu chính sách tuổi. |
+| [tests/test-hybrid-passenger-agent.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-hybrid-passenger-agent.ts>) | Model SDK giả: literal evidence, DOB mâu thuẫn, tên trùng từ giới tính, browse và timeout/429 không retry. |
+| [tests/test-hybrid-search-pagination.ts](<C:/Users/letha/OneDrive/my_source_code/bookingFlightAgent/tests/test-hybrid-search-pagination.ts>) | Kiểm tra nút chọn trên 57 chuyến/12 trang, đúng ảnh; subprocess đóng worker trước cleanup để tránh EBUSY trên Windows. |

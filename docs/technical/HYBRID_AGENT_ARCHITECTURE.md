@@ -1,3 +1,5 @@
+> Update 2026-09-16: hybrid now has a separate private-chat customer flow for verified flight selection and owner-scoped passenger confirmation. It stops before browser form filling and hold. The search agent tool catalog remains search-only; the earlier phase descriptions below are historical. See BUSINESS_RULES.md for the current customer boundary.
+
 # Hybrid Agent migration — OpenAI Agents SDK
 
 Decision: option **1A**, one manager agent using `@openai/agents`. The SDK owns model/tool iteration and interruption state. Application code owns permissions, validation, case transitions and browser actions. The existing SQLite passenger resolver and 1Booking services remain the execution boundaries.

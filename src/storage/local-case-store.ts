@@ -1,3 +1,4 @@
+import type { HybridPassengerFlow } from '../passengers/hybrid-passenger-state';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -15,6 +16,8 @@ import { type FlightResultCandidate } from '../automation/1booking/flight-result
 import { type FlightSearchSnapshot } from '../automation/1booking/flight-search-snapshot';
 
 export type LocalFlightCaseStatus =
+  | 'HYBRID_PASSENGER_DRAFT'
+  | 'HYBRID_DETAILS_CONFIRMED'
   | 'CASE_CREATED'
   | 'SEARCH_REQUESTED'
   | 'SEARCH_RUNNING'
@@ -61,6 +64,8 @@ export type LocalFlightCase = {
   rawMessage: string;
   telegramChatId?: number;
   holdApproval?: HoldApproval;
+  /** Customer confirmation only: never authorizes browser form fill or hold. */
+  hybridPassengerFlow?: HybridPassengerFlow;
   flightCandidates?: FlightResultCandidate[];
   /** Pilot-only immutable full result snapshot; legacy fields stay unchanged. */
   hybridSearchSnapshot?: FlightSearchSnapshot;

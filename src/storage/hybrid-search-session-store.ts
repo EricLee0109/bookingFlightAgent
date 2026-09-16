@@ -69,6 +69,8 @@ export type HybridSearchSession = {
   snapshotFresh: boolean;
   snapshotId?: string;
   caseId?: string;
+  /** Case owning the durable customer passenger draft, possibly from a prior search. */
+  passengerCaseId?: string;
   /** A failed refresh gets its own case, while the previous snapshot stays inspectable. */
   lastAttemptCaseId?: string;
   /** Last deterministic comparison criterion, retained for a later inspect turn. */
@@ -321,6 +323,7 @@ function normalizeStoredSession(value: unknown, chatId: number): HybridSearchSes
     snapshotFresh,
     snapshotId: typeof raw.snapshotId === 'string' ? raw.snapshotId : undefined,
     caseId: typeof raw.caseId === 'string' ? raw.caseId : undefined,
+    passengerCaseId: typeof raw.passengerCaseId === 'string' && /^BK-\d{8}-\d{6}$/.test(raw.passengerCaseId) ? raw.passengerCaseId : undefined,
     lastAttemptCaseId: typeof raw.lastAttemptCaseId === 'string'
       ? raw.lastAttemptCaseId
       : undefined,

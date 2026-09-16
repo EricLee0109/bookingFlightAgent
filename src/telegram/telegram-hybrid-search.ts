@@ -1,3 +1,4 @@
+import { runCustomerPassengerAction, runCustomerPassengerMessage, type CustomerFlowOptions } from '../services/hybrid-customer-passenger-service';
 import TelegramBot from 'node-telegram-bot-api';
 import {
   runHybridSearchTurn,
@@ -22,6 +23,7 @@ export type TelegramHybridSearchDependencies = {
     options?: HybridSearchAgentOptions,
   ) => Promise<HybridSearchTurnResult>;
   settingsReader?: () => Promise<AgentSettings>;
+  customerOptions?: CustomerFlowOptions;
 };
 
 /** Keeps customer progress feedback bounded and isolated from the search turn. */
@@ -93,7 +95,7 @@ export async function handleTelegramHybridSearchMessage(
         'Pilot tìm chuyến hỗ trợ request một chiều theo tuyến, ngày, giờ và hãng bay.',
         'Bạn có thể nói “giá rẻ nhất”, “sớm nhất” hoặc hỏi lại các chuyến đã tìm.',
         'Dùng nút Trang trước / Trang sau dưới ảnh để xem hết danh sách, mỗi trang tối đa 5 chuyến.',
-        'Pilot chưa thực hiện chọn chuyến, nhập hành khách, giữ chỗ hay lấy PNR.',
+        'Trong chat riêng, bạn có thể chọn chuyến, nhập/chọn khách đã lưu và xác nhận thông tin. Chưa giữ chỗ hay lấy PNR.',
       ].join('\n'),
     );
     return true;
@@ -116,15 +118,22 @@ export async function handleTelegramHybridSearchMessage(
     return true;
   }
 
+  let acknowledgement: Promise<void> | undefined;
+  const acknowledge = () => acknowledgement ??= sendProcessingAcknowledgement(bot, chatId, message.message_id);
+  const customerResult = await runCustomerPassengerMessage({ chatId, userId: telegramUserId, chatType: message.chat.type, updateId: String(message.message_id) }, text, {
+    ...dependencies.customerOptions, settingsReader,
+    onProcessingStarted: acknowledge,
+  });
+  if (customerResult.handled) {
+    if (customerResult.response) await bot.sendMessage(chatId, customerResult.response, { reply_markup: customerResult.replyMarkup });
+    return true;
+  }
+
   const result = await (dependencies.runTurn ?? runHybridSearchTurn)(chatId, text, {
     ownerTelegramUserId: telegramUserId,
     messageId: message.message_id,
     settingsReader,
-    onProcessingStarted: () => sendProcessingAcknowledgement(
-      bot,
-      chatId,
-      message.message_id,
-    ),
+    onProcessingStarted: acknowledge,
   });
 
   // Telegram can redeliver an update after a network retry. The session store
@@ -155,6 +164,11 @@ async function sendHybridSearchResult(bot: TelegramBot, chatId: number, result: 
     }
   }
 
+  if (result.flightChoices?.length) {
+    await bot.sendMessage(chatId, 'Chọn chuyến để tiếp tục với thông tin hành khách:', {
+      reply_markup: { inline_keyboard: result.flightChoices.map(choice => [{ text: choice.text, callback_data: choice.callbackData }]) },
+    });
+  }
   const pagination = result.pagination;
   if (pagination && pagination.pageCount > 1) {
     const buttons: TelegramBot.InlineKeyboardButton[] = [];
@@ -193,5 +207,15 @@ export async function handleTelegramHybridSearchPageCallback(
     settingsReader: dependencies.settingsReader,
   });
   await sendHybridSearchResult(bot, chatId, result);
+  return true;
+}
+
+/** Customer-only actions; never dispatch to legacy passenger/hold handlers. */
+export async function handleTelegramCustomerPassengerCallback(bot: TelegramBot, query: TelegramBot.CallbackQuery, options: CustomerFlowOptions = {}) {
+  if (!query.data?.startsWith('hc:')) return false;
+  if (!query.message) return true;
+  if (!isAllowedTelegramOperator(query.from.id)) { await bot.sendMessage(query.message.chat.id, 'Bạn chưa có quyền sử dụng Agent này nhé.'); return true; }
+  const result = await runCustomerPassengerAction({ chatId: query.message.chat.id, userId: query.from.id, chatType: query.message.chat.type, updateId: `callback:${query.id}` }, query.data, options);
+  if (result.response) await bot.sendMessage(query.message.chat.id, result.response, { reply_markup: result.replyMarkup });
   return true;
 }

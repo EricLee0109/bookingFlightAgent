@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -7,8 +9,18 @@ import { createFlightSearchSnapshot, filterFlightSearchSnapshot } from '../src/a
 import { HybridSearchSessionStore } from '../src/storage/hybrid-search-session-store';
 
 async function main() {
+  // Run in a subprocess so tsx/native worker working-directory handles are closed before cleanup.
+  if (process.env.BOOKING_PAGINATION_TEST_CHILD !== '1') {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'hybrid-pages-'));
+    try {
+      execFileSync(process.execPath, ['--import', pathToFileURL(require.resolve('tsx')).href, __filename], {
+        cwd: directory, stdio: 'inherit', env: { ...process.env, BOOKING_PAGINATION_TEST_CHILD: '1', OPENAI_API_KEY: '', NINE_ROUTER_API_KEY: '', TELEGRAM_BOT_TOKEN: '' },
+      });
+    } finally { await fs.rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+    return;
+  }
   const root = process.cwd();
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'hybrid-pages-'));
+  const dir = process.cwd();
   const previousMode = process.env.AGENT_ORCHESTRATION_MODE;
   const previousOperators = process.env.TELEGRAM_OPERATOR_IDS;
   process.env.AGENT_ORCHESTRATION_MODE = 'hybrid_search';
@@ -53,6 +65,7 @@ async function main() {
       const expected = snapshot.candidates.slice(page * 5, page * 5 + 5).map(c => c.candidateId);
       assert.deepEqual(response.screenshotBatches.flatMap(b => b.candidateIds), expected);
       assert.deepEqual(response.screenshotBatches.map(b => b.path), expected.map(id => 'card-' + id.split('-')[1] + '.png'));
+      assert.deepEqual(response.flightChoices?.map(c => c.callbackData), expected.map((_, i) => `hc:select:${token}:${page * 5 + i}`));
       ids.push(...expected);
       if (page === 11) assert.ok(response.response.includes('56–57/57'));
     }
@@ -69,6 +82,10 @@ async function main() {
     const bot = { sendMessage: async (_chat: number, text: string, opts?: object) => { sent.push({ kind: 'message', text, options: opts }); }, sendPhoto: async (_chat: number, photo: string, opts?: object) => { sent.push({ kind: 'photo', photo, options: opts }); }, answerCallbackQuery: async () => { sent.push({ kind: 'answer' }); } } as never;
     await handleTelegramHybridSearchMessage(bot, { message_id: 10, chat: { id: 700 }, from: { id: 42 }, text: 'tìm chuyến' } as never, { settingsReader, runTurn: async () => result });
     assert.equal(sent.filter(s => s.kind === 'photo').length, 5);
+    const choiceMessage = sent.find(s => s.options?.reply_markup?.inline_keyboard?.flat().some((b: any) => b.callback_data?.startsWith('hc:select:')));
+    assert.ok(choiceMessage);
+    assert.equal(choiceMessage.options.reply_markup.inline_keyboard.length, 5);
+    assert.ok(sent.indexOf(choiceMessage) > sent.findLastIndex(s => s.kind === 'photo'));
     const nextButton = sent.at(-1)!.options.reply_markup.inline_keyboard[0][0];
     assert.equal(nextButton.text, 'Trang sau ➡️');
     assert.ok(Buffer.byteLength(nextButton.callback_data) <= 64);
@@ -131,7 +148,6 @@ async function main() {
     process.chdir(root);
     if (previousMode === undefined) delete process.env.AGENT_ORCHESTRATION_MODE; else process.env.AGENT_ORCHESTRATION_MODE = previousMode;
     if (previousOperators === undefined) delete process.env.TELEGRAM_OPERATOR_IDS; else process.env.TELEGRAM_OPERATOR_IDS = previousOperators;
-    await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

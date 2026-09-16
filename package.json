@@ -32,7 +32,10 @@
     "test:telegram-errors": "tsx tests/test-telegram-error-sanitizer.ts",
     "test:e2e:1booking": "playwright test tests/1booking-search.e2e.spec.ts",
     "test:e2e:1booking:headed": "playwright test tests/1booking-search.e2e.spec.ts --headed",
-    "test:hybrid-search-pagination": "tsx tests/test-hybrid-search-pagination.ts"
+    "test:hybrid-search-pagination": "tsx tests/test-hybrid-search-pagination.ts",
+    "test:customer-passengers": "tsx tests/test-customer-passenger-store.ts",
+    "test:hybrid-passenger-agent": "tsx tests/test-hybrid-passenger-agent.ts",
+    "test:hybrid-customer-flow": "tsx tests/test-hybrid-customer-flow.ts"
   },
   "keywords": [],
   "author": "",

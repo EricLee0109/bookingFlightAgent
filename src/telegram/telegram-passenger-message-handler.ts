@@ -1,4 +1,4 @@
-import { handleTelegramHybridSearchPageCallback } from './telegram-hybrid-search';
+import { handleTelegramHybridSearchPageCallback, handleTelegramCustomerPassengerCallback } from './telegram-hybrid-search';
 import TelegramBot from 'node-telegram-bot-api';
 import {
   parseDeterministicPassengerMessage,
@@ -132,9 +132,10 @@ export async function handleTelegramCallbackQuery(
   // the payload and before any passenger state can be changed.
   if (readAgentOrchestrationMode() === 'hybrid_search') {
     if (await handleTelegramHybridSearchPageCallback(bot, callbackQuery)) return;
+    if (await handleTelegramCustomerPassengerCallback(bot, callbackQuery)) return;
     await bot.sendMessage(
       chatId,
-      'Pilot tìm chuyến hiện chỉ hỗ trợ tìm và so sánh chuyến bay; nút chọn khách, giữ chỗ và PNR đang bị khóa trong pilot này.',
+      'Hybrid hiện chỉ hỗ trợ tìm và so sánh, chọn chuyến và xác nhận thông tin khách qua nút mới. Nút legacy, giữ chỗ và PNR vẫn bị khóa.',
     );
     return;
   }
