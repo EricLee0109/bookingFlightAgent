@@ -1,4 +1,8 @@
 import fs from 'node:fs/promises';
+import path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { parseFlightCardText } from './flight-card-parser';
+import type { FlightResultCandidate } from './flight-result-types';
 import { type Locator, type Page } from 'playwright';
 import { DEFAULT_TIMEOUT, ONE_BOOKING_VIEWPORT, SCREENSHOT_DIR } from './constants';
 
@@ -275,4 +279,49 @@ async function restoreFlightOptionsVisibility(flightOptions: Locator) {
       delete element.dataset.originalDisplay;
     });
   });
+}
+
+/** Capture each verified card once so later filters can reuse exact original pixels. */
+export async function takeFlightResultCardScreenshots(
+  page: Page,
+  fileNamePrefix: string,
+  candidates: FlightResultCandidate[],
+  directory = SCREENSHOT_DIR,
+) {
+  const cardIndexes = candidates.map(candidate => candidate.cardIndex);
+  if (!cardIndexes.length || new Set(cardIndexes).size !== cardIndexes.length
+    || cardIndexes.some(index => !Number.isInteger(index) || index < 0)) {
+    throw new Error('Flight screenshot card indexes must be unique nonnegative integers.');
+  }
+  await fs.mkdir(directory, { recursive: true });
+  const cards = page.getByRole('list', { name: /Single ticket options/i }).locator(':scope > div');
+  const captureId = randomUUID();
+  const paths: string[] = [];
+  for (const expected of candidates) {
+    // Pin the element, not a positional locator that could resolve to a new card.
+    const card = await cards.nth(expected.cardIndex).elementHandle();
+    if (!card || !await card.isVisible()) throw new Error('Verified flight card is no longer visible for screenshot.');
+    const target = path.join(directory, fileNamePrefix + '-card-' + expected.cardIndex + '-' + captureId + '.png');
+    try {
+      assertScreenshotCardMatches(expected, await card.innerText());
+      await card.screenshot({ path: target, animations: 'disabled', scale: 'css' });
+      assertScreenshotCardMatches(expected, await card.innerText());
+      paths.push(target);
+    } catch (error) {
+      await fs.rm(target, { force: true }).catch(() => undefined);
+      throw error;
+    } finally {
+      await card.dispose();
+    }
+  }
+  return paths;
+}
+
+/** Reject reordered or changed flight/fare content instead of mislabelling its image. */
+function assertScreenshotCardMatches(expected: FlightResultCandidate, text: string) {
+  const observed = parseFlightCardText(expected.cardIndex, text);
+  const fields = ['airlineCode', 'flightNumber', 'departureTime', 'arrivalTime', 'bookingClass', 'rawBookingClassCode', 'priceAmount'] as const;
+  if (!observed || fields.some(field => observed[field] !== expected[field])) {
+    throw new Error('Flight card changed between extraction and screenshot.');
+  }
 }

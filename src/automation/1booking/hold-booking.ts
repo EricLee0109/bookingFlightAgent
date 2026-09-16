@@ -95,6 +95,7 @@ export type PassengerHoldReviewExpectation = {
 
 export type ConfirmPassengerHoldOptions = {
   onReviewReady?: () => Promise<void>;
+  onSubmitting?: () => Promise<void>;
   onSubmitted?: () => Promise<void>;
   onLoadingObserved?: (observedAt: string) => Promise<void>;
   onSuccessModalObserved?: (observedAt: string) => Promise<void>;
@@ -227,9 +228,10 @@ export async function confirmPassengerHold(
     options.onSuccessModalObserved,
   );
 
-  await clickFinalHoldBooking(page, reviewDrawer);
+  await options.onSubmitting?.();
 
   try {
+    await clickFinalHoldBooking(page, reviewDrawer);
     await options.onSubmitted?.();
     return await waitForHeldOrderPage(page, expectation.flightNumber);
   } catch (error) {

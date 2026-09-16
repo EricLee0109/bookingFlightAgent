@@ -77,6 +77,10 @@ import {
   createTelegramScreenshotArchiveFileOptions,
 } from './telegram-screenshot-archive';
 import { PassengerProfile } from '../passengers/passenger-types';
+import { observeTelegramAgentDecision } from './telegram-agent-shadow';
+import { sendHoldApproval } from './telegram-hold-approval';
+import { readAgentOrchestrationMode } from '../agent/booking-agent-policy';
+import { handleTelegramHybridSearchMessage } from './telegram-hybrid-search';
 
 /**
  * Handles one incoming Telegram message from an operator.
@@ -131,6 +135,14 @@ export async function handleTelegramMessage(
     return;
   }
 
+  // Hybrid search owns every non-command message in pilot mode. This branch
+  // must stay before legacy hold recovery, selection, passenger and shadow
+  // routing so an old button or natural-language booking request cannot cross
+  // into a live booking side effect.
+  if (readAgentOrchestrationMode() === 'hybrid_search') {
+    if (await handleTelegramHybridSearchMessage(bot, message)) return;
+  }
+
   const settings = await readLocalAgentSettings();
 
   if (!settings.agentEnabled) {
@@ -141,6 +153,14 @@ export async function handleTelegramMessage(
   if (await tryHandleTelegramHoldRecoveryMessage(bot, chatId, text)) {
     return;
   }
+
+  const holdRequest = text.match(/^\/hold\s+(BK-\d{8}-\d{6})$/i);
+  if (holdRequest) {
+    try { await sendHoldApproval(bot, chatId, holdRequest[1].toUpperCase()); }
+    catch (error) { await bot.sendMessage(chatId, error instanceof Error ? error.message : 'Không thể yêu cầu giữ chỗ.'); }
+    return;
+  }
+  void observeTelegramAgentDecision(chatId, text).catch(() => undefined);
 
   if (
     await tryHandleSpecificTimeClarificationMessage(bot, chatId, text, settings)
@@ -228,7 +248,7 @@ export async function handleTelegramMessage(
     return;
   }
 
-  const flightCase = await createLocalFlightCase(text);
+  const flightCase = await createLocalFlightCase(text, chatId);
 
 
   // Save request information to JSON storage
@@ -1111,7 +1131,7 @@ export function buildCheapestMoreSearchPatch(
 } {
   const preferredTime =
     'preferredTime' in cheapestRequest
-      ? cheapestRequest.preferredTime
+      ? cheapestRequest.preferredTime ?? null
       : (flightCase.searchInput?.preferredTime ??
         flightCase.parsedRequest?.preferredTime ??
         null);
@@ -1195,7 +1215,7 @@ export function parseCheapestBucketFollowUpMessage(
 export function buildCheapestBucketSearchPatch(
   flightCase: Pick<LocalFlightCase, 'searchInput' | 'parsedRequest'>,
   bucketFollowUp: CheapestBucketFollowUp,
-): Pick<LocalFlightCase, 'searchInput' | 'parsedRequest'> {
+): { searchInput: SearchFlightsInput; parsedRequest: LocalFlightCase['parsedRequest'] } {
   const searchInput = {
     ...(flightCase.searchInput as SearchFlightsInput),
     preferredTime: bucketFollowUp.preferredTime,
@@ -1224,10 +1244,10 @@ export function buildCheapestBucketSearchPatch(
 export function buildNormalBucketSearchPatch(
   flightCase: Pick<LocalFlightCase, 'searchInput' | 'parsedRequest'>,
   bucketFollowUp: NormalFlightFollowUpRequest,
-): Pick<LocalFlightCase, 'searchInput' | 'parsedRequest'> {
+): { searchInput: SearchFlightsInput; parsedRequest: LocalFlightCase['parsedRequest'] } {
   const preferredTime =
     'preferredTime' in bucketFollowUp
-      ? bucketFollowUp.preferredTime
+      ? bucketFollowUp.preferredTime ?? null
       : (flightCase.searchInput?.preferredTime ??
         flightCase.parsedRequest?.preferredTime ??
         null);
@@ -1669,9 +1689,9 @@ export function looksLikeMoreCheapestOptionsRequest(text: string) {
 /**
  * Checks whether the latest case has enough saved data to show cheapest buckets.
  */
-export function canShowCheapestMoreOptionsForCase(
-  flightCase: Pick<LocalFlightCase, 'searchInput'> | null | undefined,
-) {
+export function canShowCheapestMoreOptionsForCase<T extends Pick<LocalFlightCase, 'searchInput'>>(
+  flightCase: T | null | undefined,
+): flightCase is T & { searchInput: SearchFlightsInput } {
   return Boolean(flightCase?.searchInput);
 }
 
@@ -1700,6 +1720,12 @@ async function handleTelegramFlightSelection(
         { reason: 'case_not_found' },
       ),
     );
+    return;
+  }
+
+  if (existingCase.telegramChatId !== chatId || existingCase.holdSubmittedAt
+    || ['FILL_PASSENGER_RUNNING', 'FILL_PASSENGER_DONE', 'READY_TO_HOLD', 'HOLD_RUNNING', 'HOLD_SUCCESS', 'PNR_EXTRACTED', 'HOLD_NEEDS_REVIEW'].includes(existingCase.status)) {
+    await bot.sendMessage(chatId, 'Case không cho phép chọn lại chuyến hoặc không thuộc cuộc trò chuyện này.');
     return;
   }
 
@@ -1837,6 +1863,7 @@ async function handleTelegramFlightSelection(
   });
 
   if (hasReadyPassengerForCombinedHold(currentCase)) {
+    currentCase = await updateLocalFlightCase(currentCase, { status: 'PASSENGER_INFO_CONFIRMED' });
     await bot.sendMessage(
       chatId,
       formatCombinedSelectionPassengerReadyMessage(

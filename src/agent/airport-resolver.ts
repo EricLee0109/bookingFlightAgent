@@ -21,6 +21,7 @@ export type ResolvedAirport = {
  */
 export function normalizeAirportText(value: string) {
   return value
+    .replace(/[đĐ]/g, 'd')
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')
     .toLowerCase();

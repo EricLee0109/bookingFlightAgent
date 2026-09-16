@@ -1,7 +1,141 @@
-import { type Locator, type Page } from 'playwright';
+import { type ElementHandle, type Locator, type Page } from 'playwright';
+import { randomUUID } from 'node:crypto';
+import { ensureScreenshotDir } from './screenshots';
+import { SCREENSHOT_DIR } from './constants';
 
 const ONE_BOOKING_IMPORTANT_NOTICE_HEADING =
   /LƯU Ý QUAN TRỌNG|LUU Y QUAN TRONG/i;
+
+type OneBookingPromotionHandlerState = {
+  locator: Locator;
+  screenshotPrefix: string;
+  timeoutMs: number;
+  registration: Promise<void>;
+};
+
+const oneBookingPromotionHandlers = new WeakMap<
+  Page,
+  OneBookingPromotionHandlerState
+>();
+
+/** Builds the exact image-slider dialog locator used by promotion cleanup. */
+function getOneBookingPromotionLocator(page: Page) {
+  return page
+    .locator('.ant-modal[role="dialog"]')
+    .filter({
+      has: page.locator('.ant-carousel img[src*="/files/imagesliders/"]'),
+    })
+    .first();
+}
+
+/** Installs one page-scoped handler so a late promotion cannot intercept actions. */
+async function ensureOneBookingPromotionHandler(
+  page: Page,
+  timeoutMs: number,
+  screenshotPrefix: string,
+) {
+  const existing = oneBookingPromotionHandlers.get(page);
+
+  if (existing) {
+    existing.timeoutMs = Math.max(timeoutMs, 1);
+    existing.screenshotPrefix = screenshotPrefix;
+    await existing.registration;
+    return;
+  }
+
+  const state: OneBookingPromotionHandlerState = {
+    locator: getOneBookingPromotionLocator(page),
+    screenshotPrefix,
+    timeoutMs: Math.max(timeoutMs, 1),
+    registration: Promise.resolve(),
+  };
+
+  state.registration = page
+    .addLocatorHandler(state.locator, async () => {
+      await closeOneBookingPromotionPopup(
+        page,
+        state.timeoutMs,
+        state.screenshotPrefix,
+      );
+    })
+    .catch((error) => {
+      if (oneBookingPromotionHandlers.get(page) === state) {
+        oneBookingPromotionHandlers.delete(page);
+      }
+      throw error;
+    });
+
+  oneBookingPromotionHandlers.set(page, state);
+  await state.registration;
+}
+
+/** Waits for an overlay handle to hide, treating immediate detachment as closed. */
+async function waitForOneBookingOverlayToHide(overlay: ElementHandle) {
+  try {
+    await overlay.waitForElementState('hidden', { timeout: 3000 });
+  } catch (error) {
+    if (await overlay.isVisible().catch(() => false)) {
+      throw error;
+    }
+  }
+}
+
+/** Clears only known search-blocking advertisements, including delayed promotions. */
+export async function closeOneBookingSearchOverlays(page: Page, timeoutMs = 2000, screenshotPrefix = '1booking') {
+  await ensureOneBookingPromotionHandler(page, timeoutMs, screenshotPrefix);
+  await closeOneBookingPromotionPopup(page, timeoutMs, screenshotPrefix);
+  await closeOneBookingImportantNoticeDrawer(page, timeoutMs);
+  // A promotion can appear while the optional notice is being dismissed.
+  await closeOneBookingPromotionPopup(page, 500, screenshotPrefix);
+}
+
+/** Recognizes the observed image-slider modal without dismissing login or booking dialogs. */
+export async function closeOneBookingPromotionPopup(page: Page, timeoutMs = 2000, screenshotPrefix = '1booking') {
+  const promotion = getOneBookingPromotionLocator(page);
+  try {
+    await promotion.waitFor({ state: 'visible', timeout: timeoutMs });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'TimeoutError') return false;
+    throw error;
+  }
+  const evidencePrefix = `${screenshotPrefix.replace(/[^a-zA-Z0-9_-]/g, '-')}-promotion-${Date.now()}-${randomUUID()}`;
+  await capturePromotionEvidence(page, `${evidencePrefix}-before`);
+  const root = promotion.locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-modal-root ")][1]');
+  try {
+    // Keep the original mask and wrapper: the modal can unmount before either
+    // sibling overlay finishes its fade-out.
+    const mask = await root.locator('.ant-modal-mask').elementHandle({ timeout: 3000 });
+    if (!mask) throw new Error('Promotion mask not found.');
+    const wrapperLocator = root.locator('.ant-modal-wrap').first();
+    const wrapper =
+      (await wrapperLocator.count()) > 0
+        ? await wrapperLocator.elementHandle({ timeout: 3000 })
+        : null;
+    await promotion.getByRole('button', { name: 'Đóng', exact: true }).click({ timeout: 3000 });
+    await Promise.all([
+      promotion.waitFor({ state: 'hidden', timeout: 3000 }),
+      wrapper ? waitForOneBookingOverlayToHide(wrapper) : Promise.resolve(),
+      waitForOneBookingOverlayToHide(mask),
+    ]);
+    await wrapper?.dispose();
+    await mask.dispose();
+  } catch {
+    await capturePromotionEvidence(page, `${evidencePrefix}-failed`);
+    throw new Error('1Booking promotion popup remained open and blocked the search form.');
+  }
+  await capturePromotionEvidence(page, `${evidencePrefix}-after`);
+  return true;
+}
+
+/** Saves bounded before/after evidence without allowing screenshot failures to block dismissal. */
+async function capturePromotionEvidence(page: Page, name: string) {
+  try {
+    await ensureScreenshotDir();
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/${name}.png`, timeout: 2000 });
+  } catch {
+    console.warn('[1Booking] Could not capture promotion popup screenshot.');
+  }
+}
 
 export class RetryableOneBookingSearchError extends Error {
   readonly retryable = true;
@@ -343,7 +477,10 @@ export async function waitForLoadingOverlayToDisappear(page: Page) {
  * - waits for the rendered flight cards to catch up
  * - fails when the page still looks incomplete after the bounded wait
  */
-export async function waitForFlightResultsReady(page: Page) {
+export async function waitForFlightResultsReady(
+  page: Page,
+  options: { allowEmpty?: boolean } = {},
+) {
   await waitForLoadingOverlayToDisappear(page);
 
   const resultSummary = page
@@ -365,8 +502,30 @@ export async function waitForFlightResultsReady(page: Page) {
     throw new Error(`Could not parse flight result count from: ${summaryText}`);
   }
 
-  if (countFromSummary < 1) {
+  if (countFromSummary < 1 && !options.allowEmpty) {
     throw new Error('Expected at least 1 flight result, but found 0.');
+  }
+
+  if (countFromSummary < 1) {
+    // A zero summary can be painted before the provider finishes its
+    // background request.  Only the explicit full-snapshot caller may accept
+    // zero, and it must wait for provider loading to settle first.
+    await waitForProviderSearchToSettle(page);
+    await page.waitForLoadState('networkidle', {
+      timeout: 10000,
+    }).catch(() => null);
+    await page.waitForTimeout(1500);
+
+    const settledSummaryText = await resultSummary.innerText();
+    const settledCount = parseFlightResultCount(settledSummaryText);
+    if (settledCount === null) {
+      throw new Error(`Could not parse flight result count after settling: ${settledSummaryText}`);
+    }
+    if (settledCount > 0) {
+      return waitForFlightResultsReady(page, { allowEmpty: false });
+    }
+
+    return 0;
   }
 
   const flightOptions = page
@@ -399,5 +558,30 @@ export async function waitForFlightResultsReady(page: Page) {
   // Small render-stabilization delay before screenshot.
   await page.waitForTimeout(1500);
 
-  return countFromSummary;
+  // Provider responses can append cards after the first summary/count pair.
+  // Re-read the summary after settling so a full snapshot never claims to
+  // contain the complete result set using an earlier partial count.
+  const settledSummaryText = await resultSummary.innerText();
+  const settledCount = parseFlightResultCount(settledSummaryText);
+  if (settledCount === null) {
+    throw new Error(`Could not parse flight result count after settling: ${settledSummaryText}`);
+  }
+  if (settledCount < 1) {
+    if (options.allowEmpty) return 0;
+    throw new Error('Expected at least 1 flight result, but found 0.');
+  }
+  if (settledCount !== countFromSummary) {
+    const settledVisibleFlightOptionCount = await waitForFlightOptionsCount(
+      page,
+      flightOptions,
+      settledCount,
+    );
+    if (settledVisibleFlightOptionCount > settledCount) {
+      throw new Error(
+        `Flight result count mismatch after settling. Summary says ${settledCount}, but found ${settledVisibleFlightOptionCount} visible option(s).`,
+      );
+    }
+  }
+
+  return settledCount;
 }

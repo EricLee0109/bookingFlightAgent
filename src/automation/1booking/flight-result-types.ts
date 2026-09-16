@@ -21,10 +21,21 @@ export type FlightTimeFilter =
       startMinute: number;
       endMinute: number;
       label: string;
+    }
+  | {
+      kind: 'exact' | 'from' | 'before' | 'after' | 'between';
+      startMinute: number;
+      endMinute: number;
+      exactMinute?: number;
+      startInclusive?: boolean;
+      endInclusive?: boolean;
+      label: string;
     };
 
 export type FlightResultCandidate = FlightSelectionCandidate & {
   priceAmount: number | null;
+  /** Assigned only when the candidate is copied into a durable search snapshot. */
+  candidateId?: string;
 };
 
 export type FlightResultFilterSummary = {
@@ -35,6 +46,7 @@ export type FlightResultFilterSummary = {
   requestedTimeBucketLabel: string | null;
   requestedSpecificTime: string | null;
   requestedTimeWindowLabel: string | null;
+  requestedTimeConstraintLabel?: string | null;
   totalVisibleCount: number;
   matchedCount: number;
   displayedCount: number;

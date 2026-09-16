@@ -1,5 +1,15 @@
 # Dự Án AI Agent Đặt Vé Máy Bay (MVP)
 
+## Hybrid Agent — triển khai theo giai đoạn
+
+Đã thêm nền tảng OpenAI Agents SDK, chế độ `shadow` chỉ đề xuất tool, và pilot `hybrid_search` cho tìm chuyến bay. Pilot chỉ tìm kiếm, lọc và so sánh từ snapshot đã kiểm chứng; không chọn chuyến, xử lý hành khách hay giữ chỗ. Mặc định vẫn là `AGENT_ORCHESTRATION_MODE=legacy`. Xem [kiến trúc, cách chạy và các giai đoạn còn lại](docs/technical/HYBRID_AGENT_ARCHITECTURE.md).
+
+Build: `pnpm build`. Chạy bản đã biên dịch từ thư mục dự án: `pnpm telegram:start`. Kiểm tra nền tảng SDK: `pnpm test:hybrid-agent`; kiểm tra pilot: `pnpm test:hybrid-search`, `pnpm test:hybrid-search-browser`, `pnpm test:hybrid-search-agent`, `pnpm test:hybrid-search-telegram` và `pnpm test:onebooking-airline-card`. Đánh giá bằng `pnpm eval:hybrid-search` (gọi provider đã cấu hình; automation giả lập và state tách riêng). Xem [kết quả nghiệm thu và giới hạn kiểm thử](docs/technical/HYBRID_SEARCH_VERIFICATION.md).
+
+Có thể dùng endpoint OpenAI trực tiếp hoặc 9Router với key riêng: xem [cấu hình 9Router](docs/technical/NINE_ROUTER_SETUP.md). Evaluator gọi provider được chọn trong `.env`. Xem [danh sách file đang thay đổi](docs/technical/CHANGED_FILES.md), bao gồm các file mới chưa xuất hiện trong `git diff` thông thường.
+
+Trong chế độ legacy/shadow, sau khi đã chọn chuyến và xác nhận khách, Agent gửi nút **Xác nhận giữ chỗ**. Có thể dùng `/hold BK-YYYYMMDD-HHMMSS` để yêu cầu xác nhận mới nếu nút cũ hết hạn. Pilot `hybrid_search` chặn các thao tác này.
+
 ## Mục tiêu dự án
 Dự án xây dựng một hệ thống AI Agent hỗ trợ nhân viên nội bộ xử lý yêu cầu đặt vé máy bay từ khách hàng. MVP tập trung vào **giảm thiểu thao tác thủ công**, giúp:
 

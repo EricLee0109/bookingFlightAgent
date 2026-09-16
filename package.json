@@ -4,6 +4,20 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "build": "node node_modules/typescript/bin/tsc",
+    "telegram:start": "node dist/scripts/start-telegram-agent.js",
+    "test:hybrid-agent": "tsx tests/test-hybrid-agent-contract.ts",
+    "test:ai-provider": "tsx tests/test-ai-provider.ts",
+    "test:hybrid-search": "tsx tests/test-hybrid-search-contract.ts",
+    "test:hybrid-search-screenshots": "playwright test tests/hybrid-search-screenshots.spec.ts --workers=1",
+    "test:hybrid-search-browser": "playwright test tests/hybrid-search-empty-results.spec.ts",
+    "test:hybrid-search-intent": "tsx tests/test-hybrid-search-intent.ts",
+    "test:hybrid-search-reliability": "tsx tests/test-hybrid-search-reliability.ts",
+    "test:hybrid-search-agent": "tsx tests/test-hybrid-search-agent.ts",
+    "test:hybrid-search-telegram": "tsx tests/test-hybrid-search-telegram.ts",
+    "test:onebooking-airline-card": "tsx tests/test-onebooking-airline-card.ts",
+    "eval:hybrid-search": "tsx scripts/evaluate-hybrid-search.ts",
+    "eval:agent-shadow": "tsx scripts/evaluate-agent-shadow.ts",
     "telegram:dev": "tsx scripts/start-telegram-agent.ts",
     "save-auth:dev": "tsx scripts/save-auth.ts",
     "passengers:bootstrap:sample": "tsx scripts/bootstrap-passengers-sample.ts",
@@ -11,12 +25,14 @@
     "passengers:stats": "tsx scripts/passenger-db-stats.ts",
     "test:browser-config": "tsx tests/test-browser-config-contract.ts",
     "test:native-dependencies": "tsx tests/test-native-dependency-policy.ts",
+    "test:airports": "tsx tests/test-airport-resolver.ts",
     "test:parser": "tsx tests/test-flight-parser-contract.ts",
     "test:passengers": "tsx tests/test-passenger-cache-contract.ts",
     "test:passenger-parser": "tsx tests/test-passenger-message-parser-contract.ts",
     "test:telegram-errors": "tsx tests/test-telegram-error-sanitizer.ts",
     "test:e2e:1booking": "playwright test tests/1booking-search.e2e.spec.ts",
-    "test:e2e:1booking:headed": "playwright test tests/1booking-search.e2e.spec.ts --headed"
+    "test:e2e:1booking:headed": "playwright test tests/1booking-search.e2e.spec.ts --headed",
+    "test:hybrid-search-pagination": "tsx tests/test-hybrid-search-pagination.ts"
   },
   "keywords": [],
   "author": "",
@@ -25,12 +41,15 @@
   "packageManager": "pnpm@10.27.0",
   "devDependencies": {
     "@playwright/test": "^1.59.1",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^25.6.2",
     "@types/node-telegram-bot-api": "^0.64.14",
     "playwright": "^1.59.1",
-    "tsx": "^4.21.0"
+    "tsx": "^4.21.0",
+    "typescript": "^7.0.2"
   },
   "dependencies": {
+    "@openai/agents": "^0.17.2",
     "better-sqlite3": "^12.10.0",
     "dotenv": "^17.4.2",
     "fflate": "^0.8.3",

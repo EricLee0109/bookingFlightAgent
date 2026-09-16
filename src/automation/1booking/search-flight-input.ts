@@ -6,6 +6,7 @@ import {
   validateSearchFlightInput,
 } from '../../contracts/flight';
 import { normalizePreferredAirlineCodes } from '../../agent/airline-catalog';
+import type { HybridTimeConstraint } from '../../agent/hybrid-flight-request';
 import { formatIsoDateForOneBooking } from './dates';
 
 /**
@@ -22,6 +23,7 @@ export type SearchFlightsInput = {
   departureDate: string | null;
   preferredTime?: PreferredTime;
   specificTime?: string | null;
+  timeConstraint?: HybridTimeConstraint | null;
   resultRanking?: FlightResultRanking;
   resultLimit?: 5 | 10;
   preferredAirlineCodes?: string[] | null;
@@ -82,7 +84,10 @@ export function validateSearchFlightsAutomationInput(
  */
 export function assertSearchFlightsAutomationInput(
   input: Partial<SearchFlightsInput>,
-): asserts input is SearchFlightsInput {
+): asserts input is SearchFlightsInput & {
+  fromAirportCode: string; fromAirportText: string;
+  toAirportCode: string; toAirportText: string; departureDate: string;
+} {
   const validation = validateSearchFlightsAutomationInput(input);
 
   if (!validation.valid) {

@@ -8,7 +8,14 @@ export type ParsedFlightCard = FlightSelectionCandidate & {
   priceAmount: number | null;
 };
 
-const MVP_SUPPORTED_AIRLINE_CODES = new Set(['VJ', 'VN', 'QH', 'VU', '9S']);
+const MVP_SUPPORTED_AIRLINE_CODES = new Set([
+  'VJ',
+  'VN',
+  'QH',
+  'VU',
+  '9G',
+  '9S',
+]);
 
 /**
  * Parses one visible 1Booking flight card into a reusable search/selection
@@ -64,7 +71,7 @@ export function isMvpSupportedAirlineCode(airlineCode: string) {
  */
 export function extractFlightNumber(cardText: string) {
   return (
-    cardText.match(/\b(?:VJ|VN|QH|VU|9S)\d+[A-Z]?\b/i)?.[0]?.toUpperCase() ??
+    cardText.match(/\b(?:VJ|VN|QH|VU|9G|9S)\d+[A-Z]?\b/i)?.[0]?.toUpperCase() ??
     null
   );
 }

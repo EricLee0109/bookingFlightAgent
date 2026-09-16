@@ -1,6 +1,8 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { handleTelegramMessage } from './telegram-message-handler';
 import { handleTelegramCallbackQuery } from './telegram-passenger-message-handler';
+import { readAgentOrchestrationMode } from '../agent/booking-agent-policy';
+import { readAIConnectionConfig, sanitizeAIError } from '../agent/ai-provider';
 
 /**
  * Starts the Telegram Agent using long polling.
@@ -16,11 +18,23 @@ import { handleTelegramCallbackQuery } from './telegram-passenger-message-handle
  *   public webhook server.
  */
 export async function startTelegramAgent() {
+  const mode = readAgentOrchestrationMode();
+  if (mode === 'shadow' || mode === 'hybrid_search') {
+    const aiConfig = readAIConnectionConfig({
+      defaultModel: mode === 'shadow' ? 'gpt-5.4-mini' : 'gpt-5.6-luna',
+    });
+    console.log(
+      `Telegram Agent AI provider: ${aiConfig.provider}; model: ${aiConfig.model}.`,
+    );
+  }
+  console.log(`Telegram Agent orchestration mode: ${mode}`);
   const token = process.env.TELEGRAM_BOT_TOKEN;
 
   if (!token) {
     throw new Error('Missing TELEGRAM_BOT_TOKEN in environment variables.');
   }
+
+  if (!process.env.NTBA_FIX_350) process.env.NTBA_FIX_350 = '1';
 
   const bot = new TelegramBot(token, {
     polling: true,
@@ -50,10 +64,17 @@ export async function startTelegramAgent() {
       );
 
       if (message.chat?.id) {
-        await bot.sendMessage(
-          message.chat.id,
-          '⚠️ Mình gặp lỗi ngoài ý muốn khi xử lý request. Bạn kiểm tra log local giúp mình nhé.',
-        );
+        try {
+          await bot.sendMessage(
+            message.chat.id,
+            '⚠️ Mình gặp lỗi ngoài ý muốn khi xử lý request. Bạn kiểm tra log local giúp mình nhé.',
+          );
+        } catch (notificationError) {
+          console.error(
+            'Telegram message error notification failed:',
+            toSafeTelegramError(notificationError, token),
+          );
+        }
       }
     }
   });
@@ -68,10 +89,17 @@ export async function startTelegramAgent() {
       );
 
       if (callbackQuery.message?.chat.id) {
-        await bot.sendMessage(
-          callbackQuery.message.chat.id,
-          '⚠️ Mình gặp lỗi khi xử lý lựa chọn khách. Bạn kiểm tra log local giúp mình nhé.',
-        );
+        try {
+          await bot.sendMessage(
+            callbackQuery.message.chat.id,
+            '⚠️ Mình gặp lỗi khi xử lý lựa chọn khách. Bạn kiểm tra log local giúp mình nhé.',
+          );
+        } catch (notificationError) {
+          console.error(
+            'Telegram callback error notification failed:',
+            toSafeTelegramError(notificationError, token),
+          );
+        }
       }
     }
   });
@@ -94,7 +122,7 @@ export function toSafeTelegramError(error: unknown, botToken?: string) {
         : readSafeErrorField(errorRecord, 'name') ?? 'UnknownError',
     code: readSafeErrorField(errorRecord, 'code'),
     message: redactTelegramToken(
-      error instanceof Error ? error.message : String(error),
+      sanitizeAIError(error),
       botToken,
     ),
     causeCode: readSafeErrorField(causeRecord, 'code'),

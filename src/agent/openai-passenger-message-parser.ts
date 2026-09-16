@@ -1,10 +1,10 @@
-import OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import {
   ParsedPassengerMessageSchema,
   type ParsedPassengerMessage,
 } from '../contracts/passenger';
 import { type PassengerMessageParser } from './passenger-message-parser';
+import { createAIClient, readAIConnectionConfig } from './ai-provider';
 
 type ParsedMessage = {
   parsed?: ParsedPassengerMessage | null;
@@ -42,20 +42,14 @@ const DEFAULT_OPENAI_MODEL = 'gpt-5.4-mini';
 export function createOpenAIPassengerMessageParser(
   options: OpenAIPassengerMessageParserOptions = {},
 ): PassengerMessageParser {
-  const apiKey = process.env.OPENAI_API_KEY;
-
-  if (!options.client && !apiKey) {
-    throw new Error(
-      'Missing OPENAI_API_KEY. Set OPENAI_API_KEY before parsing passenger messages.',
-    );
-  }
-
-  const client =
-    options.client ??
-    new OpenAI({
-      apiKey: apiKey as string,
-    });
-  const model = options.model ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
+  const config = readAIConnectionConfig({
+    model: options.model,
+    defaultModel: DEFAULT_OPENAI_MODEL,
+    // Existing injected parser clients are deliberately credential-free.
+    requireCredentials: !options.client,
+  });
+  const client = options.client ?? createAIClient({ config });
+  const model = config.model;
 
   return {
     async parse(rawMessage: string) {

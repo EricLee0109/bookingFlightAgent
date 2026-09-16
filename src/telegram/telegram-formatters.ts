@@ -516,7 +516,7 @@ export function formatCombinedSelectionPassengerReadyMessage(
 ) {
   return [
     `✈️✅ Đã chọn chuyến và nhận khách cho case ${caseId}.`,
-    'Mình đang tiến hành giữ chỗ trên 1Booking, đợi 1 xíu nhé...',
+    'Thông tin đã sẵn sàng để kiểm tra trước khi giữ chỗ.',
   ].join('\n');
 }
 
@@ -648,7 +648,7 @@ export function formatPassengerAttachedMessage(
     ...formatPassengerSummaryLines(profile),
     '',
     'Trạng thái: passenger_ready.',
-    'Mình sẽ tự động nhập form và giữ chỗ trên 1Booking nhé.',
+    'Thông tin khách đã sẵn sàng để kiểm tra trước khi giữ chỗ.',
   ].join('\n');
 }
 

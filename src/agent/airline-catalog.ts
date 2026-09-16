@@ -32,9 +32,22 @@ export const AIRLINE_CATALOG: AirlineCatalogEntry[] = [
     aliases: ['vietravel', 'vietravel airlines', 'vu'],
   },
   {
+    code: '9G',
+    name: 'Sun PhuQuoc Airways',
+    aliases: [
+      'sun',
+      'sun phuquoc',
+      'sun phuquoc airways',
+      'sun phu quoc',
+      'sun phu quoc airways',
+      'sun airways',
+      '9g',
+    ],
+  },
+  {
     code: '9S',
     name: 'Sun Phu Quoc Airways',
-    aliases: ['sun phu quoc', 'sun phu quoc airways', 'sun airways', '9s'],
+    aliases: ['9s'],
   },
 ];
 
@@ -46,6 +59,11 @@ export const AIRLINE_CATALOG: AirlineCatalogEntry[] = [
  */
 export function resolveAirlineFromText(rawText: string) {
   const normalizedText = normalizeTextForAirlineLookup(rawText);
+  const explicitAirline = resolveExplicitAirlineFromText(normalizedText);
+
+  if (explicitAirline) {
+    return explicitAirline;
+  }
 
   return (
     AIRLINE_CATALOG.find((airline) =>
@@ -53,6 +71,20 @@ export function resolveAirlineFromText(rawText: string) {
         includesAlias(normalizedText, normalizeTextForAirlineLookup(alias)),
       ),
     ) ?? null
+  );
+}
+
+/** Resolves a visible airline code or flight-number prefix before brand aliases. */
+function resolveExplicitAirlineFromText(normalizedText: string) {
+  return (
+    AIRLINE_CATALOG.find((airline) => {
+      const normalizedCode = normalizeTextForAirlineLookup(airline.code);
+      const codePattern = new RegExp(
+        `(^|\\W)${escapeRegExp(normalizedCode)}(?=\\d|\\W|$)`,
+      );
+
+      return codePattern.test(normalizedText);
+    }) ?? null
   );
 }
 
@@ -74,19 +106,53 @@ export function resolveAirlineCodeOrText(rawValue: string) {
 /**
  * Normalizes optional preferred airline codes into unique catalog codes.
  */
+export type NormalizePreferredAirlineCodesOptions = {
+  /** Reject unknown values instead of treating them as an omitted preference. */
+  strict?: boolean;
+};
+
+/**
+ * Normalizes requested airline values against the local catalog.
+ *
+ * The legacy mapper keeps its historical lenient behavior by default.  Hybrid
+ * search passes `strict: true`, because silently dropping a requested airline
+ * could return a materially different set of flights.
+ */
 export function normalizePreferredAirlineCodes(
   rawCodes: string[] | null | undefined,
+  options: NormalizePreferredAirlineCodesOptions = {},
 ) {
   if (!rawCodes || rawCodes.length === 0) {
     return null;
   }
 
+  const unknownValues: string[] = [];
   const normalizedCodes = rawCodes
-    .map((rawCode) => resolveAirlineCodeOrText(rawCode)?.code ?? null)
+    .map((rawCode) => {
+      const resolved = resolveAirlineCodeOrText(rawCode);
+      if (!resolved) unknownValues.push(rawCode);
+      return resolved?.code ?? null;
+    })
     .filter((code): code is string => code !== null);
+
+  if (options.strict && unknownValues.length > 0) {
+    throw new Error(
+      `Không nhận diện được hãng bay: ${unknownValues.join(', ')}. Vui lòng chọn hãng trong danh mục hỗ trợ.`,
+    );
+  }
   const uniqueCodes = Array.from(new Set(normalizedCodes));
 
   return uniqueCodes.length > 0 ? uniqueCodes : null;
+}
+
+/**
+ * Strict hybrid-search wrapper kept discoverable for callers that prefer a
+ * named validation function over an options object.
+ */
+export function normalizePreferredAirlineCodesStrict(
+  rawCodes: string[] | null | undefined,
+) {
+  return normalizePreferredAirlineCodes(rawCodes, { strict: true });
 }
 
 /**
