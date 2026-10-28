@@ -1,3 +1,4 @@
+import { handleTelegramHybridSearchPageCallback, handleTelegramCustomerPassengerCallback } from './telegram-hybrid-search';
 import TelegramBot from 'node-telegram-bot-api';
 import {
   parseDeterministicPassengerMessage,
@@ -8,7 +9,7 @@ import { PassengerStore } from '../passengers/passenger-store';
 import {
   type PassengerProfile,
 } from '../passengers/passenger-types';
-import { type PassengerMention } from '../contracts/passenger';
+import { type PassengerMention, type ParsedPassengerMessage } from '../contracts/passenger';
 import {
   PassengerResolutionService,
   type PassengerMentionResolutionResult,
@@ -53,6 +54,9 @@ import {
   parsePassengerCallbackData,
 } from './telegram-passenger-keyboards';
 import { tryHandleTelegramPnrDetailCallback } from './telegram-pnr-detail';
+import { mayStartTelegramHold, tryHandleHoldApprovalCallback } from './telegram-hold-approval';
+import { readLocalAgentSettings } from '../storage/local-settings-store';
+import { readAgentOrchestrationMode } from '../agent/booking-agent-policy';
 
 const PASSENGER_PARSER_TIMEOUT_MS = 15000;
 
@@ -123,6 +127,19 @@ export async function handleTelegramCallbackQuery(
     return;
   }
 
+  // Hybrid search is search-only. Guard every legacy callback, including
+  // buttons issued before a mode switch, before PNR or hold handlers inspect
+  // the payload and before any passenger state can be changed.
+  if (readAgentOrchestrationMode() === 'hybrid_search') {
+    if (await handleTelegramHybridSearchPageCallback(bot, callbackQuery)) return;
+    if (await handleTelegramCustomerPassengerCallback(bot, callbackQuery)) return;
+    await bot.sendMessage(
+      chatId,
+      'Hybrid hiện chỉ hỗ trợ tìm và so sánh, chọn chuyến và xác nhận thông tin khách qua nút mới. Nút legacy, giữ chỗ và PNR vẫn bị khóa.',
+    );
+    return;
+  }
+
   if (
     await tryHandleTelegramPnrDetailCallback(
       bot,
@@ -132,6 +149,10 @@ export async function handleTelegramCallbackQuery(
   ) {
     return;
   }
+
+  if (await tryHandleHoldApprovalCallback(bot, chatId, telegramUserId, callbackQuery.data,
+    (flightCase) => runAutomaticPassengerHold(bot, chatId, flightCase))) return;
+  if (!(await readLocalAgentSettings()).agentEnabled) return;
 
   const payload = callbackQuery.data
     ? parsePassengerCallbackData(callbackQuery.data)
@@ -145,6 +166,11 @@ export async function handleTelegramCallbackQuery(
 
   if (!existingCase) {
     await bot.sendMessage(chatId, `Mình chưa tìm thấy case ${payload.caseId}. Bạn kiểm tra lại mã case giúp mình nhé.`);
+    return;
+  }
+
+  if (existingCase.telegramChatId !== chatId || !isPassengerReadyCaseStatus(existingCase.status)) {
+    await bot.sendMessage(chatId, 'Lựa chọn khách đã cũ hoặc case không thuộc cuộc trò chuyện này.');
     return;
   }
 
@@ -198,6 +224,11 @@ export async function tryHandleTelegramPassengerMessage(
   }
 
   const existingCase = await readLocalFlightCase(caseId);
+
+  if (existingCase && existingCase.telegramChatId !== chatId) {
+    await bot.sendMessage(chatId, 'Case không thuộc cuộc trò chuyện này hoặc chưa có thông tin nguồn.');
+    return true;
+  }
 
   if (!existingCase || !isPassengerReadyCaseStatus(existingCase.status)) {
     if (
@@ -256,7 +287,7 @@ export async function resolvePassengerMessageForCase(
     };
   }
 
-  let parsedPassengerMessage;
+  let parsedPassengerMessage: ParsedPassengerMessage;
 
   try {
     parsedPassengerMessage = await parsePassengerMessageWithTimeout(rawMessage);
@@ -796,6 +827,7 @@ export async function runAutomaticPassengerHold(
     skipProgressMessage?: boolean;
   } = {},
 ) {
+  if (!await mayStartTelegramHold(bot, chatId, flightCase.caseId)) return;
   if (!options.skipProgressMessage) {
     await bot.sendMessage(
       chatId,
@@ -876,6 +908,8 @@ async function withPassengerResolutionService<T>(
 
 function isPassengerReadyCaseStatus(status: string) {
   return new Set([
+    'AWAITING_HOLD_APPROVAL',
+    'PASSENGER_INFO_CONFIRMED',
     'AWAITING_PASSENGER_INFO',
     'PASSENGER_INFO_RECEIVED',
     'PASSENGER_INFO_PARSED',

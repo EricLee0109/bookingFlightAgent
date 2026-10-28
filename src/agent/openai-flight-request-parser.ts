@@ -1,4 +1,3 @@
-import OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import {
   ParsedFlightRequestSchema,
@@ -7,6 +6,11 @@ import {
 import { AIRPORT_CATALOG } from './airport-catalog';
 import { AIRLINE_CATALOG } from './airline-catalog';
 import { type FlightRequestParser } from './flight-request-parser';
+import {
+  createAIClient,
+  parseChatCompletionWithSchema,
+  readAIConnectionConfig,
+} from './ai-provider';
 
 /**
  * Agent component for parsing raw operator text into the canonical flight request contract. - openAI
@@ -43,7 +47,9 @@ export type OpenAIFlightRequestParserOptions = {
   timeZone?: string;
 };
 
-const DEFAULT_OPENAI_MODEL = 'gpt-5.4-mini';
+// Keep the default aligned with the configured provider. 9Router requires a
+// provider-prefixed id, so a bare OpenAI id fails there with a model error.
+const DEFAULT_OPENAI_MODEL = 'cx/gpt-6-luna';
 const DEFAULT_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
 /**
@@ -55,27 +61,20 @@ const DEFAULT_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 export function createOpenAIFlightRequestParser(
   options: OpenAIFlightRequestParserOptions = {},
 ): FlightRequestParser {
-  const apiKey = process.env.OPENAI_API_KEY;
-
-  if (!options.client && !apiKey) {
-    throw new Error(
-      'Missing OPENAI_API_KEY. Set OPENAI_API_KEY or switch FLIGHT_PARSER_PROVIDER=mock.',
-    );
-  }
-
-  const client =
-    options.client ??
-    new OpenAI({
-      apiKey: apiKey as string,
-    });
-  const model = options.model ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
+  const config = readAIConnectionConfig({
+    model: options.model,
+    defaultModel: DEFAULT_OPENAI_MODEL,
+    // Existing injected parser clients are deliberately credential-free.
+    requireCredentials: !options.client,
+  });
+  const client = options.client ?? createAIClient({ config });
+  const model = config.model;
   const timeZone = options.timeZone ?? DEFAULT_TIME_ZONE;
 
   return {
     async parse(rawMessage: string) {
       const today = options.today ?? getTodayIsoDate(timeZone);
-      const completion = await client.chat.completions.parse({
-        model,
+      return parseChatCompletionWithSchema(client, { ...config, model }, {
         messages: [
           {
             role: 'system',
@@ -86,27 +85,12 @@ export function createOpenAIFlightRequestParser(
             content: rawMessage,
           },
         ],
-        response_format: zodResponseFormat(
+        responseFormat: zodResponseFormat(
           ParsedFlightRequestSchema,
           'parsed_flight_request',
         ),
+        schema: ParsedFlightRequestSchema,
       });
-
-      const message = completion.choices[0]?.message;
-
-      if (message?.refusal) {
-        throw new Error(`OpenAI parser refused the request: ${message.refusal}`);
-      }
-
-      if (!message?.parsed) {
-        const contentPreview = message?.content?.slice(0, 200) ?? 'empty content';
-
-        throw new Error(
-          `OpenAI parser returned invalid structured output: ${contentPreview}`,
-        );
-      }
-
-      return ParsedFlightRequestSchema.parse(message.parsed);
     },
   };
 }

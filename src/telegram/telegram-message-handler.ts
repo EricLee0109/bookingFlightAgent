@@ -15,6 +15,10 @@ import {
   type PreferredTime,
 } from '../contracts/flight';
 import { type SearchFlightsInput } from '../automation/1booking/search-flight-input';
+import {
+  AIAvailabilityGuard,
+  classifyAIError,
+} from '../agent/ai-availability-guard';
 import { searchOneBookingFlights } from '../services/flight-search-automation-service';
 import { selectMatchingOneBookingFlight } from '../services/flight-selection-automation-service';
 import {
@@ -46,6 +50,7 @@ import {
   formatNormalMoreOptionsMessage,
   formatOneBookingAuthRefreshStartedMessage,
   formatPassengerReadySelectionStillNeededMessage,
+  formatAIParserFailureMessage,
   formatParserFailedMessage,
   formatParsedRequestMessage,
   formatSearchFailedMessage,
@@ -77,6 +82,18 @@ import {
   createTelegramScreenshotArchiveFileOptions,
 } from './telegram-screenshot-archive';
 import { PassengerProfile } from '../passengers/passenger-types';
+import { observeTelegramAgentDecision } from './telegram-agent-shadow';
+import { sendHoldApproval } from './telegram-hold-approval';
+import { readAgentOrchestrationMode } from '../agent/booking-agent-policy';
+import { handleTelegramHybridSearchMessage } from './telegram-hybrid-search';
+
+/**
+ * Process-wide breaker for the legacy flight parser.
+ *
+ * Exported so tests can observe recovery and operators get one consistent
+ * outage window across chats instead of one failed API call per message.
+ */
+export const flightParserGuard = new AIAvailabilityGuard();
 
 /**
  * Handles one incoming Telegram message from an operator.
@@ -107,7 +124,6 @@ export async function handleTelegramMessage(
   if (await handleTelegramSettingsCommand(bot, message)) {
     return;
   }
-
   if (!text) {
     await bot.sendMessage(
       chatId,
@@ -131,6 +147,14 @@ export async function handleTelegramMessage(
     return;
   }
 
+  // Hybrid search owns every non-command message in pilot mode. This branch
+  // must stay before legacy hold recovery, selection, passenger and shadow
+  // routing so an old button or natural-language booking request cannot cross
+  // into a live booking side effect.
+  if (readAgentOrchestrationMode() === 'hybrid_search') {
+    if (await handleTelegramHybridSearchMessage(bot, message)) return;
+  }
+
   const settings = await readLocalAgentSettings();
 
   if (!settings.agentEnabled) {
@@ -141,6 +165,14 @@ export async function handleTelegramMessage(
   if (await tryHandleTelegramHoldRecoveryMessage(bot, chatId, text)) {
     return;
   }
+
+  const holdRequest = text.match(/^\/hold\s+(BK-\d{8}-\d{6})$/i);
+  if (holdRequest) {
+    try { await sendHoldApproval(bot, chatId, holdRequest[1].toUpperCase()); }
+    catch (error) { await bot.sendMessage(chatId, error instanceof Error ? error.message : 'Không thể yêu cầu giữ chỗ.'); }
+    return;
+  }
+  void observeTelegramAgentDecision(chatId, text).catch(() => undefined);
 
   if (
     await tryHandleSpecificTimeClarificationMessage(bot, chatId, text, settings)
@@ -228,7 +260,7 @@ export async function handleTelegramMessage(
     return;
   }
 
-  const flightCase = await createLocalFlightCase(text);
+  const flightCase = await createLocalFlightCase(text, chatId);
 
 
   // Save request information to JSON storage
@@ -251,26 +283,57 @@ export async function handleTelegramMessage(
 
   let parsedRequest;
 
+  // A provider that is out of credit or rejected its key fails every message,
+  // so report the real outage immediately instead of paying the timeout again.
+  const blockedFailure = flightParserGuard.currentFailure();
+  if (blockedFailure) {
+    await updateLocalFlightCase(flightCase, {
+      status: 'CASE_FAILED',
+      errorMessage: blockedFailure.detail,
+      aiFailureCategory: blockedFailure.category,
+    });
+    await appendLocalLog({
+      level: 'error',
+      event: 'flight_request_parser_skipped',
+      caseId: flightCase.caseId,
+      message: `AI provider unavailable (${blockedFailure.category}); skipped call.`,
+      meta: { category: blockedFailure.category },
+    });
+    await bot.sendMessage(
+      chatId,
+      formatAIParserFailureMessage(blockedFailure.category),
+    );
+    return;
+  }
+
   try {
     const parser = createFlightRequestParser();
     parsedRequest = await parser.parse(text);
+    flightParserGuard.recordSuccess();
   } catch (error) {
-    const errorMessage =
-      error instanceof Error
-        ? error.message
-        : 'AI parser failed with an unknown error.';
+    const failure = classifyAIError(error);
+
+    // Providers sometimes report a monthly quota as HTTP 429 with a "rate
+    // limit" wording. The transport message is what the operator acts on, so a
+    // missing balance must always surface as a credit problem.
+    flightParserGuard.recordFailure(failure);
 
     await updateLocalFlightCase(flightCase, {
       status: 'CASE_FAILED',
-      errorMessage,
+      errorMessage: failure.detail,
+      aiFailureCategory: failure.category,
     });
     await appendLocalLog({
       level: 'error',
       event: 'flight_request_parser_failed',
       caseId: flightCase.caseId,
-      message: errorMessage,
+      message: failure.detail,
+      meta: { category: failure.category },
     });
-    await bot.sendMessage(chatId, formatParserFailedMessage());
+    await bot.sendMessage(
+      chatId,
+      formatAIParserFailureMessage(failure.category),
+    );
     return;
   }
   
@@ -1111,7 +1174,7 @@ export function buildCheapestMoreSearchPatch(
 } {
   const preferredTime =
     'preferredTime' in cheapestRequest
-      ? cheapestRequest.preferredTime
+      ? cheapestRequest.preferredTime ?? null
       : (flightCase.searchInput?.preferredTime ??
         flightCase.parsedRequest?.preferredTime ??
         null);
@@ -1195,7 +1258,7 @@ export function parseCheapestBucketFollowUpMessage(
 export function buildCheapestBucketSearchPatch(
   flightCase: Pick<LocalFlightCase, 'searchInput' | 'parsedRequest'>,
   bucketFollowUp: CheapestBucketFollowUp,
-): Pick<LocalFlightCase, 'searchInput' | 'parsedRequest'> {
+): { searchInput: SearchFlightsInput; parsedRequest: LocalFlightCase['parsedRequest'] } {
   const searchInput = {
     ...(flightCase.searchInput as SearchFlightsInput),
     preferredTime: bucketFollowUp.preferredTime,
@@ -1224,10 +1287,10 @@ export function buildCheapestBucketSearchPatch(
 export function buildNormalBucketSearchPatch(
   flightCase: Pick<LocalFlightCase, 'searchInput' | 'parsedRequest'>,
   bucketFollowUp: NormalFlightFollowUpRequest,
-): Pick<LocalFlightCase, 'searchInput' | 'parsedRequest'> {
+): { searchInput: SearchFlightsInput; parsedRequest: LocalFlightCase['parsedRequest'] } {
   const preferredTime =
     'preferredTime' in bucketFollowUp
-      ? bucketFollowUp.preferredTime
+      ? bucketFollowUp.preferredTime ?? null
       : (flightCase.searchInput?.preferredTime ??
         flightCase.parsedRequest?.preferredTime ??
         null);
@@ -1669,9 +1732,9 @@ export function looksLikeMoreCheapestOptionsRequest(text: string) {
 /**
  * Checks whether the latest case has enough saved data to show cheapest buckets.
  */
-export function canShowCheapestMoreOptionsForCase(
-  flightCase: Pick<LocalFlightCase, 'searchInput'> | null | undefined,
-) {
+export function canShowCheapestMoreOptionsForCase<T extends Pick<LocalFlightCase, 'searchInput'>>(
+  flightCase: T | null | undefined,
+): flightCase is T & { searchInput: SearchFlightsInput } {
   return Boolean(flightCase?.searchInput);
 }
 
@@ -1700,6 +1763,12 @@ async function handleTelegramFlightSelection(
         { reason: 'case_not_found' },
       ),
     );
+    return;
+  }
+
+  if (existingCase.telegramChatId !== chatId || existingCase.holdSubmittedAt
+    || ['FILL_PASSENGER_RUNNING', 'FILL_PASSENGER_DONE', 'READY_TO_HOLD', 'HOLD_RUNNING', 'HOLD_SUCCESS', 'PNR_EXTRACTED', 'HOLD_NEEDS_REVIEW'].includes(existingCase.status)) {
+    await bot.sendMessage(chatId, 'Case không cho phép chọn lại chuyến hoặc không thuộc cuộc trò chuyện này.');
     return;
   }
 
@@ -1837,6 +1906,7 @@ async function handleTelegramFlightSelection(
   });
 
   if (hasReadyPassengerForCombinedHold(currentCase)) {
+    currentCase = await updateLocalFlightCase(currentCase, { status: 'PASSENGER_INFO_CONFIRMED' });
     await bot.sendMessage(
       chatId,
       formatCombinedSelectionPassengerReadyMessage(

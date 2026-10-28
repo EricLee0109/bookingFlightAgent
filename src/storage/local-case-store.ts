@@ -1,3 +1,4 @@
+import type { HybridPassengerFlow } from '../passengers/hybrid-passenger-state';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -10,8 +11,13 @@ import {
   type PassengerProfile,
 } from '../passengers/passenger-types';
 import { BOOKING_CASE_REGEX } from '../automation/1booking/constants';
+import { type HoldApproval } from '../services/hold-approval-service';
+import { type FlightResultCandidate } from '../automation/1booking/flight-result-types';
+import { type FlightSearchSnapshot } from '../automation/1booking/flight-search-snapshot';
 
 export type LocalFlightCaseStatus =
+  | 'HYBRID_PASSENGER_DRAFT'
+  | 'HYBRID_DETAILS_CONFIRMED'
   | 'CASE_CREATED'
   | 'SEARCH_REQUESTED'
   | 'SEARCH_RUNNING'
@@ -24,6 +30,7 @@ export type LocalFlightCaseStatus =
   | 'PASSENGER_INFO_PARSED'
   | 'PASSENGER_INFO_NEEDS_REVIEW'
   | 'PASSENGER_INFO_CONFIRMED'
+  | 'AWAITING_HOLD_APPROVAL'
   | 'FILL_PASSENGER_RUNNING'
   | 'FILL_PASSENGER_DONE'
   | 'READY_TO_HOLD'
@@ -55,6 +62,13 @@ export type LocalFlightCase = {
   caseId: string;
   status: LocalFlightCaseStatus;
   rawMessage: string;
+  telegramChatId?: number;
+  holdApproval?: HoldApproval;
+  /** Customer confirmation only: never authorizes browser form fill or hold. */
+  hybridPassengerFlow?: HybridPassengerFlow;
+  flightCandidates?: FlightResultCandidate[];
+  /** Pilot-only immutable full result snapshot; legacy fields stay unchanged. */
+  hybridSearchSnapshot?: FlightSearchSnapshot;
   parsedRequest?: ParsedFlightRequest;
   searchInput?: SearchFlightsInput;
   flightCount?: number;
@@ -84,6 +98,8 @@ export type LocalFlightCase = {
   pnrExtractedAt?: string;
   pnrErrorMessage?: string;
   errorMessage?: string;
+  /** Machine-readable cause of an AI failure, for auditing and dashboards. */
+  aiFailureCategory?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -118,19 +134,29 @@ export function createLocalCaseId(now = new Date()) {
  * This store owns local case memory only. Telegram and automation code should
  * update case state through this boundary.
  */
-export async function createLocalFlightCase(rawMessage: string) {
+export async function createLocalFlightCase(rawMessage: string, telegramChatId?: number) {
   const now = new Date().toISOString();
   const flightCase: LocalFlightCase = {
     caseId: createLocalCaseId(),
     status: 'CASE_CREATED',
     rawMessage,
+    telegramChatId,
     createdAt: now,
     updatedAt: now,
   };
 
-  await saveLocalFlightCase(flightCase);
-
-  return flightCase;
+  // Reserve the initial filename exclusively so simultaneous chats cannot overwrite ownership.
+  await fs.mkdir(CASE_DIR, { recursive: true });
+  for (let offset = 0; offset < 1000; offset++) {
+    flightCase.caseId = createLocalCaseId(new Date(Date.parse(now) + offset * 1000));
+    try {
+      await fs.writeFile(getCasePath(flightCase.caseId), `${JSON.stringify(flightCase, null, 2)}\n`, { flag: 'wx' });
+      return flightCase;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    }
+  }
+  throw new Error('Cannot allocate a unique booking case ID.');
 }
 
 /**

@@ -1441,6 +1441,7 @@ function testCompactCombinedTelegramMessages() {
   assert.doesNotMatch(progressMessage, /Hạng đặt chỗ|Mình hiểu/);
   assert.equal(progressMessage.split('\n').length, 1);
   assert.match(readyMessage, /Đã chọn chuyến và nhận khách/);
+  assert.doesNotMatch(readyMessage, /đang tiến hành giữ chỗ|tự động nhập form/);
   assert.doesNotMatch(readyMessage, /Mã chuyến|Giá hiển thị|NGUYEN THI LANH/);
 }
 

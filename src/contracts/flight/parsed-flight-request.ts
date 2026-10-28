@@ -20,6 +20,13 @@ export type PreferredTime =
 export type FlightResultRanking = 'cheapest' | null;
 
 /**
+ * Directional time constraints used by the hybrid search pilot.
+ *
+ * Legacy requests continue to use `specific_time` with the established
+ * +/- two-hour window.  The optional constraint lets the pilot preserve the
+ * operator's precise wording (`đúng`, `từ`, `trước`, or `sau`).
+ */
+/**
  * Trip type values supported by the shared flight request contract.
  *
  * MVP automation supports one-way search first. Round-trip is included in the

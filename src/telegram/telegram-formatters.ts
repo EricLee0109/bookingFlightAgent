@@ -12,6 +12,7 @@ import {
   normalizePreferredAirlineCodes,
 } from '../agent/airline-catalog';
 import { type PassengerMention } from '../contracts/passenger';
+import { type AIFailureCategory } from '../agent/ai-availability-guard';
 import { type PassengerProfile } from '../passengers/passenger-types';
 import { type LocalFlightCase } from '../storage/local-case-store';
 import type TelegramBot from 'node-telegram-bot-api';
@@ -120,6 +121,73 @@ export function formatParserFailedMessage() {
     'Bạn gửi lại ngắn gọn theo mẫu giúp mình nhé:',
     'bay từ SGN ra HAN ngày 30/07',
   ].join('\n');
+}
+
+/**
+ * Formats an operator message that matches the real cause of a parser failure.
+ *
+ * `response_format` and `refusal` are the only categories where resending the
+ * message can help, so advice about rewording must never appear for provider
+ * outages. Those cases stay actionable by naming who can fix them.
+ */
+export function formatAIParserFailureMessage(
+  category: AIFailureCategory,
+  detail?: string,
+) {
+  switch (category) {
+    case 'quota':
+      return [
+        '💳 Hệ thống AI tạm HẾT QUOTA/CREDIT nên chưa phân tích được yêu cầu.',
+        '',
+        'Lỗi này không do tin nhắn của bạn. Gửi lại nguyên văn sẽ vẫn lỗi cho đến khi admin nạp credit OpenAI.',
+        'Vui lòng tìm chuyến thủ công trên 1Booking và báo admin xử lý.',
+      ].join('\n');
+    case 'authentication':
+      return [
+        '🔑 API key của AI không hợp lệ hoặc đã bị thu hồi.',
+        '',
+        'Gửi lại tin nhắn sẽ không giúp được. Vui lòng báo admin kiểm tra cấu hình API key.',
+      ].join('\n');
+    case 'configuration':
+      return [
+        '⚙️ Cấu hình AI chưa đúng (thiếu key, sai model hoặc sai provider).',
+        '',
+        'Vui lòng báo admin kiểm tra cấu hình trước khi gửi lại yêu cầu.',
+      ].join('\n');
+    case 'rate_limit':
+      return [
+        '⏳ Hệ thống AI đang bị giới hạn tần suất tạm thời.',
+        '',
+        'Bạn thử gửi lại sau khoảng 1 phút nhé.',
+      ].join('\n');
+    case 'timeout':
+      return [
+        '⌛ Hệ thống AI phản hồi quá chậm nên yêu cầu bị dừng.',
+        '',
+        'Bạn thử gửi lại yêu cầu nhé.',
+      ].join('\n');
+    case 'network':
+    case 'unreachable':
+      return [
+        '📡 Không kết nối được tới dịch vụ AI.',
+        '',
+        'Bạn thử gửi lại sau ít phút nhé. Nếu vẫn lỗi, báo admin kiểm tra mạng/server.',
+      ].join('\n');
+    case 'provider':
+      return [
+        '🛠️ Dịch vụ AI đang gặp sự cố phía nhà cung cấp.',
+        '',
+        'Bạn thử gửi lại sau ít phút nhé.',
+      ].join('\n');
+    case 'refusal':
+      return [
+        '🚫 AI từ chối xử lý nội dung này.',
+        '',
+        'Bạn thử diễn đạt lại ngắn gọn hơn nhé.',
+      ].join('\n');
+    case 'response_format':
+      return formatParserFailedMessage();
+  }
 }
 
 /**
@@ -516,7 +584,7 @@ export function formatCombinedSelectionPassengerReadyMessage(
 ) {
   return [
     `✈️✅ Đã chọn chuyến và nhận khách cho case ${caseId}.`,
-    'Mình đang tiến hành giữ chỗ trên 1Booking, đợi 1 xíu nhé...',
+    'Thông tin đã sẵn sàng để kiểm tra trước khi giữ chỗ.',
   ].join('\n');
 }
 
@@ -648,7 +716,7 @@ export function formatPassengerAttachedMessage(
     ...formatPassengerSummaryLines(profile),
     '',
     'Trạng thái: passenger_ready.',
-    'Mình sẽ tự động nhập form và giữ chỗ trên 1Booking nhé.',
+    'Thông tin khách đã sẵn sàng để kiểm tra trước khi giữ chỗ.',
   ].join('\n');
 }
 

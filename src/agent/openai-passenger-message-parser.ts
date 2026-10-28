@@ -1,10 +1,14 @@
-import OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import {
   ParsedPassengerMessageSchema,
   type ParsedPassengerMessage,
 } from '../contracts/passenger';
 import { type PassengerMessageParser } from './passenger-message-parser';
+import {
+  createAIClient,
+  parseChatCompletionWithSchema,
+  readAIConnectionConfig,
+} from './ai-provider';
 
 type ParsedMessage = {
   parsed?: ParsedPassengerMessage | null;
@@ -29,7 +33,9 @@ export type OpenAIPassengerMessageParserOptions = {
   model?: string;
 };
 
-const DEFAULT_OPENAI_MODEL = 'gpt-5.4-mini';
+// Keep the default aligned with the configured provider. 9Router requires a
+// provider-prefixed id, so a bare OpenAI id fails there with a model error.
+const DEFAULT_OPENAI_MODEL = 'cx/gpt-6-luna';
 
 /**
  * Creates the OpenAI parser for natural passenger-related Telegram messages.
@@ -42,25 +48,18 @@ const DEFAULT_OPENAI_MODEL = 'gpt-5.4-mini';
 export function createOpenAIPassengerMessageParser(
   options: OpenAIPassengerMessageParserOptions = {},
 ): PassengerMessageParser {
-  const apiKey = process.env.OPENAI_API_KEY;
-
-  if (!options.client && !apiKey) {
-    throw new Error(
-      'Missing OPENAI_API_KEY. Set OPENAI_API_KEY before parsing passenger messages.',
-    );
-  }
-
-  const client =
-    options.client ??
-    new OpenAI({
-      apiKey: apiKey as string,
-    });
-  const model = options.model ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
+  const config = readAIConnectionConfig({
+    model: options.model,
+    defaultModel: DEFAULT_OPENAI_MODEL,
+    // Existing injected parser clients are deliberately credential-free.
+    requireCredentials: !options.client,
+  });
+  const client = options.client ?? createAIClient({ config });
+  const model = config.model;
 
   return {
     async parse(rawMessage: string) {
-      const completion = await client.chat.completions.parse({
-        model,
+      return parseChatCompletionWithSchema(client, { ...config, model }, {
         messages: [
           {
             role: 'system',
@@ -71,28 +70,12 @@ export function createOpenAIPassengerMessageParser(
             content: rawMessage,
           },
         ],
-        response_format: zodResponseFormat(
+        responseFormat: zodResponseFormat(
           ParsedPassengerMessageSchema,
           'parsed_passenger_message',
         ),
+        schema: ParsedPassengerMessageSchema,
       });
-      const message = completion.choices[0]?.message;
-
-      if (message?.refusal) {
-        throw new Error(
-          `OpenAI passenger parser refused the request: ${message.refusal}`,
-        );
-      }
-
-      if (!message?.parsed) {
-        const contentPreview = message?.content?.slice(0, 200) ?? 'empty content';
-
-        throw new Error(
-          `OpenAI passenger parser returned invalid structured output: ${contentPreview}`,
-        );
-      }
-
-      return ParsedPassengerMessageSchema.parse(message.parsed);
     },
   };
 }

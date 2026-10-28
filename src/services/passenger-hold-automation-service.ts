@@ -25,6 +25,8 @@ import {
 import { appendLocalLog } from '../storage/local-log-store';
 import { runWithAutomationLock } from '../utils/automation-lock';
 import { OneBookingAuthRefreshRetryController } from './onebooking-auth-refresh-retry';
+import { consumeHoldApproval, holdFingerprint, withHoldClaim } from './hold-approval-service';
+import { readLocalAgentSettings } from '../storage/local-settings-store';
 
 export type PassengerHoldAutomationResult =
   | {
@@ -79,7 +81,7 @@ export async function fillPassengerAndHoldOneBookingCase(
 ): Promise<PassengerHoldAutomationResult> {
   try {
     return await runWithAutomationLock('Giữ chỗ', () =>
-      fillPassengerAndHoldOneBookingCaseUnlocked(caseId, options),
+      withHoldClaim(caseId, () => fillPassengerAndHoldOneBookingCaseUnlocked(caseId, options)),
     );
   } catch (error) {
     return {
@@ -155,6 +157,9 @@ async function fillPassengerAndHoldOneBookingCaseUnlocked(
     onAuthRefresh: options.onAuthRefresh,
   });
 
+  await consumeHoldApproval(flightCase, await readLocalAgentSettings());
+  const approvedFingerprint = holdFingerprint(flightCase);
+
   for (let attempt = 1; attempt <= MAX_ONE_BOOKING_HOLD_ATTEMPTS; attempt++) {
     const { browser, page } = await createOneBookingBrowserSession({
       purpose: `passenger-hold:${caseId}:attempt-${attempt}`,
@@ -169,11 +174,16 @@ async function fillPassengerAndHoldOneBookingCaseUnlocked(
         errorMessage: undefined,
       });
 
-      await openMatchingFlightPassengerForm(
+      const refreshedFlight = await openMatchingFlightPassengerForm(
         page,
         flightCase.searchInput!,
         buildSavedFlightSelectionInput(flightCase),
       );
+      if (refreshedFlight.flightNumber !== flightCase.selectedFlight!.flightNumber
+        || refreshedFlight.priceText !== flightCase.selectedFlight!.priceText
+        || refreshedFlight.rawBookingClassCode !== flightCase.selectedFlight!.rawBookingClassCode) {
+        throw new Error('Chuyến bay hoặc giá đã thay đổi. Tìm và chọn lại chuyến trước khi xác nhận giữ chỗ.');
+      }
       await fillAndAssertPassengerInformation(
         page,
         flightCase.attachedPassengerInfo!,
@@ -202,11 +212,18 @@ async function fillPassengerAndHoldOneBookingCaseUnlocked(
           async onReviewReady() {
             await captureHoldUiScreenshot(page, caseId, 'hold-review');
           },
-          async onSubmitted() {
+          async onSubmitting() {
+            const latest = await readLocalFlightCase(caseId);
+            if (!latest || holdFingerprint(latest) !== approvedFingerprint
+              || !(await readLocalAgentSettings()).agentEnabled) {
+              throw new Error('Thông tin hoặc cài đặt đã thay đổi. Cần xác nhận giữ chỗ lại.');
+            }
             holdSubmitted = true;
             flightCase = await patchPersistedFlightCase(caseId, {
               holdSubmittedAt: new Date().toISOString(),
             });
+          },
+          async onSubmitted() {
             await appendLocalLog({
               level: 'info',
               event: 'one_booking_hold_submitted',
@@ -272,7 +289,7 @@ async function fillPassengerAndHoldOneBookingCaseUnlocked(
 
       try {
         const pnrCode =
-          heldOrder.pnrCode ??
+          ('pnrCode' in heldOrder ? heldOrder.pnrCode : null) ??
           (await extractHeldBookingPnr(
             page,
             flightCase.selectedFlight!.flightNumber,

@@ -10,15 +10,20 @@ import {
 import { isRetryableOneBookingSearchError } from '../automation/1booking/waiters';
 import { runWithAutomationLock } from '../utils/automation-lock';
 import { OneBookingAuthRefreshRetryController } from './onebooking-auth-refresh-retry';
+import { type FlightResultCandidate } from '../automation/1booking/flight-result-types';
+import { type FlightSearchSnapshot } from '../automation/1booking/flight-search-snapshot';
+import { readLocalFlightCase, updateLocalFlightCase } from '../storage/local-case-store';
 
 export type FlightSearchAutomationResult =
   | {
       ok: true;
+      candidates: FlightResultCandidate[];
       flightCount: number;
       displayedFlightCount: number;
       filterSummary?: FlightResultFilterSummary;
       screenshotPath: string;
       screenshotPaths: string[];
+      snapshot?: FlightSearchSnapshot;
       authRefreshed?: boolean;
     }
   | {
@@ -33,6 +38,9 @@ const MAX_ONE_BOOKING_SEARCH_ATTEMPTS = 2;
 export type FlightSearchAutomationOptions = {
   caseId?: string;
   onAuthRefresh?: () => Promise<void>;
+  fullSnapshot?: boolean;
+  allowEmptyResults?: boolean;
+  capturedAt?: Date;
 };
 
 /**
@@ -83,17 +91,33 @@ async function searchOneBookingFlightsUnlocked(
           ? buildCaseUiScreenshotFileNamePrefix(
               options.caseId,
               'search-results',
-            )
+              )
           : undefined,
+        fullSnapshot: options.fullSnapshot,
+        allowEmptyResults: options.allowEmptyResults,
+        capturedAt: options.capturedAt,
       });
+
+      if (options.caseId) {
+        const flightCase = await readLocalFlightCase(options.caseId);
+        if (flightCase) {
+          const casePatch = {
+            flightCandidates: result.candidates,
+            ...(result.snapshot ? { hybridSearchSnapshot: result.snapshot } : {}),
+          };
+          await updateLocalFlightCase(flightCase, casePatch);
+        }
+      }
 
       return {
         ok: true,
+        candidates: result.candidates,
         flightCount: result.flightCount,
         displayedFlightCount: result.displayedFlightCount,
         filterSummary: result.filterSummary,
         screenshotPath: result.screenshotPath,
         screenshotPaths: result.screenshotPaths,
+        snapshot: result.snapshot,
         authRefreshed: authRetry.authRefreshed || undefined,
       };
     } catch (error) {

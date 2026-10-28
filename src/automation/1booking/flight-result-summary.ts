@@ -38,7 +38,11 @@ export function buildFlightResultFilterSummary(
         ? input.timeFilter.specificTime
         : null,
     requestedTimeWindowLabel:
-      input.timeFilter?.kind === 'specific_window'
+      input.timeFilter && input.timeFilter.kind !== 'bucket'
+        ? input.timeFilter.label
+        : null,
+    requestedTimeConstraintLabel:
+      input.timeFilter && input.timeFilter.kind !== 'bucket'
         ? input.timeFilter.label
         : null,
     totalVisibleCount: input.totalVisibleCount,

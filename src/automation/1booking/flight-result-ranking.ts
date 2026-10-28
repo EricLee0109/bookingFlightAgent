@@ -2,6 +2,7 @@ import {
   type FlightResultRanking,
   type PreferredTime,
 } from '../../contracts/flight';
+import type { HybridTimeConstraint } from '../../agent/hybrid-flight-request';
 import { extractLowestVndPriceAmount, parseFlightCardText } from './flight-card-parser';
 import {
   extractFlightResultCandidates,
@@ -39,6 +40,7 @@ export function selectFlightResultsForSearch(input: {
   candidates: FlightResultCandidate[];
   preferredTime?: PreferredTime;
   specificTime?: string | null;
+  timeConstraint?: HybridTimeConstraint | null;
   resultRanking?: FlightResultRanking;
   limit?: number;
   preferredAirlineCodes?: string[] | null;
@@ -47,6 +49,7 @@ export function selectFlightResultsForSearch(input: {
   const timeFilter = resolveFlightTimeFilter({
     preferredTime: input.preferredTime,
     specificTime: input.specificTime,
+    timeConstraint: input.timeConstraint,
   });
 
   if (!airlineFilter && !timeFilter && input.resultRanking !== 'cheapest') {
@@ -86,7 +89,8 @@ export function selectFlightResultsForSearch(input: {
 export function rankFlightResultsForSearch(input: {
   candidates: FlightResultCandidate[];
   preferredTime?: PreferredTime;
-  specificTime?: string | null;
+    specificTime?: string | null;
+    timeConstraint?: HybridTimeConstraint | null;
   resultRanking?: FlightResultRanking;
   limit?: number;
   preferredAirlineCodes?: string[] | null;

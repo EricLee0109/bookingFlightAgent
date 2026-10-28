@@ -10,7 +10,7 @@ import {
   ONE_BOOKING_URL,
   ONE_BOOKING_VIEWPORT,
 } from './constants';
-import { closeOneBookingImportantNoticeDrawer } from './waiters';
+import { closeOneBookingSearchOverlays } from './waiters';
 
 export type OneBookingCredentials = {
   agentId: string;
@@ -106,7 +106,7 @@ export async function refreshOneBookingAuthState(
     });
     await fillOneBookingLoginForm(page, credentials);
     await waitForOneBookingAuthenticatedState(page);
-    await closeOneBookingImportantNoticeDrawer(page);
+    await closeOneBookingSearchOverlays(page);
     await fs.mkdir(path.dirname(storageStatePath), {
       recursive: true,
     });
