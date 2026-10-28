@@ -30,6 +30,8 @@
     "test:passengers": "tsx tests/test-passenger-cache-contract.ts",
     "test:passenger-parser": "tsx tests/test-passenger-message-parser-contract.ts",
     "test:telegram-errors": "tsx tests/test-telegram-error-sanitizer.ts",
+    "test:ai-availability": "tsx tests/test-ai-availability-guard.ts",
+    "test:promotion-popup": "tsx tests/test-onebooking-promotion-popup.ts",
     "test:e2e:1booking": "playwright test tests/1booking-search.e2e.spec.ts",
     "test:e2e:1booking:headed": "playwright test tests/1booking-search.e2e.spec.ts --headed",
     "test:hybrid-search-pagination": "tsx tests/test-hybrid-search-pagination.ts",

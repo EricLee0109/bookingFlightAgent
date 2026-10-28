@@ -21,7 +21,7 @@ export async function startTelegramAgent() {
   const mode = readAgentOrchestrationMode();
   if (mode === 'shadow' || mode === 'hybrid_search') {
     const aiConfig = readAIConnectionConfig({
-      defaultModel: mode === 'shadow' ? 'gpt-5.4-mini' : 'gpt-5.6-luna',
+      defaultModel: mode === 'shadow' ? 'gpt-5.4-mini' : 'cx/gpt-6-luna',
     });
     console.log(
       `Telegram Agent AI provider: ${aiConfig.provider}; model: ${aiConfig.model}.`,

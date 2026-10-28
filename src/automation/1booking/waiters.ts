@@ -111,7 +111,7 @@ export async function closeOneBookingPromotionPopup(page: Page, timeoutMs = 2000
       (await wrapperLocator.count()) > 0
         ? await wrapperLocator.elementHandle({ timeout: 3000 })
         : null;
-    await promotion.getByRole('button', { name: 'Đóng', exact: true }).click({ timeout: 3000 });
+    await clickOneBookingPromotionClose(promotion);
     await Promise.all([
       promotion.waitFor({ state: 'hidden', timeout: 3000 }),
       wrapper ? waitForOneBookingOverlayToHide(wrapper) : Promise.resolve(),
@@ -125,6 +125,40 @@ export async function closeOneBookingPromotionPopup(page: Page, timeoutMs = 2000
   }
   await capturePromotionEvidence(page, `${evidencePrefix}-after`);
   return true;
+}
+
+/**
+ * Clicks the promotion close control across the variants 1Booking ships.
+ *
+ * The observed banner renders a round icon button labelled "Close" (or no
+ * accessible name at all) rather than a text button "Đóng". Matching only the
+ * Vietnamese text failed every check and left the mask covering the search
+ * form. Candidates are tried widest-observed-first and the click is forced so a
+ * decorative overlay cannot intercept it.
+ */
+async function clickOneBookingPromotionClose(promotion: Locator) {
+  const candidates: Array<() => Locator> = [
+    () => promotion.locator('.ant-modal-close'),
+    () => promotion.locator('.ant-modal-close-x'),
+    () => promotion.getByRole('button', { name: /^(close|đóng|dong|cancel|✕|×|x)$/i }),
+    () => promotion.getByRole('button', { name: 'Đóng', exact: true }),
+    () => promotion.locator('[class*="close"], [class*="Close"]').first(),
+  ];
+  let lastError: unknown;
+
+  for (const build of candidates) {
+    const locator = build();
+    if ((await locator.count().catch(() => 0)) === 0) continue;
+
+    try {
+      await locator.first().click({ timeout: 3000, force: true });
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError ?? new Error('1Booking promotion has no usable close control.');
 }
 
 /** Saves bounded before/after evidence without allowing screenshot failures to block dismissal. */

@@ -4,7 +4,11 @@ import {
   type ParsedPassengerMessage,
 } from '../contracts/passenger';
 import { type PassengerMessageParser } from './passenger-message-parser';
-import { createAIClient, readAIConnectionConfig } from './ai-provider';
+import {
+  createAIClient,
+  parseChatCompletionWithSchema,
+  readAIConnectionConfig,
+} from './ai-provider';
 
 type ParsedMessage = {
   parsed?: ParsedPassengerMessage | null;
@@ -29,7 +33,9 @@ export type OpenAIPassengerMessageParserOptions = {
   model?: string;
 };
 
-const DEFAULT_OPENAI_MODEL = 'gpt-5.4-mini';
+// Keep the default aligned with the configured provider. 9Router requires a
+// provider-prefixed id, so a bare OpenAI id fails there with a model error.
+const DEFAULT_OPENAI_MODEL = 'cx/gpt-6-luna';
 
 /**
  * Creates the OpenAI parser for natural passenger-related Telegram messages.
@@ -53,8 +59,7 @@ export function createOpenAIPassengerMessageParser(
 
   return {
     async parse(rawMessage: string) {
-      const completion = await client.chat.completions.parse({
-        model,
+      return parseChatCompletionWithSchema(client, { ...config, model }, {
         messages: [
           {
             role: 'system',
@@ -65,28 +70,12 @@ export function createOpenAIPassengerMessageParser(
             content: rawMessage,
           },
         ],
-        response_format: zodResponseFormat(
+        responseFormat: zodResponseFormat(
           ParsedPassengerMessageSchema,
           'parsed_passenger_message',
         ),
+        schema: ParsedPassengerMessageSchema,
       });
-      const message = completion.choices[0]?.message;
-
-      if (message?.refusal) {
-        throw new Error(
-          `OpenAI passenger parser refused the request: ${message.refusal}`,
-        );
-      }
-
-      if (!message?.parsed) {
-        const contentPreview = message?.content?.slice(0, 200) ?? 'empty content';
-
-        throw new Error(
-          `OpenAI passenger parser returned invalid structured output: ${contentPreview}`,
-        );
-      }
-
-      return ParsedPassengerMessageSchema.parse(message.parsed);
     },
   };
 }

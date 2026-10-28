@@ -98,6 +98,8 @@ export type LocalFlightCase = {
   pnrExtractedAt?: string;
   pnrErrorMessage?: string;
   errorMessage?: string;
+  /** Machine-readable cause of an AI failure, for auditing and dashboards. */
+  aiFailureCategory?: string;
   createdAt: string;
   updatedAt: string;
 };

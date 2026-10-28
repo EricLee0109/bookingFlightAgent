@@ -15,6 +15,10 @@ import {
   type PreferredTime,
 } from '../contracts/flight';
 import { type SearchFlightsInput } from '../automation/1booking/search-flight-input';
+import {
+  AIAvailabilityGuard,
+  classifyAIError,
+} from '../agent/ai-availability-guard';
 import { searchOneBookingFlights } from '../services/flight-search-automation-service';
 import { selectMatchingOneBookingFlight } from '../services/flight-selection-automation-service';
 import {
@@ -46,6 +50,7 @@ import {
   formatNormalMoreOptionsMessage,
   formatOneBookingAuthRefreshStartedMessage,
   formatPassengerReadySelectionStillNeededMessage,
+  formatAIParserFailureMessage,
   formatParserFailedMessage,
   formatParsedRequestMessage,
   formatSearchFailedMessage,
@@ -83,6 +88,14 @@ import { readAgentOrchestrationMode } from '../agent/booking-agent-policy';
 import { handleTelegramHybridSearchMessage } from './telegram-hybrid-search';
 
 /**
+ * Process-wide breaker for the legacy flight parser.
+ *
+ * Exported so tests can observe recovery and operators get one consistent
+ * outage window across chats instead of one failed API call per message.
+ */
+export const flightParserGuard = new AIAvailabilityGuard();
+
+/**
  * Handles one incoming Telegram message from an operator.
  *
  * Responsibilities:
@@ -111,7 +124,6 @@ export async function handleTelegramMessage(
   if (await handleTelegramSettingsCommand(bot, message)) {
     return;
   }
-
   if (!text) {
     await bot.sendMessage(
       chatId,
@@ -271,26 +283,57 @@ export async function handleTelegramMessage(
 
   let parsedRequest;
 
+  // A provider that is out of credit or rejected its key fails every message,
+  // so report the real outage immediately instead of paying the timeout again.
+  const blockedFailure = flightParserGuard.currentFailure();
+  if (blockedFailure) {
+    await updateLocalFlightCase(flightCase, {
+      status: 'CASE_FAILED',
+      errorMessage: blockedFailure.detail,
+      aiFailureCategory: blockedFailure.category,
+    });
+    await appendLocalLog({
+      level: 'error',
+      event: 'flight_request_parser_skipped',
+      caseId: flightCase.caseId,
+      message: `AI provider unavailable (${blockedFailure.category}); skipped call.`,
+      meta: { category: blockedFailure.category },
+    });
+    await bot.sendMessage(
+      chatId,
+      formatAIParserFailureMessage(blockedFailure.category),
+    );
+    return;
+  }
+
   try {
     const parser = createFlightRequestParser();
     parsedRequest = await parser.parse(text);
+    flightParserGuard.recordSuccess();
   } catch (error) {
-    const errorMessage =
-      error instanceof Error
-        ? error.message
-        : 'AI parser failed with an unknown error.';
+    const failure = classifyAIError(error);
+
+    // Providers sometimes report a monthly quota as HTTP 429 with a "rate
+    // limit" wording. The transport message is what the operator acts on, so a
+    // missing balance must always surface as a credit problem.
+    flightParserGuard.recordFailure(failure);
 
     await updateLocalFlightCase(flightCase, {
       status: 'CASE_FAILED',
-      errorMessage,
+      errorMessage: failure.detail,
+      aiFailureCategory: failure.category,
     });
     await appendLocalLog({
       level: 'error',
       event: 'flight_request_parser_failed',
       caseId: flightCase.caseId,
-      message: errorMessage,
+      message: failure.detail,
+      meta: { category: failure.category },
     });
-    await bot.sendMessage(chatId, formatParserFailedMessage());
+    await bot.sendMessage(
+      chatId,
+      formatAIParserFailureMessage(failure.category),
+    );
     return;
   }
   

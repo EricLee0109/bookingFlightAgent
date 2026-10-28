@@ -11,7 +11,7 @@ import {
   getAIModel,
 } from './ai-provider';
 
-const DEFAULT_MODEL = 'gpt-5.6-luna';
+const DEFAULT_MODEL = 'cx/gpt-6-luna';
 const DEFAULT_MODEL_TIMEOUT_MS = 15_000;
 const MAX_MODEL_TIMEOUT_MS = 2_147_483_647;
 

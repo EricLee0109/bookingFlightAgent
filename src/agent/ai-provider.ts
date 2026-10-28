@@ -1,4 +1,6 @@
 import OpenAI, { type ClientOptions } from 'openai';
+import { zodResponseFormat } from 'openai/helpers/zod';
+import { type ZodType } from 'zod';
 import { OpenAIProvider } from '@openai/agents';
 
 export type AIAPIProvider = 'openai' | '9router';
@@ -155,8 +157,169 @@ export function createAIConnection(
   return { config, client, modelProvider };
 }
 
-/** Removes configured and bearer-style keys before an AI error is logged. */
-export function sanitizeAIError(error: unknown, env: NodeJS.ProcessEnv = process.env) {
+/**
+ * Minimal transport surface shared by the real SDK client and test doubles.
+ *
+ * Both parsers declare their own structurally-compatible client type, so the
+ * helper must not require the concrete `OpenAI` class.
+ */
+type ChatMessage = { role: 'system' | 'user'; content: string };
+
+type StructuredMessage = {
+  parsed?: unknown;
+  content?: string | null;
+  refusal?: string | null;
+};
+
+export type ChatCompletionsClient = {
+  chat: {
+    completions: {
+      // Deliberately loose: callers pass their own structurally-compatible
+      // client types, so the helper is cast at the call boundary instead of
+      // narrowing every caller to the concrete SDK type.
+      parse?: (input: any) => Promise<any>;
+      create?: (input: any) => Promise<any>;
+    };
+  };
+};
+
+/**
+ * Parses one chat completion into a Zod schema across both transports.
+ *
+ * Direct OpenAI returns `choices[0].message.parsed` already validated by the
+ * SDK. 9Router does not emit that field and, for OpenAI-shaped providers, only
+ * appends the JSON schema to the system prompt instead of enforcing it at the
+ * provider level (older models answered with invented keys for the passenger
+ * schema). The router path therefore validates the content locally and repairs
+ * it once with the concrete schema errors before failing.
+ *
+ * Errors intentionally reuse the historical wording so failure categories,
+ * operator messages and existing contracts keep behaving the same.
+ */
+export async function parseChatCompletionWithSchema<T>(
+  client: ChatCompletionsClient,
+  config: AIConnectionConfig,
+  request: {
+    messages: ChatMessage[];
+    responseFormat: ReturnType<typeof zodResponseFormat>;
+    schema: ZodType<T>;
+  },
+): Promise<T> {
+  const isRouter = config.provider === '9router';
+  const messages = [...request.messages];
+
+  if (!isRouter) {
+    if (typeof client?.chat?.completions?.parse !== 'function') {
+      throw new Error('AI client does not support structured output parsing.');
+    }
+    const completion = await (client.chat.completions.parse as (i: any) => Promise<any>)({
+      model: config.model,
+      messages,
+      response_format: request.responseFormat,
+    });
+    const message = completion.choices[0]?.message;
+
+    if (message?.refusal) {
+      throw new Error(`OpenAI parser refused the request: ${message.refusal}`);
+    }
+    if (!message?.parsed) {
+      const contentPreview = message?.content?.slice(0, 200) ?? 'empty content';
+
+      throw new Error(
+        `OpenAI parser returned invalid structured output: ${contentPreview}`,
+      );
+    }
+    return request.schema.parse(message.parsed) as T;
+  }
+
+  if (typeof client?.chat?.completions?.create !== 'function') {
+    throw new Error('AI client does not support chat completions.');
+  }
+
+  const attempt = async (attemptMessages: ChatMessage[]) => {
+    const completion = await (client.chat.completions.create as (i: any) => Promise<any>)({
+      model: config.model,
+      messages: attemptMessages,
+      response_format: request.responseFormat,
+    });
+    const message = completion.choices[0]?.message;
+
+    if (message?.refusal) {
+      throw new Error(`OpenAI parser refused the request: ${message.refusal}`);
+    }
+    return message?.content ?? '';
+  };
+
+  const parsed = await validateRouterContent(await attempt(messages), request.schema);
+
+  if (!parsed.ok) {
+    // One repair attempt: the router cannot enforce the schema, so show the
+    // model the exact validation errors instead of asking the operator again.
+    const repairMessages: ChatMessage[] = [
+      ...messages,
+      {
+        role: 'user',
+        content: [
+          'Your previous reply did not match the required JSON schema.',
+          `Validation errors: ${JSON.stringify(parsed.issues).slice(0, 600)}`,
+          'Reply with ONLY a single JSON object that matches the schema exactly.',
+        ].join('\n'),
+      },
+    ];
+    const repaired = await validateRouterContent(await attempt(repairMessages), request.schema);
+
+    if (!repaired.ok) {
+      throw new Error(
+        `OpenAI parser returned invalid structured output: ${repaired.content.slice(0, 200) || 'empty content'}`,
+      );
+    }
+    return repaired.value;
+  }
+
+  return parsed.value;
+}
+
+type RouterValidation<T> =
+  | { ok: true; value: T }
+  | { ok: false; content: string; issues: unknown };
+
+/** Validates router JSON content, tolerating fenced or wrapped JSON output. */
+async function validateRouterContent<T>(
+  content: string,
+  schema: ZodType<T>,
+): Promise<RouterValidation<T>> {
+  let jsonText = content.trim();
+  if (jsonText.startsWith('```')) {
+    jsonText = jsonText.replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
+  }
+  // Some providers wrap the object in prose; take the outermost object.
+  if (!jsonText.startsWith('{')) {
+    const start = jsonText.indexOf('{');
+    const end = jsonText.lastIndexOf('}');
+    if (start !== -1 && end > start) jsonText = jsonText.slice(start, end + 1);
+  }
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(jsonText);
+  } catch {
+    return { ok: false, content, issues: [{ message: 'response was not valid JSON' }] };
+  }
+
+  const result = schema.safeParse(raw);
+  if (result.success) return { ok: true, value: result.data };
+
+  return {
+    ok: false,
+    content,
+    issues: result.error.issues.map((issue) => ({
+      path: issue.path.join('.'),
+      message: issue.message,
+    })),
+  };
+}
+
+/** Removes configured and bearer-style keys before an AI error is logged. */export function sanitizeAIError(error: unknown, env: NodeJS.ProcessEnv = process.env) {
   let message = error instanceof Error ? error.message : String(error);
   for (const key of [env.OPENAI_API_KEY, env.NINE_ROUTER_API_KEY]) {
     if (key) message = message.replaceAll(key, '[REDACTED]');
